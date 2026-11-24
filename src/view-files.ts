@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import type { CardFile, CardFileRead, PanelSpec, Resolved, ViewSpec } from './cards.js';
+import type { CardFile, CardFileRead, GalleryItem, PanelSpec, Resolved, ViewSpec } from './cards.js';
 import { codePage, languageOf, type CodeSpec } from './code.js';
 import { extensionOf, MEDIA_EXTENSIONS, typeOfFile } from './file-types.js';
-import { href } from './page-workspace.js';
+import { href, STATIC_QUERY } from './page-workspace.js';
 import type { Entry, Row } from './results.js';
 import { readTextStart, type TextStart } from './text-start.js';
 import { Refusal, listing, type ViewContext } from './view-context.js';
@@ -13,25 +13,39 @@ const mediaType = (name: string) => (MEDIA_EXTENSIONS.includes(extensionOf(name)
 /** A frame's height in pixels: the panel's own, or the card's default, kept between 120 and 2000. */
 const heightOf = (p: PanelSpec, fallback = 480) => Math.min(Math.max(p.height ?? fallback, 120), 2000);
 
-/** Any image, video or audio the process has: an attachment, an image a result returned, or a file in the working folder.
- *  Served by the page host. */
-export function mediaOf(p: PanelSpec, ctx: ViewContext): { name: string; mime: string; url: string } {
+/** Any image, video or audio the process has, as a panel names it: an attachment (by its id or its name), an image a
+ *  result returned, or a file in the working folder; or why there is none. shows: what the card shows, in words, for an
+ *  attachment that is something else. Served by the page host. */
+export function findMedia(want: string, ctx: ViewContext, shows: string): GalleryItem | { why: string } {
   const { results, pages } = ctx;
-  if (!pages) throw new Refusal(`panel ${p.id}: this host shows no media`);
+  if (!pages) return { why: 'this host shows no media' };
   const url = (id: string) => `${pages.base}/media/${id}`; // http(s), the only media URLs an A2UI renderer loads
-  const want = String(p.media ?? p.from ?? '');
   const e = results.get(want) ?? results.all().find(x => x.kind === 'attachment' && x.name.toLowerCase() === path.basename(want).toLowerCase());
   if (e?.kind === 'attachment') {
-    if (!/^(image|video|audio)\//.test(e.mime)) throw new Refusal(`panel ${p.id}: ${e.name} is ${e.mime}; media shows images, video and audio${e.mime.startsWith('text/') ? ` (show it with a text panel, "from": "${e.id}")` : ''}`);
-    return { name: e.name, mime: e.mime, url: url(e.id) };
+    if (!/^(image|video|audio)\//.test(e.mime)) return { why: `${e.name} is ${e.mime}; ${shows}${e.mime.startsWith('text/') ? ` (show it with a text panel, "from": "${e.id}")` : ''}` };
+    return { name: e.name, mime: e.mime, url: url(e.id), from: e.id };
   }
-  if (e?.kind === 'result' && e.images.length) return { name: `${e.id} image`, mime: e.images[0].mime, url: url(e.id) };
+  if (e?.kind === 'result' && e.images.length) return { name: `${e.id} image`, mime: e.images[0].mime, url: url(e.id), from: e.id };
+  if (e?.kind === 'result') return { why: `${e.id} holds no image: show it with a table or another card of rows` };
   const ext = extensionOf(want), mime = mediaType(want);
   const file = mime ? pages.workAny?.(want) : null;
-  if (file && mime) return { name: path.basename(file), mime, url: `${pages.base}/work/${href(file)}` };
-  if (mime) { const hit = results.all().find(x => x.kind === 'result' && x.images.length && JSON.stringify(x.input ?? '').includes(path.basename(want))); if (hit?.kind === 'result') return { name: path.basename(want), mime: hit.images[0].mime, url: url(hit.id) }; }
-  const had = results.all().filter(x => x.kind === 'attachment' || (x.kind === 'result' && x.images.length)).map(x => x.id).join(', ') || 'none';
-  throw new Refusal(`panel ${p.id}: nothing to show as "${want}": ${mime ? 'no such file in the working folder, and ' : ext ? `.${ext} is not an image, video or audio file media plays (${MEDIA_EXTENSIONS.join(', ')}); ` : ''}media the task has: ${had}`);
+  if (file && mime) return { name: path.basename(file), mime, url: `${pages.base}/work/${href(file)}`, from: `work/${file}` };
+  if (mime) { const hit = results.all().find(x => x.kind === 'result' && x.images.length && JSON.stringify(x.input ?? '').includes(path.basename(want))); if (hit?.kind === 'result') return { name: path.basename(want), mime: hit.images[0].mime, url: url(hit.id), from: hit.id }; }
+  let why = '';
+  if (mime) why = ': no such file in the working folder';
+  else if (ext) why = `: .${ext} is not an image, video or audio file (${MEDIA_EXTENSIONS.join(', ')})`;
+  return { why: `nothing to show as "${want}"${why}` };
+}
+/** The media the process has, by id, for a refusal: its attachments and the results that hold an image. */
+export const mediaHad = (ctx: ViewContext) =>
+  ctx.results.all().filter(x => x.kind === 'attachment' || (x.kind === 'result' && x.images.length)).map(x => x.id).join(', ') || 'none';
+/** The one image, video or audio a media panel shows (findMedia). */
+export function mediaOf(p: PanelSpec, ctx: ViewContext): NonNullable<Resolved['media']> {
+  if (!ctx.pages) throw new Refusal(`panel ${p.id}: this host shows no media`);
+  if (Array.isArray(p.media)) throw new Refusal(`panel ${p.id}: media shows one item; for ${p.media.length} at once, send card "gallery" with the same list`);
+  const found = findMedia(String(p.media ?? p.from ?? ''), ctx, 'media shows images, video and audio');
+  if ('why' in found) throw new Refusal(`panel ${p.id}: ${found.why}; media the task has: ${mediaHad(ctx)}`);
+  return { name: found.name, mime: found.mime, url: found.url };
 }
 
 /** A path with what may follow it in an address: "game/index.html?level=2#start" → the file, and "?level=2", "#start". */
@@ -44,6 +58,9 @@ export const pageUrl = (base: string, query: string, uses: string[], hash = '') 
   const q = [query, uses.length ? `uses=${uses.map(encodeURIComponent).join(',')}` : ''].filter(Boolean).join('&');
   return `${base}${q ? `${base.includes('?') ? '&' : '?'}${q}` : ''}${hash}`;
 };
+/** A static page's address: on the process's own origin, with its own query and STATIC_QUERY, then its hash. Its frame
+ *  runs none of it, and neither does the policy it is served under. */
+const staticUrl = (base: string, query = '', hash = '') => pageUrl(base, query ? `${query}&${STATIC_QUERY}` : STATIC_QUERY, [], hash);
 
 /** The name of the file a panel's page is written to: its view's name and its id, letters, digits and dashes as they are
  *  and every other character as _ and its code (sales_q1 is sales_005fq1), joined by __, which neither holds; so two
@@ -54,23 +71,27 @@ export function pageName(view: string, panel: string): string {
   return name.length <= 120 ? name : `${name.slice(0, 101)}_${createHash('sha256').update(name).digest('hex').slice(0, 18)}`;
 }
 
-/** A web page: a file in the working folder (live), or a page the model wrote. Data reaches it by id, exact. */
+/** A web page: a file in the working folder (live), or a page the model wrote. Data reaches it by id, exact. A static
+ *  page runs nothing and reads no data: it is served as it is written, from the process's own origin. */
 export function pageOf(p: PanelSpec, view: ViewSpec, ctx: ViewContext): NonNullable<Resolved['page']> {
   const pages = ctx.pages;
   if (!pages) throw new Refusal(`panel ${p.id}: this host shows no pages`);
   if (p.path && p.html) throw new Refusal(`panel ${p.id}: a page shows "path" (a file in the working folder) or "html" (a page you write), not both`);
   const uses = [...new Set([...(p.from ? [p.from] : []), ...(p.uses ?? [])])];
+  if (p.static && uses.length) throw new Refusal(`panel ${p.id}: a static page runs nothing, so it reads no data: leave out ${p.from ? '"from" and ' : ''}"uses" (${uses.join(', ')}), or leave out "static" for a page that runs and reads them`);
   const unknown = uses.filter(id => ctx.results.get(id)?.kind !== 'result');
   if (unknown.length) throw new Refusal(`panel ${p.id}: no result ${unknown.map(x => `"${x}"`).join(', ')} to give the page. This task has: ${listing(ctx.results)}`);
-  const height = heightOf(p);
+  const height = heightOf(p), still = p.static ? { static: true as const } : {};
   if (p.path) {
     const at = splitPath(p.path), rel = pages.workFile(at.file);
     if (!rel) throw new Refusal(`panel ${p.id}: no page "${at.file}" in the working folder; pages there: ${pages.workPages().slice(0, 12).join(', ') || 'none'}`);
-    return { url: pages.workUrl(rel, at.query, uses, at.hash), label: `work/${rel}${at.query ? `?${at.query}` : ''}${at.hash}`, uses, height };
+    const url = p.static ? staticUrl(`${pages.base}/work/${href(rel)}`, at.query, at.hash) : pages.workUrl(rel, at.query, uses, at.hash);
+    return { url, label: `work/${rel}${at.query ? `?${at.query}` : ''}${at.hash}`, uses, height, ...still };
   }
   if (typeof p.html === 'string' && p.html.trim()) {
     const file = pages.writeView(pageName(view.name, p.id), p.html); // e.g. p_sales__chart.html?v=2
-    return { url: pageUrl(`${pages.base}/view/${file}`, '', uses), label: 'a page you wrote', uses, height };
+    const url = p.static ? staticUrl(`${pages.base}/view/${file}`) : pageUrl(`${pages.base}/view/${file}`, '', uses);
+    return { url, label: p.static ? 'a static page you wrote' : 'a page you wrote', uses, height, ...still };
   }
   throw new Refusal(`panel ${p.id}: a page needs "path" (a file in the working folder, such as index.html) or "html" (a page you write)`);
 }

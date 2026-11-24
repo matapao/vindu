@@ -90,6 +90,20 @@ export const BLOCKS_CSS = `
 .vindu-theme .vb-marked{position:relative;display:block} .vindu-theme .vb-marked img{display:block;max-width:100%}
 .vindu-theme .vb-region{position:absolute;border:2px solid #eb6834;border-radius:3px;box-shadow:0 0 0 1px rgba(255,255,255,.7)}
 .vindu-theme .vb-region span{position:absolute;left:-2px;top:${captionSize(-20)};background:#eb6834;color:#fff;font-size:${captionSize(11)};padding:0 ${space(5)};border-radius:3px;white-space:nowrap}
+.vindu-theme .vb-gallery{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,180px),1fr));gap:${rhythm(12)} ${space(10)}}
+.vindu-theme .vb-tile{display:flex;flex-direction:column;gap:${rhythm(4)};width:100%;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:zoom-in}
+.vindu-theme .vb-thumb{position:relative;display:block;aspect-ratio:1/1;overflow:hidden;border:1px solid var(--v-hair);border-radius:6px;background:var(--v-wash)}
+.vindu-theme .vb-thumb img,.vindu-theme .vb-thumb video{display:block;width:100%;height:100%;object-fit:cover}
+.vindu-theme .vb-play{position:absolute;right:${space(6)};bottom:${rhythm(6)};background:rgba(0,0,0,.62);color:#fff;border-radius:10px;padding:0 ${space(7)};font-size:${captionSize(11)}}
+.vindu-theme .vb-tilename{font-size:${captionSize(12)};color:var(--v-ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vindu-theme .vb-tile:focus-visible{outline:none} .vindu-theme .vb-tile:focus-visible .vb-thumb{outline:2px solid var(--v-accent);outline-offset:2px}
+.vindu-theme .vb-viewer{position:fixed;inset:auto;margin:0;padding:0;border:0;max-width:none;max-height:none;box-sizing:border-box;background:rgba(16,18,22,.96);color:#f4f4f4}
+.vindu-theme .vb-viewer[open]{display:flex;flex-direction:column} .vindu-theme .vb-viewer::backdrop{background:rgba(0,0,0,.18)}
+.vindu-theme .vb-viewerbar{display:flex;align-items:center;gap:${rhythm(8)} ${space(10)};padding:${rhythm(8)} ${space(12)}}
+.vindu-theme .vb-viewerat{font-variant-numeric:tabular-nums;font-size:${captionSize(12)};white-space:nowrap} .vindu-theme .vb-viewername{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vindu-theme .vb-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:0 ${space(12)}}
+.vindu-theme .vb-stage img,.vindu-theme .vb-stage video{display:block;max-width:100%;max-height:100%;object-fit:contain}
+.vindu-theme .vb-viewer .vb-nav{justify-content:center;margin:0;padding:${rhythm(8)} ${space(12)}}
 .vindu-theme .vb-chart{position:relative;display:block;max-width:100%} .vindu-theme .vb-chart img{display:block;max-width:100%;height:auto}
 .vindu-theme .vb-strips{position:absolute;top:0;bottom:0;display:flex} .vindu-theme .vb-strip{flex:1 1 0} .vindu-theme .vb-strip[data-opens]{cursor:pointer}
 .vindu-theme .vb-strip:hover{background:rgba(42,120,214,.07)} .vindu-theme .vb-strip:focus-visible{outline:2px solid var(--v-accent);outline-offset:-2px} .vindu-theme .vb-strip.vb-picked{background:rgba(42,120,214,.16);outline:2px solid var(--v-accent)}

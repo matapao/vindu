@@ -6,7 +6,7 @@ import type { ViewAction } from './actions.js';
 import type { Entry, Row } from './results.js';
 import type { ViewWords } from './view-words.js';
 
-export const CARDS = ['kpi', 'table', 'list', 'record', 'timeline', 'bar-chart', 'line-chart', 'media', 'text', 'page', 'code', 'diff', 'app'] as const;
+export const CARDS = ['kpi', 'table', 'list', 'record', 'timeline', 'bar-chart', 'line-chart', 'media', 'gallery', 'text', 'page', 'code', 'diff', 'app'] as const;
 export type CardName = (typeof CARDS)[number];
 
 /** A card a host adds. Vindu resolves its rows exactly as for the built-in cards (from, pick, where, group, sort, limit),
@@ -52,6 +52,11 @@ export type CardDef = {
    *  shows. Each row is cut to them. */
   presentFields?: (rows: Row[], panel: PanelSpec, props: Record<string, unknown>) => string[];
 };
+/** At most this many items in a gallery. */
+export const GALLERY_MOST = 40;
+/** An item a gallery shows: its name, its type, where the window loads it, and what it is (an attachment's id, a
+ *  result's, or work/<path>). */
+export type GalleryItem = { name: string; mime: string; url: string; from: string };
 /** The files a card shows as they are, read by the system: which it takes (by name, and an attachment's type), at most
  *  how many bytes of one it reads (the start of a longer one), and the rows its text makes; cut says, in words, what of
  *  that text the rows leave out (the sections past the first 100, say). An error it throws is the panel's refusal. */
@@ -87,8 +92,9 @@ export const GUIDE: Record<CardName, { about: string; fields: string[]; shows?: 
   'bar-chart': { about: 'bar-chart: x, the category field, and y, a numeric field or a list of them; or group + value: one bar per value of a field', fields: ['x', 'y', 'group', 'value', 'where', 'sort', 'limit', ...ROWS], shows: chartFields },
   'line-chart': { about: 'line-chart: x, the field along the axis (dates, numbers or categories, in row order: sort by it), and y, a numeric field or a list of them; or group + value', fields: ['x', 'y', 'group', 'value', 'where', 'sort', 'limit', ...ROWS], shows: chartFields },
   media: { about: 'media: an image, video or audio. media: an attachment id, a result id that holds an image, or a file in the working folder. marks: regions of a picture or moments of a recording, each with a label', fields: ['media', 'marks'] },
+  gallery: { about: `gallery: many pictures and videos at once, as tiles with their names; the person opens any one large and steps through them. media: a list of what media takes (attachment ids, result ids that hold an image, files in the working folder), at most ${GALLERY_MOST}`, fields: ['media'] },
   text: { about: 'text: plain short paragraphs. text, or from: a result that is text', fields: ['text'] },
-  page: { about: 'page: a web page. path: a file in the working folder (it may end in ?query or #hash), or html: a page you write; uses: the result ids it reads; height in px (a page alone in its view, or alone in each tab, fills its pane)', fields: ['path', 'html', 'uses', 'height'] },
+  page: { about: 'page: a web page. path: a file in the working folder (it may end in ?query or #hash), or html: a page you write; uses: the result ids it reads; static: true for a page that runs nothing (markup, styles and pictures only; it reads no data); height in px (a page alone in its view, or alone in each tab, fills its pane)', fields: ['path', 'html', 'uses', 'static', 'height'] },
   code: { about: 'code: a file in the working folder, as code in Monaco (the VS Code editor), read-only and live as the file changes. path; line: the line to show first; height in px', fields: ['path', 'line', 'height'] },
   diff: { about: 'diff: what changed in a file in the working folder since the last commit (git HEAD), side by side in Monaco, read-only and live. path; height in px', fields: ['path', 'height'] },
   app: { about: 'app: the MCP App a tool links, showing that tool\'s result. from: the result; height in px', fields: ['height'] },
@@ -162,7 +168,7 @@ const panelFields = (cards: CardDef[], o: Offer = {}) => ({ // extra properties 
     .describe('linked panels: this panel shows what the person picks in another panel of this view, with a plain click on a row there, without you: its rows where by is the picked row\'s by (with from: its own result; without from: the other panel\'s, so the picked row itself). The first row is picked to start with'),
   selected: z.union([z.string(), z.number()]).optional().describe('the row picked in this panel, by its key, for the panels that follow it (detail): the view\'s own, set by a click or with act_in_view select'),
   limit: panelOption(z.number().int().positive().optional()),
-  media: resultRef(z.string().optional().describe('media: an attachment id, a file name, or a result id holding an image')),
+  media: resultRef(z.union([z.string(), z.array(z.string())]).optional().describe(`media: an attachment id, a file name, or a result id holding an image · gallery: a list of them, at most ${GALLERY_MOST}`)),
   marks: resultRef(z.union([z.string(), z.array(z.record(z.string(), z.unknown()))]).optional().describe('media: marks on it, from a result id or as rows: regions of a picture {x, y, w, h, label} as fractions of its size (0 to 1), or moments of a recording {start, end, label} in seconds')),
   text: z.string().optional().describe('text: what to say, in plain short paragraphs'),
   path: z.string().optional().describe('page, code and diff (and a document, for a Markdown file): a file in the task\'s working folder, e.g. "index.html" or "src/app.ts"; the person sees it live: a page reloads when a file it loaded changes (only its styles are swapped when only those did), code and diff show the file as it changes'),
@@ -171,6 +177,7 @@ const panelFields = (cards: CardDef[], o: Offer = {}) => ({ // extra properties 
   line: z.number().int().positive().optional().describe('code: the line to show first'),
   html: z.string().optional().describe('page: a whole page you write, for what the cards cannot show (3D, custom charts, a dashboard with its own menus and sub-views). It runs on its own once written: everything the person does in it happens in the page, without you, so write all of it at once. Import three, three/addons/…, echarts or chart.js by name: they are pinned and served here, since a page cannot fetch from the network. Read data with task.data["r3"] (the ids in uses), or any result with await task.get("r7") (/data/r7.json); a page from the working folder ("path") reads only the results in its uses; task.value(rows, "sum(hours * rate)"), task.group(rows, "field", "sum(f)") and task.compute(rows, { amount: "hours * rate" }) compute numbers the way views do, so they count as computed, not typed. task.on("result", r => …) hears each result the task gets from then on ({id, tool, server}), task.on("change", paths => …) the files that change in the working folder. await task.send(value) sends JSON (up to 8,000 characters) to you while the person uses the page, on their click or key: it is kept as a p-id, and await_answer waits for it. vindu.select(items, note) reports what the person picked in the page (a chip above their prompt, with references if you give them), and vindu.ask(prompt) proposes a follow-up (their prompt box, unsent). The person may be in light or dark: add <meta name="color-scheme" content="light dark"> and pick colours with a prefers-color-scheme rule, or give the page its own background'),
   uses: resultRef(z.array(z.string()).optional().describe('page: the result ids the page reads, given to it exactly as task.data[id]; for a page from the working folder, the only results it can read')),
+  static: z.boolean().optional().describe('page: true for a page that runs nothing: none of its scripts run, it has no task API and it reads no data (no uses). Its images, styles, media and fonts load: those beside it in the working folder (path), or from /work/<file> and /media/<attachment id> (html). For a document or a design to look at, not an app; its check says only that it loaded, and its size'),
   height: z.number().int().positive().optional().describe(o.apps ? 'page, code, diff and app: height in pixels (default 480, 420 for an app); one alone in its view, or alone in each tab, fills its pane' : 'page, code and diff: height in pixels (default 480); one alone in its view, or alone in each tab, fills its pane'),
 });
 
@@ -272,7 +279,8 @@ export type Resolved = {
   rows?: Row[]; record?: Row; value?: unknown; text?: string;
   media?: { name: string; mime: string; url: string };
   marks?: Row[];                     // marks on the media: regions or moments, each with a label
-  page?: { url: string; label: string; uses: string[]; height: number };
+  gallery?: GalleryItem[];           // a gallery's pictures and videos, in order
+  page?: { url: string; label: string; uses: string[]; height: number; static?: true }; // static: it runs nothing
   code?: { path: string; language: string; lines: number; line?: number; against?: string; added?: number; removed?: number; new?: boolean };
   /** A file the system read for the card, where it is (an attachment's id, or work/<path>) and its name: a data file the
    *  rows were read from (data-files.ts), with its format, how many rows and columns it has, and each row's own row in
@@ -315,7 +323,7 @@ export const shownFields = (p: PanelSpec, rows: Row[], def?: CardDef): string[] 
 
 /** The card nearest to what a panel sent, for a refusal of a card that does not exist to suggest. */
 function nearestCard(p: Record<string, unknown>): CardName {
-  return p.html || p.path ? 'page' : (p.x && p.y) || p.group ? 'bar-chart' : p.value !== undefined || typeof p.data === 'number' ? 'kpi' : p.text ? 'text' : p.time ? 'timeline' : p.media ? 'media' : p.data && !Array.isArray(p.data) ? 'record' : 'table';
+  return p.html || p.path ? 'page' : (p.x && p.y) || p.group ? 'bar-chart' : p.value !== undefined || typeof p.data === 'number' ? 'kpi' : p.text ? 'text' : p.time ? 'timeline' : Array.isArray(p.media) ? 'gallery' : p.media ? 'media' : p.data && !Array.isArray(p.data) ? 'record' : 'table';
 }
 /** Why there is no such card, and what to send instead. */
 export function noCard(card: string, p: Record<string, unknown>, offered: string[]): string {

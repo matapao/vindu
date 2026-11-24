@@ -13,6 +13,7 @@ import { VNotedTable } from './blocks/table.js';
 import { VSlides, VSignature, VDiagram } from './blocks/presentation.js';
 import { VDevices, VBatch, VChanges, VDecision } from './blocks/operations.js';
 import { VMediaMarks, VChart } from './blocks/media.js';
+import { VGallery } from './blocks/gallery.js';
 /** vindu's blocks, for the window's catalog: drawSurface and mountShell include them unless a host leaves them out. */
 export const BLOCK_COMPONENTS: VinduComponent[] = [
   VChart,
@@ -33,5 +34,6 @@ export const BLOCK_COMPONENTS: VinduComponent[] = [
   VChanges,
   VDecision,
   VMediaMarks,
+  VGallery,
   VNotedTable,
 ];

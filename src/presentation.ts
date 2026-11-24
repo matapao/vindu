@@ -26,7 +26,9 @@ export type PanelPresentation = {
   chart?: { x: string; y: string[] };
   media?: Resolved['media'];
   marks?: Row[];
-  frame?: { kind: 'page' | 'app'; url: string; height: number };
+  gallery?: Resolved['gallery'];  // a gallery's pictures and videos, in order
+  /** A page's or an app's frame; a static page runs nothing, and its frame is drawn with sandbox="". */
+  frame?: { kind: 'page' | 'app'; url: string; height: number; static?: true };
   props?: Record<string, unknown>;
 };
 
@@ -81,7 +83,8 @@ function panelOf(p: PanelSpec, d: Resolved, cards: ReadonlyMap<string, CardDef>)
   kind?.present?.(result, p, d);
   if (d.media) result.media = d.media;
   if (d.marks) result.marks = d.marks.map(mark => project(mark, ['x', 'y', 'w', 'h', 'start', 'end', 'label']));
-  if (d.page) result.frame = { kind: 'page', url: d.page.url, height: d.page.height };
+  if (d.gallery) result.gallery = d.gallery;
+  if (d.page) result.frame = { kind: 'page', url: d.page.url, height: d.page.height, ...(d.page.static ? { static: true as const } : {}) };
   if (d.app) result.frame = { kind: 'app', url: d.app.url, height: d.app.height };
   if (props) result.props = props;
   return result;

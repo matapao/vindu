@@ -16,7 +16,8 @@ import type { OpenMore, Shown, UiProcess } from './contracts.js';
 import type { RecordFile } from './record-files.js';
 import type { ServerRuntime } from './runtime.js';
 
-export type Page = { url: string; label: string; uses: string[] };
+/** A page for check_page to read: where it is, how it is named, the results it reads, and whether it runs nothing. */
+export type Page = { url: string; label: string; uses: string[]; static?: true };
 export type Outcome =
   | { action: 'accept'; values: Record<string, unknown>; n?: number }
   | { action: 'decline' }

@@ -10,6 +10,9 @@
 // A page from the working folder (a website or game the process is building, or anything a cloned repository holds)
 // runs apart, live, on a work origin for the results it was given (http://work-<key>-<grant>.localhost:<port>, see
 // page-grants.ts): /work, /lib and /__vindu only, and of the task's data only the results in its uses.
+// A static page (/work or /view on the process's own origin, asked for with static=1) is served as it is written, with
+// no import map and no boot script, under a policy that runs none of it and reaches nothing but its own images, styles,
+// media and fonts (STATIC_CSP and sandbox); its frame is drawn with sandbox="" as well.
 // Every client loads the same URLs: an Electron window, a browser, a headless check.
 // A page cannot fetch from the network: its CSP keeps every request on its own origin. Its frame can still navigate
 // anywhere, with what the page read in the address, and only the browser that shows it can refuse that: the host's
@@ -31,7 +34,7 @@ import { fileOf, type ResultEntry, type ResultSource } from './results.js';
 import { boot, MEASURES, noWebRtc } from './page-runtime.js';
 import { libraryTable, wrapperFor, type Libraries, type Library } from './page-libraries.js';
 import { inject } from './page-inject.js';
-import { href, inside, insideAsync, page, pagesIn, watchFolder } from './page-workspace.js';
+import { asksStatic, href, inside, insideAsync, page, pagesIn, watchFolder } from './page-workspace.js';
 import { SEND_MAX } from './page-send.js';
 import { readTextStart, type TextStart } from './text-start.js';
 
@@ -55,6 +58,12 @@ const mediaType = (mime: string) => {
 };
 /** An attachment as a document: it loads nothing but its own images and media, and never runs. */
 const MEDIA_CSP = "default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'";
+/** A static page (a page panel with static): its markup, its styles, and the images, media and fonts of its own origin,
+ *  and nothing that runs, connects, frames or sends a form. It is served with sandbox too, as its frame is drawn. */
+const STATIC_CSP = "default-src 'self' data:; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; font-src 'self' data:; connect-src 'none'; worker-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'self'";
+/** A font of the working folder, for a static page beside it: sandboxed, the page has no origin of its own, and a font
+ *  loads only with CORS. A font is a font: it is given to any origin that asks for it. */
+const fontsFor = (f: PageFile): PageFile => (f.headers['Content-Type'].startsWith('font/') ? { ...f, headers: { ...f.headers, 'Access-Control-Allow-Origin': '*' } } : f);
 /** A page the model writes in show_view, or a page check's: a plain name, its file in the process's folder. */
 const VIEW_NAME = /^[A-Za-z0-9_-]{1,200}$/;
 const viewFile = (name: string) => {
@@ -291,7 +300,8 @@ async function serve(t: PageProcess | undefined, url: string, { libs, parents, g
       if (root === 'work') watch(t);
       const runs = root === 'view' || !!work; // a file of the working folder runs only on a work origin, apart from the task's data
       if (u.searchParams.get('raw') === '1') return file(f, 'text/plain; charset=utf-8', runs ? undefined : sandboxed); // as written: a code panel reads a page's source
-      if (!runs) return file(f, undefined, sandboxed); // as a file: an image, a sound, a script a page the model wrote imports
+      if (!work && /\.html?$/i.test(f) && asksStatic(u.searchParams)) return file(f, HTML_TYPE, `${STATIC_CSP}${ancestors}; sandbox`); // a static page: as written, and none of it runs
+      if (!runs) return fontsFor(file(f, undefined, sandboxed)); // as a file: an image, a sound, a script a page the model wrote imports
       if (!/\.html?$/i.test(f)) return file(f);
       return { ...file(f, HTML_TYPE), inject: html => inject(html, uses, root === 'work', libs.importMap) };
     }

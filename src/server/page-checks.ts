@@ -94,6 +94,21 @@ const CheckPage = z.object({
     .describe('audit it for accessibility after the steps (axe-core: WCAG 2 A and AA); true by default'),
 });
 
+/** What a static page's check says: it runs nothing, so only whether it loaded and how big it is, in bytes. */
+type StaticReport = { page: string; static: string; loaded: boolean; status?: number; bytes?: number; steps?: string };
+/** A static page, checked by the page host itself: served as the window loads it, with no browser, as nothing in it
+ *  runs. Steps and reads are not done: there is nothing in it to do them with. */
+const checkStatic = async (session: Session, pg: Page, asked: boolean): Promise<StaticReport> => {
+  const at = new URL(pg.url);
+  const served = await session.runtime.host.serve(session.key, at.pathname + at.search);
+  const loaded = served.status === 200;
+  return {
+    page: pg.label, static: 'nothing in it runs, so it was not run: only whether it loaded, and its size', loaded,
+    ...(loaded ? { bytes: Buffer.byteLength(served.body) } : { status: served.status }),
+    ...(asked ? { steps: 'not done: a static page runs nothing, so there is nothing to press, click or read in it' } : {}),
+  };
+};
+
 export const check = (
   session: Session,
   pg: Page,
@@ -101,20 +116,21 @@ export const check = (
   read?: string[],
   size?: 'desktop' | 'phone',
   accessibility?: boolean,
-): Promise<PageReport | string> =>
-  session.runtime.options.driver
-    ? checkPage(session.runtime.options.driver, pg.url, {
-        label: pg.label,
-        steps,
-        read,
-        size,
-        accessibility,
-        pinned: session.runtime.host.pinned,
-        usesData: pg.uses.length > 0,
-        known: amountsOf(session.results),
-        misses: (since) => session.runtime.host.misses(session.key, since),
-      }).catch(unchecked)
-    : Promise.resolve(NO_DRIVER);
+): Promise<PageReport | StaticReport | string> => {
+  if (pg.static) return checkStatic(session, pg, !!(steps?.length || read?.length)).catch(unchecked);
+  if (!session.runtime.options.driver) return Promise.resolve(NO_DRIVER);
+  return checkPage(session.runtime.options.driver, pg.url, {
+    label: pg.label,
+    steps,
+    read,
+    size,
+    accessibility,
+    pinned: session.runtime.host.pinned,
+    usesData: pg.uses.length > 0,
+    known: amountsOf(session.results),
+    misses: (since) => session.runtime.host.misses(session.key, since),
+  }).catch(unchecked);
+};
 
 const workPage = (session: Session, rel: string, uses: string[] = []): Page | undefined => {
   const at = splitPath(rel),
@@ -146,7 +162,7 @@ export function registerPageCheck(server: McpServer, session: Session) {
     'check_page',
     {
       description:
-        "Load a page in a fresh browser page (a copy: not the one in the person's window) and report what happened, as JSON: errors, failed or blocked requests, what charts plotted, the 3D scene and canvases, text, overflow at phone width; then do steps (press or hold keys, click, type, run JavaScript, wait) and read values. For a website or game the task is building, a page you write before showing it, or a page panel already shown. Where this host has no browser to check pages in, it says so, and for a page panel already shown, it tells how the page runs in the person's window instead: the page itself only (errors by kind and place, failed loads, canvases, the 3D scene, overflow), with no steps done.",
+        "Load a page in a fresh browser page (a copy: not the one in the person's window) and report what happened, as JSON: errors, failed or blocked requests, what charts plotted, the 3D scene and canvases, text, overflow at phone width; then do steps (press or hold keys, click, type, run JavaScript, wait) and read values. For a website or game the task is building, a page you write before showing it, or a page panel already shown. Where this host has no browser to check pages in, it says so, and for a page panel already shown, it tells how the page runs in the person's window instead: the page itself only (errors by kind and place, failed loads, canvases, the 3D scene, overflow), with no steps done. A static page panel runs nothing: its check says only whether it loaded, and its size.",
       inputSchema: CheckPage,
       annotations: HINTS.read,
     },

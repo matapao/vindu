@@ -183,6 +183,10 @@ function panelPoint(
     const ref = data.src && refOf(data.src.id, basePointer(data.src)) + pointerStep(field);
     return { ...location, field, value: data.record[field], ...(data.src ? { ref } : {}) };
   }
+  if (data.gallery && point.row !== undefined) { // an item of a gallery: which it is, and what it was found as
+    const item = data.gallery[point.row];
+    return item ? { ...location, media: item.name, type: item.mime, from: item.from, item: `${point.row + 1} of ${data.gallery.length}` } : null;
+  }
   if (point.node !== undefined) return { ...location, node: point.node };
   if (point.row !== undefined && data.rows) return rowPoint(point.row, location, panel, data, definition);
   return { ...location, ...(point.chart ? { whole: 'the chart' } : {}) };

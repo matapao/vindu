@@ -195,7 +195,7 @@ export const inSight = (session: Session, view: string, got: Record<string, Sigh
   for (const p of panelsOf(spec)) {
     const g = got[p.id] ?? got[pidFor(p.id)];
     if (!g) continue;
-    const rows = (data?.[p.id]?.rows ?? []) as Record<string, unknown>[];
+    const rows = (data?.[p.id]?.rows ?? data?.[p.id]?.gallery ?? []) as Record<string, unknown>[]; // a gallery's items by their names
     const total = rows.length || g.of;
     const name = (i: number) => {
       const r = rows[i];

@@ -1,7 +1,7 @@
 // The words Vindu draws on a view's own surface, besides what the model wrote: what a panel says of itself, the way
-// back and through steps, the system's own suggestions, and each hook's line with its switch. English by default; a
-// host gives its own, whole or word by word (view-words-norwegian.ts has Bokmål and Nynorsk). What the model is told
-// stays in English, whatever the person reads.
+// back and through steps and a gallery, the system's own suggestions, and each hook's line with its switch. English by
+// default; a host gives its own, whole or word by word (view-words-norwegian.ts has Bokmål and Nynorsk). What the model
+// is told stays in English, whatever the person reads.
 
 /** A hook's line, as the person reads it: when it runs, then each thing it does; and why it is off where it cannot be
  *  turned on. Panels come by their titles, an operation by its name with spaces. */
@@ -31,6 +31,9 @@ export type ViewWords = {
   pathSeparator: string;                                 // between the steps of a drill's way in
   step: (at: number, of: number) => string;              // "Step 2 of 3"
   next: string;                                          // "Next ›"
+  previous: string;                                      // "‹ Previous", in a gallery's item shown large
+  close: string;                                         // "Close", the way back to the gallery
+  itemOf: (at: number, of: number) => string;            // "3 of 12", the item shown large of a gallery's
   bySystem: string;                                      // "the system", after what it offers or does by itself
   on: string;                                            // a hook's job, or a device, that is on
   off: string;
@@ -59,6 +62,9 @@ export const VIEW_WORDS: ViewWords = {
   pathSeparator: ' › ',
   step: (at, of) => `Step ${at} of ${of}`,
   next: 'Next ›',
+  previous: '‹ Previous',
+  close: 'Close',
+  itemOf: (at, of) => `${at} of ${of}`,
   bySystem: 'the system',
   on: 'on',
   off: 'off',

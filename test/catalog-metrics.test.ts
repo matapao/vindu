@@ -52,6 +52,7 @@ const examples: Record<string, Example> = {
   VChanges: { part: '.vb-anchor', property: 'font-size' },
   VDecision: { part: '.vb-title', property: 'font-size' },
   VMediaMarks: { props: { kind: 'image', url: image, marks: ref('marks') }, part: '.vb-region span', property: 'font-size' },
+  VGallery: { props: { items: ref('pictures'), panel: 'pictures' }, part: '.vb-tilename', property: 'font-size' },
   VChart: { props: { url: ref('chart'), bands: 2 }, part: 'img', property: 'width', intrinsic: true },
   Page: { props: { url: frameUrl, title: 'Document', height: 92 }, part: 'iframe', property: 'height', intrinsic: true },
   McpApp: { props: { url: frameUrl, title: 'Connector', height: 92, resource: 'ui://example/result', panel: 'connector' }, part: 'iframe', property: 'height', intrinsic: true },
@@ -64,11 +65,12 @@ function catalogView(): View {
   const data = {
     rows: [row], map: Object.fromEntries(Object.keys(row).map(k => [k, k])), name: '', included: false, selected: [], date: '2026-06-01',
     marks: [{ x: 0.2, y: 0.3, w: 0.4, h: 0.1, label: 'Area' }], nodes: [{ id: 'Step', layer: 0, order: 0 }],
+    pictures: [{ name: 'Cabin', kind: 'image', url: image, at: '1 of 1' }],
     cells: { fields: ['title'], notes: [{ n: 1, cell: 'A2', note: 'Checked', row: 0, column: 0 }] },
   };
   const blocks = children.map(name => ({
     id: name, component: name,
-    ...(name.startsWith('V') && !['Video', 'VChart', 'VMediaMarks'].includes(name) ? { rows: ref('rows'), map: ref('map') } : {}),
+    ...(name.startsWith('V') && !['Video', 'VChart', 'VMediaMarks', 'VGallery'].includes(name) ? { rows: ref('rows'), map: ref('map') } : {}),
     ...examples[name].props,
   }));
   const surface = (width: number): Surface => [

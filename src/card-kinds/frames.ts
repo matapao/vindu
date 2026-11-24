@@ -1,6 +1,7 @@
 // Cards that draw something other than rows: media (a picture, a video or a recording, with marks on it), and the
-// framed ones, each in a frame of its own: a page (a file in the working folder, or one the model wrote), code and a
-// diff (a file in Monaco, a page of Vindu's own) and an MCP App. What each shows is read before any result.
+// framed ones, each in a frame of its own: a page (a file in the working folder, or one the model wrote; a static one
+// runs nothing), code and a diff (a file in Monaco, a page of Vindu's own) and an MCP App. What each shows is read
+// before any result. A gallery of many pictures is gallery.ts.
 import { GUIDE, type CardName, type PanelSpec } from '../cards.js';
 import { refOf, type Row } from '../results.js';
 import { Refusal, type ViewContext } from '../view-context.js';
@@ -43,12 +44,15 @@ const frameHeight = (height: number, compact: boolean) => (compact ? Math.min(he
 const frameProbe = (p: PanelSpec, _d: unknown, _m: unknown, pid: string): CardProbe[] => [{ component: `${pid}__${p.card}`, expect: '', panel: p.id, frame: true }];
 const framed = { typed: false, framed: true, noGroup: rowsAsTheyAre, probes: frameProbe } as const;
 
-export const PAGE: CardKind = { // a web page in a frame of its own origin
+export const PAGE: CardKind = { // a web page in a frame of its own origin; a static one in a frame where nothing runs
   ...framed, reads: GUIDE.page.fields,
   own: (p, view, ctx) => ({ page: pageOf(p, view, ctx) }),
   draw: (p, d, k) => { k.model.url = d.page!.url;
-    return [k.add({ id: `${k.pid}__page`, component: 'Page', url: { path: `/panels/${k.pid}/url` }, height: frameHeight(d.page!.height, k.compact), title: p.title ?? 'page', panel: p.id })]; },
-  account: (o, _p, d) => { o.from = d.page!.label; if (d.page!.uses.length) o.uses = d.page!.uses; },
+    return [k.add({ id: `${k.pid}__page`, component: 'Page', url: { path: `/panels/${k.pid}/url` }, height: frameHeight(d.page!.height, k.compact), title: p.title ?? 'page', panel: p.id, ...(d.page!.static ? { static: true } : {}) })]; },
+  account: (o, _p, d) => {
+    o.from = d.page!.label; if (d.page!.uses.length) o.uses = d.page!.uses;
+    if (d.page!.static) o.static = 'nothing runs in it: no script, no task API and no data, and it does not reload as its files change; its images, styles, media and fonts load. Its check says only that it loaded, and its size';
+  },
 };
 const file = (name: CardName, shows: string, against = false): CardKind => ({ // a file in Monaco: a page of Vindu's own, on the process's origin
   ...framed, reads: GUIDE[name].fields,

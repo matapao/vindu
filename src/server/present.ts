@@ -11,7 +11,7 @@ import { log } from './records.js';
 import { readBack, windowSaid } from './render-reports.js';
 import type { Session } from './state.js';
 
-type PageEntry = { url: string; label: string; uses: string[] };
+type PageEntry = { url: string; label: string; uses: string[]; static?: true };
 /** A page, or a file shown in Monaco, for check_page to read: under its panel's id, and under view/panel. */
 const setPage = (session: Session, view: string, id: string, pg: PageEntry) => {
   session.pages.set(id, pg);
@@ -108,7 +108,7 @@ export const present = async (
   for (const p of pages) {
     if (!current()) return superseded();
     const d = v.data[p.id].page!;
-    const pg = { url: d.url, label: d.label, uses: d.uses };
+    const pg = { url: d.url, label: d.label, uses: d.uses, ...(d.static ? { static: d.static } : {}) };
     setPage(session, v.spec.name, p.id, pg);
     const o = v.account.panels.find((x) => x.id === p.id)!;
     if (!restoring) o.page = await check(session, pg);

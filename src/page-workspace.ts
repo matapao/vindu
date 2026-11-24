@@ -45,6 +45,11 @@ export async function insideAsync(base: string, rel: string, root?: string): Pro
 }
 /** A path under a folder as an address path: each part encoded. */
 export const href = (rel: string) => rel.split('/').map(encodeURIComponent).join('/');
+/** The query a static page is asked for with, on the process's own origin: the page host serves it as it is written,
+ *  with nothing put in it, under a policy that runs none of it (pages.ts). */
+export const STATIC_QUERY = 'static=1';
+/** Whether an address's query asks for a static page, wherever in it STATIC_QUERY is. */
+export const asksStatic = (query: URLSearchParams) => query.getAll('static').includes('1');
 /** A page in the working folder: an HTML file, or a folder with an index.html. */
 export const page = (work: string, rel: string) => { const f = inside(work, rel.replace(/^\/+/, '') || 'index.html'); return f && /\.html?$/i.test(f) ? f : null; };
 export function pagesIn(root: string, dir = root, out: string[] = []): string[] {

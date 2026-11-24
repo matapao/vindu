@@ -37,16 +37,19 @@ const SAME_ORIGIN_PAGE = 'This page has the window\'s own origin, so it is not s
 
 /** A web page in a frame of its own origin (the page host's), sandboxed: scripts run, nothing reaches the app. Never a
  *  page of the window's own origin, whose script could lift its frame's sandbox. What it sends (task.send) goes through
- *  the shell, which knows the frame by its panel. */
+ *  the shell, which knows the frame by its panel. A static page (static) is drawn in a frame of its own where nothing
+ *  runs at all (sandbox=""), made with its sandbox before its address is set, so it holds from its first load. */
 export const Page = defineComponent({
-  name: 'Page', tag: 'vindu-page', props: { url: 'string', height: 'number', title: 'string', panel: 'string' },
+  name: 'Page', tag: 'vindu-page', props: { url: 'string', height: 'number', title: 'string', panel: 'string', static: 'boolean' },
   styles: css`:host { display: block; } iframe { background: var(--v-pane, #fff); }`,
   render: (p, element) => {
     const address = frameUrl(p.url), own = !!address && address.origin === element.ownerDocument.defaultView?.origin;
     const url = address && !own ? String(p.url) : undefined;
-    return url
-      ? html`<iframe src=${url} title=${String(p.title ?? 'page')} data-page-panel=${String(p.panel ?? '')} style=${`display:block;width:100%;border:0;height:var(--vindu-page-h, ${Number(p.height) || 480}px)`} sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock" allow="fullscreen; gamepad; autoplay" referrerpolicy="origin"></iframe>`
-      : html`<p>${own ? SAME_ORIGIN_PAGE : 'No page to show.'}</p>`;
+    if (!url) return html`<p>${own ? SAME_ORIGIN_PAGE : 'No page to show.'}</p>`;
+    const style = `display:block;width:100%;border:0;height:var(--vindu-page-h, ${Number(p.height) || 480}px)`;
+    return p.static === true
+      ? html`<iframe sandbox="" src=${url} title=${String(p.title ?? 'page')} data-page-panel=${String(p.panel ?? '')} style=${style} allow="fullscreen" referrerpolicy="no-referrer"></iframe>`
+      : html`<iframe src=${url} title=${String(p.title ?? 'page')} data-page-panel=${String(p.panel ?? '')} style=${style} sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock" allow="fullscreen; gamepad; autoplay" referrerpolicy="origin"></iframe>`;
   },
 });
 
