@@ -20,6 +20,9 @@ await withPackedSdk('test:package', async ({ dir, archive, pnpm }) => {
     dependencies: { [manifest.name]: 'file:./package', '@a2ui/web_core': manifest.dependencies['@a2ui/web_core'] },
   }));
   copyFileSync(lockfile, join(dir, 'pnpm-lock.yaml'));
+  // A browser consumer, installed as the SDK itself is: a version a week old at least, and pdf.js's native canvas for
+  // Node left out, as the window never renders a PDF in Node.
+  writeFileSync(join(dir, 'pnpm-workspace.yaml'), 'minimumReleaseAge: 10080\nignoredOptionalDependencies:\n  - \'@napi-rs/canvas\'\n');
   pnpm(dir, 'install', updateLockfile ? '--no-frozen-lockfile' : '--frozen-lockfile', '--ignore-scripts', '--prefer-offline');
   const entry = join(dir, 'consumer.ts');
   copyFileSync(new URL('./fixtures/package-consumer.ts', import.meta.url), entry);

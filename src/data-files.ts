@@ -66,6 +66,7 @@ function jsonTable(text: string, name: string, pick: string | undefined, said: s
   try { v = JSON.parse(text); } catch (e) { throw new Error(`"${name}" is not JSON: ${(e as Error).message}`); }
   if (pick) for (const k of pick.split('.')) {
     if (!isRecord(v) || !Object.hasOwn(v, k)) throw new Error(`"${name}" has no "${pick}"`);
+    // nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop -- it only reads, and only a field the object has of its own; nothing is written
     v = v[k];
   }
   if (Array.isArray(v) && v.every(isRecord)) {

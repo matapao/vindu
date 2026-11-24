@@ -115,6 +115,7 @@ function blocksOf(lines: string[], depth: number): MarkdownBlock[] {
 const headingOf = (text: string, level: number): MarkdownBlock => ({ heading: parseInline(text), level });
 
 function codeFence(lines: string[], i: number, f: Fence, out: MarkdownBlock[]): number {
+  // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp -- built from constants only: the fence's own mark, one of two, and its length, a number
   const close = new RegExp(`^ {0,3}${f.mark === '`' ? '`' : '~'}{${f.size},}[ \\t]*$`);
   const body: string[] = []; let j = i + 1;
   for (; j < lines.length && !close.test(lines[j]); j++) body.push(outdent(lines[j], f.indent));
