@@ -20,6 +20,27 @@ export const BLOCKS_CSS = `
 .vindu-theme .vb-anchor{font-family:var(--v-mono);font-size:${captionSize(11.5)};color:var(--v-muted);white-space:nowrap}
 .vindu-theme ins{background:rgba(27,175,122,.16);text-decoration:none} .vindu-theme del{background:rgba(227,73,72,.13);color:var(--v-ink-2)}
 .vindu-theme .vb-gone{opacity:.7}
+.vindu-theme .vb-md{container:vb-md/inline-size} .vindu-theme .vb-mdbody{min-width:0;max-width:80ch;line-height:1.55;overflow-wrap:anywhere}
+.vindu-theme .vb-md .vb-toc{display:none} .vindu-theme .vb-mdfile{font-family:var(--v-mono);font-size:${captionSize(11.5)};color:var(--v-muted);margin-bottom:${rhythm(4)}}
+@container vb-md (min-width:720px){.vindu-theme .vb-withtoc{display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,220px);gap:0 ${space(24)}}
+.vindu-theme .vb-withtoc .vb-toc{display:block;grid-column:2;grid-row:1;position:sticky;top:0;align-self:start;max-height:80vh;overflow:auto;border-left:1px solid var(--v-hair);padding-left:${space(10)}}}
+.vindu-theme .vb-tochead{font-size:${captionSize(11.5)};color:var(--v-muted);margin-bottom:${rhythm(4)}} .vindu-theme .vb-toc ol{list-style:none;margin:0;padding:0}
+.vindu-theme .vb-toc button{border:0;background:none;color:var(--v-ink-2);font:inherit;font-size:${captionSize(12)};text-align:left;padding:${rhythm(2)} 0;cursor:pointer} .vindu-theme .vb-toc button:hover{color:var(--v-accent)}
+.vindu-theme .vb-toc2{padding-left:${space(10)}} .vindu-theme .vb-toc3{padding-left:${space(20)}}
+.vindu-theme .vb-mdh{font-weight:600;margin:${rhythm(14)} 0 ${rhythm(4)};scroll-margin-top:${rhythm(8)}} .vindu-theme .vb-mdbody>.vb-mdsec:first-child>.vb-mdh,.vindu-theme .vb-mdfile+.vb-mdsec>.vb-mdh{margin-top:0}
+.vindu-theme .vb-mdh1{font-size:${headingSize(18)}}.vindu-theme .vb-mdh2{font-size:${headingSize(15.5)}}.vindu-theme .vb-mdh3{font-size:${headingSize(13.5)}}.vindu-theme .vb-mdh4,.vindu-theme .vb-mdh5,.vindu-theme .vb-mdh6{font-size:${headingSize(13)};color:var(--v-ink-2)}
+.vindu-theme .vb-mdbody p{margin:${rhythm(6)} 0} .vindu-theme .vb-mdbody li>p{margin:${rhythm(2)} 0} .vindu-theme .vb-mdbody li>ul,.vindu-theme .vb-mdbody li>ol{margin:${rhythm(2)} 0} .vindu-theme .vb-mdbody ul,.vindu-theme .vb-mdbody ol{margin:${rhythm(6)} 0;padding-left:${space(22)}}
+.vindu-theme .vb-mdbody li.vb-task{list-style:none;margin-left:${space(-20)}} .vindu-theme .vb-task>input{margin:0 ${space(6)} 0 0;vertical-align:-1px} .vindu-theme .vb-task>p:first-of-type{display:inline}
+.vindu-theme .vb-mdbody blockquote{margin:${rhythm(8)} 0;padding:${rhythm(1)} ${space(12)};border-left:3px solid var(--v-line);color:var(--v-ink-2)}
+.vindu-theme .vb-mdbody code{font-family:var(--v-mono);font-size:.9em;background:var(--v-wash);border-radius:3px;padding:0 ${space(3)}}
+.vindu-theme .vb-mdpre{margin:${rhythm(8)} 0} .vindu-theme .vb-mdpre figcaption{font-family:var(--v-mono);font-size:${captionSize(10.5)};color:var(--v-muted);margin-bottom:${rhythm(2)}}
+.vindu-theme .vb-mdpre pre{margin:0;padding:${rhythm(8)} ${space(10)};background:var(--v-wash);border:1px solid var(--v-hair);border-radius:6px;overflow-x:auto;line-height:1.45}
+.vindu-theme .vb-mdpre pre code{background:none;padding:0;font-size:${captionSize(12)};overflow-wrap:normal;white-space:pre}
+.vindu-theme .vb-mdtable{overflow-x:auto;margin:${rhythm(8)} 0} .vindu-theme .vb-mdtable table{width:auto;min-width:50%}
+.vindu-theme .vb-mdtable th{font-weight:600;text-align:left;border-bottom:1px solid var(--v-line);padding:${rhythm(3)} ${space(8)}} .vindu-theme .vb-mdtable td{border-bottom:1px solid var(--v-hair);padding:${rhythm(3)} ${space(8)};vertical-align:top}
+.vindu-theme .vb-mdtable .vb-left{text-align:left} .vindu-theme .vb-mdtable .vb-center{text-align:center} .vindu-theme .vb-mdtable .vb-right{text-align:right;font-variant-numeric:tabular-nums}
+.vindu-theme .vb-mdbody hr{border:0;border-top:1px solid var(--v-line);margin:${rhythm(12)} 0} .vindu-theme .vb-mdbody a{color:var(--v-accent)}
+.vindu-theme .vb-mdcut{margin-top:${rhythm(12)};padding-top:${rhythm(6)};border-top:1px dashed var(--v-line);color:var(--v-muted);font-size:${captionSize(12)}}
 .vindu-theme .vb-dayhead{font-weight:600;font-size:${headingSize(12)};color:var(--v-ink-2);padding:${rhythm(8)} 0 ${rhythm(3)}}
 .vindu-theme .vb-ev .vb-time{flex:0 0 auto;font-variant-numeric:tabular-nums;color:var(--v-ink-2);min-width:88px}
 .vindu-theme .vb-free{color:#12805a;font-weight:600}

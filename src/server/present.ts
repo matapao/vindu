@@ -203,6 +203,7 @@ const ctxFor = (
     workPages: () => session.runtime.host.workPages(session.key),
     writeView: (name, html) => session.runtime.host.writeView(session.key, name, html),
     workText: (rel) => session.runtime.host.workText(session.key, rel),
+    workStart: (rel, most) => session.runtime.host.workStart(session.key, rel, most),
     headText: (rel) => session.runtime.host.headText(session.key, rel),
   },
   ...(session.more.apps && session.runtime.options.apps && session.runtime.options.apps !== 'off'

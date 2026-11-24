@@ -3,7 +3,7 @@
 // account, the window's read-back and a host's own drawing ask a panel's kind (registry.ts), never its card's name;
 // a hook a kind leaves out does what a card of rows does.
 import type { Component, Probe } from '../a2ui.js';
-import type { CardDef, PanelSpec, Resolved, Suggestion, ViewSpec } from '../cards.js';
+import type { CardDef, CardFileRead, PanelSpec, Resolved, Suggestion, ViewSpec } from '../cards.js';
 import { plainList } from '../format.js';
 import type { PanelPresentation } from '../presentation.js';
 import type { Entry, Row } from '../results.js';
@@ -56,6 +56,9 @@ export type CardKind = {
   /** It draws its rows as cells by A1 address (a table, a sheet): the cells it draws of the resolved rows. A card that
    *  has it reads a data file (CSV, TSV or JSON) as rows, and takes the model's notes on its cells. */
   cells?: (p: PanelSpec, d: Resolved) => DrawnCells;
+  /** A file the panel names that the card reads itself (a document's Markdown): its rows, and which file it is;
+   *  undefined when the panel names none. */
+  file?: (p: PanelSpec, e: Entry | undefined, ctx: ViewContext) => { rows: Row[]; file: CardFileRead } | undefined;
   /** Its own check of the resolved data, after the checks every card of rows has: null when it fits. */
   check?: (p: PanelSpec, d: Resolved) => string | null;
   /** What the model sent without a source is its own, and marked so; false for what is never the model's words (a file,

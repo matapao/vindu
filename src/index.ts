@@ -13,7 +13,7 @@ export { fromApp, appHtml, resultFor, textOnly, appsOn, anyAppsOn, resourceOf, t
 export { memoryResults, brief, shapeOf, amountsOf, fileOf, readRef, refOf, dataOf, withOwn, type ResultSource, type Entry, type ResultEntry, type AttachmentEntry, type AnswerEntry, type Row } from './results.js';
 export { showView } from './view.js';
 export { Refusal, type ViewContext } from './view-context.js';
-export { CARDS, MAX_ROWS, Panel, ShowView, panelSchema, showViewSchema, resultRef, panelOption, type CardDef, type CardAction, type Shaped, type PanelSpec, type ViewSpec, type Resolved } from './cards.js';
+export { CARDS, MAX_ROWS, Panel, ShowView, panelSchema, showViewSchema, resultRef, panelOption, type CardDef, type CardAction, type CardFile, type Shaped, type PanelSpec, type ViewSpec, type Resolved } from './cards.js';
 export { z } from 'zod'; // the zod a host's card fields are written with: Vindu's own, so they compose with its schemas
 export { compile, probesFor, type Surface, type Component, type Probe } from './a2ui.js';
 export { checkSurface } from './surface-check.js';

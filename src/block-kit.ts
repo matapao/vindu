@@ -32,6 +32,7 @@ type Spec = { name: string; about: string; component: string; roles: Roles; layo
   check?: (rows: Row[], p: PanelSpec, map: Record<string, string>) => string | null;
   rows?: (rows: Row[], p: PanelSpec, map: Record<string, string>, read: (id: string) => Entry | undefined, inputs?: Record<string, number>) => Row[] | Shaped;
   source?: CardDef['source'];
+  file?: CardDef['file'];                            // files it shows as they are (a document's Markdown)
   props?: (p: PanelSpec) => Record<string, unknown>; // fixed props for its component
   account?: (rows: Row[], p: PanelSpec, map: Record<string, string>, props: Record<string, unknown>) => Record<string, unknown>;
   derived?: string[];                                // fields of each row it works out itself, which a host's drawing gets too
@@ -60,7 +61,7 @@ export function block(o: Spec): CardDef {
       const account = { roles: map, ...(props.layout ? { layout: props.layout } : {}), ...o.account?.(out, p, map, props), ...more };
       return { rows: out, props, account, ...(checkRows ? { checkRows } : {}) };
     },
-    ...(o.source ? { source: o.source } : {}),
+    ...(o.source ? { source: o.source } : {}), ...(o.file ? { file: o.file } : {}),
     props: fixed,
     presentFields: (rows, p, props) => (o.allFields?.(p)
       ? [...new Set(rows.flatMap(row => Object.keys(row).filter(key => !key.startsWith('__'))))]

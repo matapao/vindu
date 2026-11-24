@@ -2,6 +2,7 @@ import type { CardDef, PanelSpec, ViewSpec } from './cards.js';
 import type { HeadText } from './pages.js';
 import { brief, type Entry, type ResultSource } from './results.js';
 import type { ViewWords } from './view-words.js';
+import type { TextStart } from './text-start.js';
 
 export class Refusal extends Error {} // shown to the model as "not shown: …", with what to send instead
 
@@ -45,6 +46,7 @@ export type ViewContext = {
     workPages(): string[];                          // the pages there, for a refusal that lists them
     writeView(name: string, html: string): string;  // keep a page the model wrote; its path under /view/, with a version
     workText?(rel: string): { rel: string; text: string } | { why: string };  // a text file there, for code and diff panels
+    workStart?(rel: string, most: number): ({ rel: string } & TextStart) | { why: string }; // the start of one, for a document
     headText?(rel: string): HeadText;               // it as the last commit has it
   };
 };

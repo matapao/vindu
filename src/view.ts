@@ -147,7 +147,9 @@ function resolve(p: PanelSpec, view: ViewSpec, ctx: ViewContext, notes: string[]
   const direct = kind.direct?.(p, e); if (direct) return direct;
   let rows: Row[]; let src: Resolved['src'];
   const read = kind.cells ? dataFileOf(p, e, ctx, notes) : undefined; // a CSV, TSV or JSON file, read by the system
+  const own = read ? undefined : kind.file?.(p, e, ctx); // a file the card reads itself (a document's Markdown), by the system
   if (read) rows = read.rows;
+  else if (own) rows = own.rows;
   else if (e) {
     const got = rowsOf(e, p, notes, !!kind.one); rows = got.rows;
     src = { id: e.id, pointer: got.pointer, index: new Map(rows.map((r, i) => [r, i])), of: rows.length,
@@ -192,7 +194,8 @@ function resolve(p: PanelSpec, view: ViewSpec, ctx: ViewContext, notes: string[]
     rows = out; if (Object.keys(worked).length) shaped = worked;
     if (rows !== before && !behind) reindex(at, before, rows); // a group's rows stand for the rows behind them
   }
-  return { rows, src, steps, ...(behind ? { behind } : {}), ...given, ...(shaped ? { shaped } : {}), ...(file ? { file } : {}) };
+  const shownFile = file ?? own?.file; // a data file read as rows, or the file the card read itself
+  return { rows, src, steps, ...(behind ? { behind } : {}), ...given, ...(shaped ? { shaped } : {}), ...(shownFile ? { file: shownFile } : {}) };
 }
 
 /** Rows made from the rows before (fields computed for each, a block's own shaping), each kept at its place in its

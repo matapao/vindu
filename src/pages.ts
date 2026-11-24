@@ -33,6 +33,7 @@ import { libraryTable, wrapperFor, type Libraries, type Library } from './page-l
 import { inject } from './page-inject.js';
 import { href, inside, insideAsync, page, pagesIn, watchFolder } from './page-workspace.js';
 import { SEND_MAX } from './page-send.js';
+import { readTextStart, type TextStart } from './text-start.js';
 
 export { LIBRARIES, type Library } from './page-libraries.js';
 export { watchFolder } from './page-workspace.js';
@@ -179,6 +180,17 @@ export async function startPageHost(o: { libraries?: Library[]; pageParentOrigin
       if (!bytes) return { why: `"${rel}" is ${(size / 1e6).toFixed(1)} MB; code and diff panels show files up to ${TEXT_MAX / 1e6} MB` };
       if (bytes.subarray(0, 8000).includes(0)) return { why: `"${rel}" is not text` };
       return { rel: path.relative(fs.realpathSync(t.work), f).split(path.sep).join('/'), text: bytes.toString('utf8') };
+    },
+    /** The start of a text file in the working folder, for a document panel: its path under the folder, and at most
+     *  most bytes of its text; or why not. */
+    workStart: (key: string, rel: string, most: number): ({ rel: string } & TextStart) | { why: string } => {
+      const t = get(key); if (!t.work) return { why: 'this task has no working folder' };
+      const f = inside(t.work, rel.replace(/^\/+/, ''));
+      if (!f) return { why: `no file "${rel}" in the working folder` };
+      let start: TextStart | null;
+      try { start = readTextStart(f, most); } catch { return { why: `"${rel}" could not be read` }; }
+      if (!start) return { why: `"${rel}" is not text` };
+      return { rel: path.relative(fs.realpathSync(t.work), f).split(path.sep).join('/'), ...start };
     },
     /** A file as the last commit has it, or why there is nothing to compare with: the process's head says (a host's,
      *  or gitHead), for a file in the working folder. Vindu runs no git of its own. */

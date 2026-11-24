@@ -9,6 +9,7 @@ import {
   displayNames,
   defineBlock,
 } from './shared.js';
+import { markdownDocument } from './markdown.js';
 import { asText } from '../../format.js';
 
 export const VMessages = defineBlock('VMessages', 'vindu-messages', {}, (props) => {
@@ -88,12 +89,13 @@ export const VMessages = defineBlock('VMessages', 'vindu-messages', {}, (props) 
   );
 });
 
+// a document of sections, or one read from a Markdown file, which is drawn from its blocks (markdown.ts)
 export const VDocument = defineBlock(
   'VDocument',
   'vindu-document',
-  {},
+  { file: 'value' },
   (props) =>
-    html`<div class="vb-doc">${props.rows.map((row, index) => {
+    props.rows.some((row) => Array.isArray(row.__blocks)) ? markdownDocument(props) : html`<div class="vb-doc">${props.rows.map((row, index) => {
       const level = Number(fieldValue(props, row, 'level') ?? 1);
       const anchor = fieldValue(props, row, 'anchor');
       const heading = fieldValue(props, row, 'heading');

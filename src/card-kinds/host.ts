@@ -5,6 +5,7 @@ import { MAX_ROWS, PANEL_FIELDS, rowFields, type CardDef, type PanelSpec, type R
 import { pointerStep, type Row } from '../results.js';
 import { VIEW_WORDS, type ViewWords } from '../view-words.js';
 import { notesAccount, notesProblem, placedNotes, type DrawnCells } from './cells.js';
+import { cardFileOf } from '../view-files.js';
 import type { CardKind } from './kind.js';
 
 /** The fields of rows as cells: in the order they first appear, without those the system keeps to itself (__). */
@@ -17,7 +18,12 @@ const cellsOf = (most: NonNullable<CardDef['cells']>) => (_p: PanelSpec, d: Reso
 };
 
 export function hostKind(def: CardDef): CardKind {
-  const props = (p: PanelSpec, d: Resolved) => (def.props || d.shaped?.props ? { ...def.props?.(p), ...d.shaped?.props } : undefined);
+  // its component's props: its fixed ones, what its shaping worked out, and the file it shows itself (its name, and whether
+  // only its start is); a data file read as rows is the system's, and goes as rows
+  const own = (d: Resolved) => (d.file && !('format' in d.file) ? d.file : undefined);
+  const file = (d: Resolved) => { const f = own(d); return f ? { file: { name: f.name, cut: !!f.cut } } : {}; };
+  const props = (p: PanelSpec, d: Resolved) => (def.props || d.shaped?.props || own(d) ? { ...def.props?.(p), ...d.shaped?.props, ...file(d) } : undefined);
+  const how = def.file;
   // its component's words, where the view is drawn in other words than English, which its component has of its own
   const words = (w: ViewWords) => {
     if (!def.words) return {};
@@ -29,6 +35,7 @@ export function hostKind(def: CardDef): CardKind {
     reads: [...PANEL_FIELDS, ...Object.keys(def.fields ?? {})], // a host's card may read any shared field, besides its own
     ...(def.one ? { one: true } : {}), ...(def.rows ? { rows: def.rows } : {}), ...(def.source ? { source: def.source } : {}),
     ...(cells ? { cells } : {}),
+    ...(how ? { file: (p, e, ctx) => cardFileOf(p, e, ctx, how) } : {}),
     check: (p, d) => (d.rows && def.check ? def.check(d.rows, p, d.shaped) : null)
       ?? (cells && d.rows ? notesProblem(p, cells(p, d)) : p.notes?.length && !def.fields?.notes ? `notes go on the cells of a table or a sheet; a ${p.card} takes none` : null),
     props,

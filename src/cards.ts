@@ -27,6 +27,10 @@ export type CardDef = {
   rows?: (rows: Row[], panel: PanelSpec, read: (id: string) => Entry | undefined, context: { inputs: Record<string, number> }) => Row[] | Shaped;
   /** Rows for a panel with neither from nor data, made from other results (one row per call of a batch, say). */
   source?: (panel: PanelSpec, read: (id: string) => Entry | undefined) => Row[];
+  /** Files it shows as they are (a document's Markdown): a panel that names one, with from (an attachment) or path (a
+   *  file in the working folder), gets the rows made of its text instead of a result's, and its account says which file
+   *  it is and whether only its start is shown. */
+  file?: CardFile;
   /** An object it is given is one row, whatever lists it holds (a message with its recipients and attachments). */
   one?: boolean;
   /** Its component takes the window's locale and time zone, and the panel's id (Vindu's own blocks do). */
@@ -47,6 +51,15 @@ export type CardDef = {
   /** The fields of each row a host's own drawing gets (presentation.ts), given the component's props; by default those it
    *  shows. Each row is cut to them. */
   presentFields?: (rows: Row[], panel: PanelSpec, props: Record<string, unknown>) => string[];
+};
+/** The files a card shows as they are, read by the system: which it takes (by name, and an attachment's type), at most
+ *  how many bytes of one it reads (the start of a longer one), and the rows its text makes; cut says, in words, what of
+ *  that text the rows leave out (the sections past the first 100, say). An error it throws is the panel's refusal. */
+export type CardFile = {
+  kinds: string;                                          // the files it takes, in words, for a refusal
+  takes: (name: string, mime?: string) => boolean;
+  most: number;
+  rows: (text: string, panel: PanelSpec) => { rows: Row[]; cut?: string };
 };
 /** What a card's own shaping worked out besides its rows, so nothing is kept on the panel: props for its component (an
  *  invoice's totals, where nodes go), what its account adds, and the rows its check reads when not these (free time is
@@ -152,7 +165,7 @@ const panelFields = (cards: CardDef[], o: Offer = {}) => ({ // extra properties 
   media: resultRef(z.string().optional().describe('media: an attachment id, a file name, or a result id holding an image')),
   marks: resultRef(z.union([z.string(), z.array(z.record(z.string(), z.unknown()))]).optional().describe('media: marks on it, from a result id or as rows: regions of a picture {x, y, w, h, label} as fractions of its size (0 to 1), or moments of a recording {start, end, label} in seconds')),
   text: z.string().optional().describe('text: what to say, in plain short paragraphs'),
-  path: z.string().optional().describe('page, code and diff: a file in the task\'s working folder, e.g. "index.html" or "src/app.ts"; the person sees it live: a page reloads when a file it loaded changes (only its styles are swapped when only those did), code and diff show the file as it changes. table and sheet: a .csv, .tsv or .json file there (up to 5 MB), read by the system as rows: a CSV or TSV file\'s first row is its header; JSON is a list of records, a list of lists (the first the header) or one object'),
+  path: z.string().optional().describe('page, code and diff (and a document, for a Markdown file): a file in the task\'s working folder, e.g. "index.html" or "src/app.ts"; the person sees it live: a page reloads when a file it loaded changes (only its styles are swapped when only those did), code and diff show the file as it changes'),
   notes: z.array(z.object({ cell: z.string().describe('an A1 address: the column\'s letters, then the row\'s number, e.g. "B3"; row 1 is the header row, and the columns are A, B, … in the order drawn'), note: z.string().describe('what you note there, up to 200 characters') })).optional()
     .describe('table and sheet: your notes on cells, at most 20: each noted cell is marked, and the notes are listed, numbered, below it. Only on the rows and columns drawn'),
   line: z.number().int().positive().optional().describe('code: the line to show first'),
@@ -261,9 +274,11 @@ export type Resolved = {
   marks?: Row[];                     // marks on the media: regions or moments, each with a label
   page?: { url: string; label: string; uses: string[]; height: number };
   code?: { path: string; language: string; lines: number; line?: number; against?: string; added?: number; removed?: number; new?: boolean };
-  /** A data file the rows were read from by the system (data-files.ts): its name, where it is (an attachment's id, or
-   *  work/<path>), its format, how many rows and columns it has, and each row's own row in it (row 1 its header). */
-  file?: { name: string; from: string; format: string; rows: number; columns: number; index: Map<Row, number> };
+  /** A file the system read for the card, where it is (an attachment's id, or work/<path>) and its name: a data file the
+   *  rows were read from (data-files.ts), with its format, how many rows and columns it has, and each row's own row in
+   *  it (row 1 its header); or a file the card reads itself (a document's Markdown), with the bytes read of its size,
+   *  and what is left out. */
+  file?: DataFileRead | CardFileRead;
   app?: { server: string; tool: string; result: string; uri: string; url: string; height: number };
   src?: { id: string; pointer: string; index: Map<Row, number>; of: number; fidelity: string; digest?: string; columns?: boolean };
   steps?: Record<string, unknown>[];
@@ -278,6 +293,13 @@ export type Resolved = {
   failed?: string;                   // the call it waited for failed: the server's own answer
   shaped?: Omit<Shaped, 'rows'>;     // what the card's own shaping worked out besides its rows
 };
+
+/** A data file the system read as rows (data-files.ts): where it is (an attachment's id, or work/<path>), its name, its
+ *  format, how many rows and columns it has, and each row's own row in it (row 1 its header). */
+export type DataFileRead = { name: string; from: string; format: string; rows: number; columns: number; index: Map<Row, number> };
+/** A file a card reads itself (a document's Markdown): where it is, its name, the bytes read of its size, and what is
+ *  left out. */
+export type CardFileRead = { from: string; name: string; bytes: number; size: number; cut?: string };
 
 /** Every field the rows have, in the order they first appear. */
 export const rowFields = (rows: Row[]) => [...new Set(rows.flatMap(r => Object.keys(r ?? {})))];

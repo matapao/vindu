@@ -2,7 +2,7 @@
 // working folder (path). The system reads and parses it, so every value is the file's own and none is typed by the
 // model. A cell of a CSV or TSV file that is a number exactly as written (31050, -2.5) is that number; every other
 // cell is its text as written ("007", "1.50", "").
-import type { PanelSpec, Resolved } from './cards.js';
+import type { DataFileRead, PanelSpec } from './cards.js';
 import { parseDelimited } from './delimited.js';
 import { extensionOf } from './file-types.js';
 import { asText } from './format.js';
@@ -114,7 +114,7 @@ function sourceOf(p: PanelSpec, e: Entry | undefined, ctx: ViewContext): Source 
 
 /** The rows a table or a sheet shows from a data file, and what the file is: an attachment that is CSV, TSV or JSON
  *  (from), or a file of these in the working folder (path). Undefined when the panel names neither. */
-export function dataFileOf(p: PanelSpec, e: Entry | undefined, ctx: ViewContext, said: string[]): { rows: Row[]; file: NonNullable<Resolved['file']> } | undefined {
+export function dataFileOf(p: PanelSpec, e: Entry | undefined, ctx: ViewContext, said: string[]): { rows: Row[]; file: DataFileRead } | undefined {
   if (p.path === undefined && !isDataAttachment(e)) return undefined;
   const notes: string[] = [];
   let at: Source, table: DataTable;

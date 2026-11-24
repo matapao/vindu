@@ -1,9 +1,11 @@
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import type { PanelSpec, Resolved, ViewSpec } from './cards.js';
+import type { CardFile, CardFileRead, PanelSpec, Resolved, ViewSpec } from './cards.js';
 import { codePage, languageOf, type CodeSpec } from './code.js';
 import { extensionOf, MEDIA_EXTENSIONS, typeOfFile } from './file-types.js';
 import { href } from './page-workspace.js';
+import type { Entry, Row } from './results.js';
+import { readTextStart, type TextStart } from './text-start.js';
 import { Refusal, listing, type ViewContext } from './view-context.js';
 
 /** The type of a media file, by its extension: an image, video or audio file; undefined for any other. */
@@ -107,4 +109,37 @@ export function appOf(p: PanelSpec, ctx: ViewContext): NonNullable<Resolved['app
   const uri = apps.resourceOf(e.server, e.tool);
   if (!uri) throw new Refusal(`panel ${p.id}: ${e.server}.${e.tool} has no MCP App (its tool links no ui:// resource); show ${e.id} with the cards`);
   return { server: e.server, tool: e.tool, result: e.id, uri, url: apps.frame(e.server, uri, e.id), height: heightOf(p, 420) };
+}
+
+/** What else an attachment can be shown with, for a refusal: media for a picture or a recording, text for other text. */
+function otherwise(mime: string, attachment: string): string {
+  if (/^(image|video|audio)\//.test(mime)) return `; show it with a media panel ("media": "${attachment}")`;
+  return mime.startsWith('text/') ? `; show it with a text panel ("from": "${attachment}")` : '';
+}
+/** A file a card shows as it is (CardFile), read by the system: the attachment from names, or path, a file in the
+ *  working folder; at most how.most bytes of it. Undefined when the panel names neither, and its rows come as any do. */
+export function cardFileOf(p: PanelSpec, e: Entry | undefined, ctx: ViewContext, how: CardFile): { rows: Row[]; file: CardFileRead } | undefined {
+  if (!p.path && e?.kind !== 'attachment') return undefined;
+  if (p.path && p.from) throw new Refusal(`panel ${p.id}: a ${p.card} shows "from" (an attachment) or "path" (a file in the working folder), not both`);
+  let read: { name: string; from: string } & TextStart;
+  if (e?.kind === 'attachment') {
+    if (!how.takes(e.name, e.mime)) throw new Refusal(`panel ${p.id}: ${e.id} is ${e.name} (${e.mime}); a ${p.card} shows ${how.kinds}${otherwise(e.mime, e.id)}`);
+    let start: TextStart | null;
+    try { start = readTextStart(e.file, how.most); } catch { throw new Refusal(`panel ${p.id}: ${e.id} (${e.name}) could not be read`); }
+    if (!start) throw new Refusal(`panel ${p.id}: ${e.name} is not text`);
+    read = { name: e.name, from: e.id, ...start };
+  } else {
+    const rel = splitPath(p.path!).file;
+    if (!how.takes(rel)) throw new Refusal(`panel ${p.id}: "${rel}" is not a file a ${p.card} shows: it shows ${how.kinds}; show another file with a code panel`);
+    if (!ctx.pages?.workStart) throw new Refusal(`panel ${p.id}: this host shows no files`);
+    const f = ctx.pages.workStart(rel, how.most);
+    if ('why' in f) throw new Refusal(`panel ${p.id}: ${f.why}`);
+    if (!how.takes(f.rel)) throw new Refusal(`panel ${p.id}: "${rel}" is a folder, and ${p.card} panels show files: ${how.kinds}`); // its index.html
+    read = { ...f, name: path.basename(f.rel), from: `work/${f.rel}` };
+  }
+  if (!read.text.trim()) throw new Refusal(`panel ${p.id}: ${read.name} is empty, so there is nothing to show`);
+  let made: ReturnType<CardFile['rows']>;
+  try { made = how.rows(read.text, p); } catch (x) { throw new Refusal(`panel ${p.id}: ${(x as Error).message}`); }
+  const cut = [read.bytes < read.size ? `the first ${read.bytes} of its ${read.size} bytes` : '', made.cut ?? ''].filter(Boolean).join('; ');
+  return { rows: made.rows, file: { from: read.from, name: read.name, bytes: read.bytes, size: read.size, ...(cut ? { cut } : {}) } };
 }
