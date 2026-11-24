@@ -218,7 +218,9 @@ renderer.setAnimationLoop(() => renderer.render(scene, camera));
   const r = page(await json('show_view', { name: 'bars3d', title: 'Invoices in 3D', panels: [{ card: 'page', html, uses: ['r1'], height: 320 }] }));
   assert.equal(r.errors, undefined, JSON.stringify(r.errors));
   assert.deepEqual(r.libraries, ['three 0.187.0']);
-  const s = r.three[0];
+  // a slow machine draws fewer frames before the first look: the page is looked at again until its loop has drawn more
+  let s = r.three[0];
+  for (let n = 0; s.frames <= 3 && n < 10; n++) s = (await json('check_page', { panel: 'bars3d' })).three[0];
   assert.ok(s.frames > 3, JSON.stringify(s)); assert.equal(s.draw_calls, 4); assert.equal(s.triangles, 48);
   assert.deepEqual(s.objects, { AmbientLight: 1, Mesh: 4 }); assert.deepEqual(s.named, invoices.map(i => i.id)); assert.equal(s.camera, 'PerspectiveCamera');
   assert.equal(r.canvases[0].context, 'webgl2'); assert.ok(r.canvases[0].draw_calls > 0);
