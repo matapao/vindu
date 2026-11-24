@@ -51,8 +51,8 @@ importers:
         specifier: ^3.3.3
         version: 3.3.3
       monaco-editor:
-        specifier: 0.58.0-dev-20261109
-        version: 0.58.0-dev-20261109
+        specifier: 0.58.0-dev-20261111
+        version: 0.58.0-dev-20261111
       three:
         specifier: 0.187.0
         version: 0.187.0
@@ -1640,8 +1640,8 @@ packages:
     resolution: {integrity: sha512-nFQuYSTVrGvysVBps5Ih+0BdnYFN/Cj3C816r6+p7yK+FHrVLGE4O4N9AFwykrlNlvM2HYt+Rad1Uiro6h88Ig==}
     engines: {node: 20 || >=22}
 
-  monaco-editor@0.58.0-dev-20261109:
-    resolution: {integrity: sha512-6SapnimCFPhP0xSngKj/bbkuXUe+8iHmudi6ZEyBo6WDyuOpETFN4+8Fd+PHLRlh+dqGjtvqEUPUs59oYsphCA==}
+  monaco-editor@0.58.0-dev-20261111:
+    resolution: {integrity: sha512-jw9YRFn//o4+8HVOz3QKw2qKkmenNnCTudVBtiWPxriIFumB6g37sqZgKVsm0lzT67QEkE9NaBkmYm1D6vgzZA==}
 
   mri@1.2.0:
     resolution: {integrity: sha512-tzzskb3bG8LvYGFF/mDTpq3jpI6Q9wc3LEmBaghu+DdCssd1FakN7Bc0hVNmEyGq1bq3RgfkCb3cmQLpNPOroA==}
@@ -3219,7 +3219,7 @@ snapshots:
       '@isaacs/nonrecursive-glob-match': 1.1.0
       brace-expansion: 5.0.13
 
-  monaco-editor@0.58.0-dev-20261109:
+  monaco-editor@0.58.0-dev-20261111:
     dependencies:
       dompurify: 3.4.17
       marked: 14.0.0

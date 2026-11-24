@@ -98,7 +98,7 @@
     "chart.js": "4.6.1",
     "echarts": "6.1.0",
     "lit": "^3.3.3",
-    "monaco-editor": "0.58.0-dev-20261109",
+    "monaco-editor": "0.58.0-dev-20261111",
     "three": "0.187.0",
     "zod": "^4.6.7"
   },
