@@ -5,6 +5,7 @@ import { asText, ellipsis } from '../format.js';
 import { basePointer, rowPointer } from '../pointing.js';
 import { pointerStep, refOf, type Row } from '../results.js';
 import { isWrapped } from '../view-rows.js';
+import { notesAccount, notesProblem, placedNotes, type DrawnCells } from './cells.js';
 import { rowsAsTheyAre, type AccountKit, type CardKind, type CardProbe, type DrawKit } from './kind.js';
 
 /** The account of a card of rows: how many, the fields, empty cells, the first row as drawn, and a reference for each
@@ -55,6 +56,17 @@ function drawTable(p: PanelSpec, d: Resolved, k: DrawKit): string[] {
     k.list(f.map((_, i) => k.text(`${pid}__c${i}`, { path: `c${i}` }, undefined, w[i])), 'Row'),
   ];
 }
+/** The cells a table draws: its columns, and its first rows. */
+const tableCells = (p: PanelSpec, d: Resolved): DrawnCells => ({ fields: shownFields(p, d.rows!), rows: Math.min(d.rows!.length, MAX_ROWS) });
+/** A table with the model's notes on its cells, drawn by Vindu's own component wide and narrow alike, so that every
+ *  cell keeps its A1 address: each noted cell is marked, and the notes are listed below. Its head sorts as a table's. */
+function drawNotedTable(p: PanelSpec, d: Resolved, k: DrawKit): string[] {
+  const f = shownFields(p, d.rows!);
+  k.model.rows = d.rows!.slice(0, MAX_ROWS).map(r => Object.fromEntries(f.map((x, i) => [`c${i}`, k.cell(r[x], x)])));
+  k.model.cells = { fields: f, notes: placedNotes(p), sort: p.sort ?? '' };
+  return [k.add({ id: `${k.pid}__cells`, component: 'VNotedTable', rows: { path: `/panels/${k.pid}/rows` }, cells: { path: `/panels/${k.pid}/cells` }, panel: p.id })];
+}
+
 /** The rows as lines: each its label, and its time above it. */
 function drawLines(p: PanelSpec, d: Resolved, k: DrawKit): string[] {
   k.model.rows = d.rows!.slice(0, MAX_ROWS).map(r => ({ label: k.cell(r[p.label!], p.label), meta: p.time ? k.cell(r[p.time], p.time) : '' }));
@@ -70,11 +82,15 @@ function inferLabel(p: PanelSpec, rows: Row[], notes: string[]) {
 }
 
 export const TABLE: CardKind = {
-  reads: GUIDE.table.fields, draw: drawTable, probes: rowProbes,
+  reads: GUIDE.table.fields, cells: tableCells,
+  draw: (p, d, k) => (p.notes?.length ? drawNotedTable(p, d, k) : drawTable(p, d, k)),
+  probes: (p, d, m, pid) => (p.notes?.length ? [] : rowProbes(p, d, m, pid)), // Vindu's own component draws a noted table
+  check: (p, d) => notesProblem(p, tableCells(p, d)),
   account: (o, p, d, kit) => {
     rowsAccount(o, p, d, kit);
     const f = (o.fields ?? []) as string[]; const nr = kit.narrow.rows as Record<string, string>[] | undefined;
     if (nr?.[0] && 'meta' in nr[0]) o.phone = `a list: ${f[0]}, with ${f.slice(1).join(', ')} beneath`;
+    notesAccount(o, p, d, tableCells(p, d));
   },
   suggest: (rows, _p, where) => (rows.length > MAX_ROWS ? [{ label: `Show all ${rows.length} rows`, prompt: `${where} shows the first ${MAX_ROWS} of ${rows.length} rows. Show the rest, or sum them up.` }] : []),
 };

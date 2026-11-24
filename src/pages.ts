@@ -167,6 +167,8 @@ export async function startPageHost(o: { libraries?: Library[]; pageParentOrigin
     workFile: (key: string, rel: string) => { const t = get(key); const f = t.work ? page(t.work, rel) : null; return f ? path.relative(fs.realpathSync(t.work!), f).split(path.sep).join('/') : null; },
     /** Any file in the working folder (an image, a sound, a model), as a path under it: what /work/ serves. */
     workAny: (key: string, rel: string) => { const t = get(key); const f = t.work ? inside(t.work, rel.replace(/^\/+/, '')) : null; return f ? path.relative(fs.realpathSync(t.work!), f).split(path.sep).join('/') : null; },
+    /** Any file in the working folder, as a path under it and its real path on disk: a data file a table or a sheet reads. */
+    workPath: (key: string, rel: string) => { const t = get(key); const f = t.work ? inside(t.work, rel.replace(/^\/+/, '')) : null; return f ? { rel: path.relative(fs.realpathSync(t.work!), f).split(path.sep).join('/'), file: f } : null; },
     workPages: (key: string) => { const t = get(key); return t.work ? pagesIn(t.work).sort() : []; },
     /** A text file in the working folder, for a code or diff panel: its path under the folder and its text, or why not. */
     workText: (key: string, rel: string): { rel: string; text: string } | { why: string } => {

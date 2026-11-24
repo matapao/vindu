@@ -199,6 +199,7 @@ const ctxFor = (
     workFile: (rel) => session.runtime.host.workFile(session.key, rel),
     workUrl: (rel, query, uses, hash) => session.runtime.host.workUrl(session.key, rel, query, uses, hash),
     workAny: (rel) => session.runtime.host.workAny(session.key, rel),
+    workPath: (rel) => session.runtime.host.workPath(session.key, rel),
     workPages: () => session.runtime.host.workPages(session.key),
     writeView: (name, html) => session.runtime.host.writeView(session.key, name, html),
     workText: (rel) => session.runtime.host.workText(session.key, rel),

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import type { CardKind } from './card-kinds/kind.js';
 import { rowFields, type PanelSpec } from './cards.js';
 import { computedName, parse, setValue } from './compute.js';
+import { dataFormat } from './data-files.js';
 import { wholePointer } from './pointing.js';
 import { dataOf, pointerStep, type Entry, type Row } from './results.js';
 import { Refusal } from './view-context.js';
@@ -17,7 +18,11 @@ const wrap = (x: unknown): Row => { const r = { value: x }; wrapped.add(r); retu
  *  an object of equal lists, read as columns, each value is at pointer/field/row). whole: an object is one row, whatever
  *  lists it holds. */
 export function rowsOf(e: Entry, p: PanelSpec, notes: string[], whole = false): { rows: Row[]; pointer: string; columns?: boolean } {
-  if (e.kind === 'attachment') throw new Refusal(`panel ${p.id}: ${e.id} is an attachment (${e.mime}); show it with a media panel, or point at the result where you read it`);
+  if (e.kind === 'attachment') {
+    const format = dataFormat(e.name, e.mime);
+    if (format) throw new Refusal(`panel ${p.id}: ${e.id} is a ${format.toUpperCase()} file (${e.name}); a table or a sheet shows its rows, read by the system`);
+    throw new Refusal(`panel ${p.id}: ${e.id} is an attachment (${e.mime}); show it with a media panel, or point at the result where you read it`);
+  }
   let v: unknown = e.kind === 'answer' ? dataOf(e) : e.value ?? (e.rows?.length ? e.rows : undefined);
   if (v === undefined && e.kind === 'result' && e.images.length) throw new Refusal(`panel ${p.id}: ${e.id} is an image, not data; show it with a media panel ("media": "${e.id}"), or type the rows you read from it`);
   let pointer = '';

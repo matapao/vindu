@@ -5,7 +5,8 @@ export const FILE_TYPES: ReadonlyMap<string, string> = new Map(Object.entries({
   json: 'application/json', map: 'application/json', svg: 'image/svg+xml', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
   webp: 'image/webp', ico: 'image/x-icon', wasm: 'application/wasm', mp3: 'audio/mpeg', ogg: 'audio/ogg', wav: 'audio/wav', mp4: 'video/mp4',
   webm: 'video/webm', glb: 'model/gltf-binary', gltf: 'model/gltf+json', bin: 'application/octet-stream', woff: 'font/woff', woff2: 'font/woff2',
-  ttf: 'font/ttf', txt: 'text/plain; charset=utf-8', csv: 'text/csv; charset=utf-8', md: 'text/markdown; charset=utf-8',
+  ttf: 'font/ttf', txt: 'text/plain; charset=utf-8', csv: 'text/csv; charset=utf-8', tsv: 'text/tab-separated-values; charset=utf-8',
+  md: 'text/markdown; charset=utf-8', pdf: 'application/pdf',
 }));
 
 /** A file's extension, lowercase, as path.extname reads it (without its dot): "" for none, or a name that starts with one. */

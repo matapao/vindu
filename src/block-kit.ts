@@ -28,7 +28,7 @@ export const needOne = (map: Record<string, string>, roles: string[], what: stri
 const MAP = z.record(z.string(), z.string()).optional();
 /** A block: its roles and layouts, and what it works out from its rows (props for its component, what its account adds,
  *  the rows its check reads), given the roles found (map). Nothing it works out is kept on the panel. */
-type Spec = { name: string; about: string; component: string; roles: Roles; layouts?: string[]; fields?: Record<string, z.ZodType>; one?: boolean;
+type Spec = { name: string; about: string; component: string; roles: Roles; layouts?: string[]; fields?: Record<string, z.ZodType>; one?: boolean; cells?: CardDef['cells'];
   check?: (rows: Row[], p: PanelSpec, map: Record<string, string>) => string | null;
   rows?: (rows: Row[], p: PanelSpec, map: Record<string, string>, read: (id: string) => Entry | undefined, inputs?: Record<string, number>) => Row[] | Shaped;
   source?: CardDef['source'];
@@ -41,7 +41,7 @@ export function block(o: Spec): CardDef {
   const badLayout = (p: PanelSpec) => !!(o.layouts && p.layout && !o.layouts.includes(asText(p.layout)));
   const fixed = (p: PanelSpec) => ({ map: p.map ?? {}, layout: p.layout ?? '', ...o.props?.(p) });
   return {
-    name: o.name, component: o.component, context: true, ...(o.one ? { one: true } : {}),
+    name: o.name, component: o.component, context: true, ...(o.one ? { one: true } : {}), ...(o.cells ? { cells: o.cells } : {}),
     about: `${o.about}${Object.keys(o.roles).length ? `; roles: ${Object.keys(o.roles).join(', ')}` : ''}${o.layouts ? `; layout: ${o.layouts.join(' | ')}` : ''}`,
     fields: { map: panelOption(MAP.describe('blocks: which of the rows\' fields plays each role, e.g. {"from": "sender"}; roles left out are found by their usual names')),
       layout: panelOption(z.string().optional().describe('blocks: how it is drawn; each block lists its layouts')), ...o.fields },

@@ -1,9 +1,20 @@
 // A card a host adds, and each of Vindu's blocks (blocks.ts): its rows resolved as for any card, its own shaping and
-// checks, and the rows, exact, bound to the component the host's renderer registers.
-import { MAX_ROWS, PANEL_FIELDS, type CardDef, type PanelSpec, type Resolved } from '../cards.js';
-import { pointerStep } from '../results.js';
+// checks, and the rows, exact, bound to the component the host's renderer registers. A card of cells (a sheet) draws
+// its rows as cells by A1 address, with the model's notes on them.
+import { MAX_ROWS, PANEL_FIELDS, rowFields, type CardDef, type PanelSpec, type Resolved } from '../cards.js';
+import { pointerStep, type Row } from '../results.js';
 import { VIEW_WORDS, type ViewWords } from '../view-words.js';
+import { notesAccount, notesProblem, placedNotes, type DrawnCells } from './cells.js';
 import type { CardKind } from './kind.js';
+
+/** The fields of rows as cells: in the order they first appear, without those the system keeps to itself (__). */
+const cellFields = (rows: Row[]) => rowFields(rows).filter(k => !k.startsWith('__'));
+/** The cells a card of cells draws: of a data file, its first rows and columns, as many as the card says; of other
+ *  rows, as many rows as any card draws, with all their fields. */
+const cellsOf = (most: NonNullable<CardDef['cells']>) => (_p: PanelSpec, d: Resolved): DrawnCells => {
+  const rows = d.rows!.slice(0, d.file ? most.rows : MAX_ROWS), fields = cellFields(rows);
+  return { fields: d.file ? fields.slice(0, most.columns) : fields, rows: rows.length };
+};
 
 export function hostKind(def: CardDef): CardKind {
   const props = (p: PanelSpec, d: Resolved) => (def.props || d.shaped?.props ? { ...def.props?.(p), ...d.shaped?.props } : undefined);
@@ -13,21 +24,33 @@ export function hostKind(def: CardDef): CardKind {
     const own = def.words(w);
     return JSON.stringify(own) === JSON.stringify(def.words(VIEW_WORDS)) ? {} : { words: own };
   };
+  const cells = def.cells ? cellsOf(def.cells) : undefined;
   return {
     reads: [...PANEL_FIELDS, ...Object.keys(def.fields ?? {})], // a host's card may read any shared field, besides its own
     ...(def.one ? { one: true } : {}), ...(def.rows ? { rows: def.rows } : {}), ...(def.source ? { source: def.source } : {}),
-    check: (p, d) => (d.rows && def.check ? def.check(d.rows, p, d.shaped) : null),
+    ...(cells ? { cells } : {}),
+    check: (p, d) => (d.rows && def.check ? def.check(d.rows, p, d.shaped) : null)
+      ?? (cells && d.rows ? notesProblem(p, cells(p, d)) : p.notes?.length && !def.fields?.notes ? `notes go on the cells of a table or a sheet; a ${p.card} takes none` : null),
     props,
     draw: (p, d, k) => {
-      k.model.rows = d.rows!.slice(0, MAX_ROWS);
+      const drawn = cells?.(p, d), rows = d.rows!.slice(0, drawn?.rows ?? MAX_ROWS);
+      // cells go as one JSON list of values a row, so that a sheet of 1,000 rows and 200 columns stays within a surface's limits
+      k.model.rows = drawn ? rows.map(r => JSON.stringify(drawn.fields.map(f => r[f] ?? null))) : rows;
+      const of = drawn && { fields: drawn.fields, notes: placedNotes(p), rows: d.rows!.length, columns: cellFields(rows).length };
       // A2UI takes plain values as they are and anything else bound by path: a block's maps and lists go in the data model
-      const bound = Object.fromEntries(Object.entries({ ...props(p, d), ...words(k.words) }).map(([name, v]) => {
+      const bound = Object.fromEntries(Object.entries({ ...props(p, d), ...words(k.words), ...(of ? { cells: of } : {}) }).map(([name, v]) => {
         if (v === null || typeof v !== 'object') return [name, v];
         const held = (k.model.props ??= {}) as Record<string, unknown>; held[name] = v; return [name, { path: `/panels/${k.pid}/props${pointerStep(name)}` }];
       }));
       return [k.add({ id: `${k.pid}__custom`, component: def.component, rows: { path: `/panels/${k.pid}/rows` }, ...(def.context ? { locale: k.locale, timeZone: k.timeZone, panel: p.id } : {}), ...bound })];
     },
-    account: (o, p, d) => { o.rows = d.rows!.length; if (d.rows!.length > MAX_ROWS) o.shown_rows = MAX_ROWS; Object.assign(o, def.account?.(d.rows!, p), d.shaped?.account); },
+    account: (o, p, d) => {
+      const drawn = cells?.(p, d), most = drawn?.rows ?? MAX_ROWS;
+      o.rows = d.rows!.length; if (d.rows!.length > most) o.shown_rows = most;
+      if (drawn && drawn.fields.length < cellFields(d.rows!.slice(0, most)).length) o.shown_columns = drawn.fields.length;
+      Object.assign(o, def.account?.(d.rows!, p), d.shaped?.account);
+      if (drawn) notesAccount(o, p, d, drawn);
+    },
     ...(def.presentFields ? { presentFields: (rows, p, d) => def.presentFields!(rows, p, props(p, d) ?? {}) } : {}),
     ...(def.suggest ? { suggest: def.suggest } : {}),
   };

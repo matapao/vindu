@@ -9,6 +9,7 @@ import type { PanelPresentation } from '../presentation.js';
 import type { Entry, Row } from '../results.js';
 import type { ViewContext } from '../view-context.js';
 import type { ViewWords } from '../view-words.js';
+import type { DrawnCells } from './cells.js';
 
 /** What a card draws itself with: its part of the data model, components it adds below its title, the window it is for. */
 export type DrawKit = {
@@ -52,6 +53,9 @@ export type CardKind = {
   /** Rows shaped by the card itself (a host's card or a block), and rows it makes without a source (see CardDef). */
   rows?: CardDef['rows'];
   source?: CardDef['source'];
+  /** It draws its rows as cells by A1 address (a table, a sheet): the cells it draws of the resolved rows. A card that
+   *  has it reads a data file (CSV, TSV or JSON) as rows, and takes the model's notes on its cells. */
+  cells?: (p: PanelSpec, d: Resolved) => DrawnCells;
   /** Its own check of the resolved data, after the checks every card of rows has: null when it fits. */
   check?: (p: PanelSpec, d: Resolved) => string | null;
   /** What the model sent without a source is its own, and marked so; false for what is never the model's words (a file,

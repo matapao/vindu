@@ -34,6 +34,10 @@ export type CardDef = {
   /** The words its component draws, from the words the view is drawn in (Vindu's devices: each one's state and switch).
    *  They go to it as its words prop where they are not the English ones, which its component draws by itself. */
   words?: (words: ViewWords) => Record<string, string>;
+  /** Its rows are drawn as cells with A1 addresses (a sheet): it reads a data file (CSV, TSV or JSON) as rows, of which
+   *  it draws at most these many rows and columns, and takes the model's notes on its cells (notes). Its component
+   *  gets the cells it draws as its cells prop: their fields, the notes on them, and how many rows and columns there are. */
+  cells?: { rows: number; columns: number };
   /** Actions inside a view only this card takes, by name (a calendar's plan, a deck's slide), for the person and the
    *  model alike: offered in act_in_view where a card that takes them is. */
   actions?: Record<string, CardAction>;
@@ -61,7 +65,7 @@ const chartFields = (p: PanelSpec) => [p.x!, ...[p.y!].flat()];
  *  as ignored, never dropped in silence. What each card does is its kind's (card-kinds/). */
 export const GUIDE: Record<CardName, { about: string; fields: string[]; shows?: (p: PanelSpec, rows: Row[]) => string[] }> = {
   kpi: { about: 'kpi: one number. value: count(), sum(f), avg(f), median(f), min(f) or max(f) over the rows (after where); or data: a number you worked out', fields: ['value', 'where', ...ROWS] },
-  table: { about: 'table: rows. columns: the fields to show, in order (else the first 6). group + value: one row per value of a field, with value computed for each. sort, limit', fields: ['columns', 'group', 'value', 'where', 'sort', 'limit', ...ROWS],
+  table: { about: 'table: rows. columns: the fields to show, in order (else the first 6). group + value: one row per value of a field, with value computed for each. sort, limit. A CSV, TSV or JSON file as rows: from, its attachment id, or path, the file in the working folder; the system reads it. notes: your notes on its cells, by A1 address', fields: ['columns', 'group', 'value', 'where', 'sort', 'limit', 'path', 'notes', ...ROWS],
     shows: (p, rows) => (p.columns?.length ? [...new Set(p.columns)] : rowFields(rows).slice(0, 6)) },
   list: { about: 'list: one line per row. label: a field with text', fields: ['label', 'where', 'sort', 'limit', ...ROWS], shows: p => [p.label!] },
   record: { about: 'record: one object, a line per field (the first row, after where and sort). fields: the fields to show (else the first 12)', fields: ['fields', 'where', 'sort', ...ROWS] },
@@ -148,7 +152,9 @@ const panelFields = (cards: CardDef[], o: Offer = {}) => ({ // extra properties 
   media: resultRef(z.string().optional().describe('media: an attachment id, a file name, or a result id holding an image')),
   marks: resultRef(z.union([z.string(), z.array(z.record(z.string(), z.unknown()))]).optional().describe('media: marks on it, from a result id or as rows: regions of a picture {x, y, w, h, label} as fractions of its size (0 to 1), or moments of a recording {start, end, label} in seconds')),
   text: z.string().optional().describe('text: what to say, in plain short paragraphs'),
-  path: z.string().optional().describe('page, code and diff: a file in the task\'s working folder, e.g. "index.html" or "src/app.ts"; the person sees it live: a page reloads when a file it loaded changes (only its styles are swapped when only those did), code and diff show the file as it changes'),
+  path: z.string().optional().describe('page, code and diff: a file in the task\'s working folder, e.g. "index.html" or "src/app.ts"; the person sees it live: a page reloads when a file it loaded changes (only its styles are swapped when only those did), code and diff show the file as it changes. table and sheet: a .csv, .tsv or .json file there (up to 5 MB), read by the system as rows: a CSV or TSV file\'s first row is its header; JSON is a list of records, a list of lists (the first the header) or one object'),
+  notes: z.array(z.object({ cell: z.string().describe('an A1 address: the column\'s letters, then the row\'s number, e.g. "B3"; row 1 is the header row, and the columns are A, B, … in the order drawn'), note: z.string().describe('what you note there, up to 200 characters') })).optional()
+    .describe('table and sheet: your notes on cells, at most 20: each noted cell is marked, and the notes are listed, numbered, below it. Only on the rows and columns drawn'),
   line: z.number().int().positive().optional().describe('code: the line to show first'),
   html: z.string().optional().describe('page: a whole page you write, for what the cards cannot show (3D, custom charts, a dashboard with its own menus and sub-views). It runs on its own once written: everything the person does in it happens in the page, without you, so write all of it at once. Import three, three/addons/…, echarts or chart.js by name: they are pinned and served here, since a page cannot fetch from the network. Read data with task.data["r3"] (the ids in uses), or any result with await task.get("r7") (/data/r7.json); a page from the working folder ("path") reads only the results in its uses; task.value(rows, "sum(hours * rate)"), task.group(rows, "field", "sum(f)") and task.compute(rows, { amount: "hours * rate" }) compute numbers the way views do, so they count as computed, not typed. task.on("result", r => …) hears each result the task gets from then on ({id, tool, server}), task.on("change", paths => …) the files that change in the working folder. await task.send(value) sends JSON (up to 8,000 characters) to you while the person uses the page, on their click or key: it is kept as a p-id, and await_answer waits for it. vindu.select(items, note) reports what the person picked in the page (a chip above their prompt, with references if you give them), and vindu.ask(prompt) proposes a follow-up (their prompt box, unsent). The person may be in light or dark: add <meta name="color-scheme" content="light dark"> and pick colours with a prefers-color-scheme rule, or give the page its own background'),
   uses: resultRef(z.array(z.string()).optional().describe('page: the result ids the page reads, given to it exactly as task.data[id]; for a page from the working folder, the only results it can read')),
@@ -255,6 +261,9 @@ export type Resolved = {
   marks?: Row[];                     // marks on the media: regions or moments, each with a label
   page?: { url: string; label: string; uses: string[]; height: number };
   code?: { path: string; language: string; lines: number; line?: number; against?: string; added?: number; removed?: number; new?: boolean };
+  /** A data file the rows were read from by the system (data-files.ts): its name, where it is (an attachment's id, or
+   *  work/<path>), its format, how many rows and columns it has, and each row's own row in it (row 1 its header). */
+  file?: { name: string; from: string; format: string; rows: number; columns: number; index: Map<Row, number> };
   app?: { server: string; tool: string; result: string; uri: string; url: string; height: number };
   src?: { id: string; pointer: string; index: Map<Row, number>; of: number; fidelity: string; digest?: string; columns?: boolean };
   steps?: Record<string, unknown>[];

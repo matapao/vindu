@@ -114,8 +114,16 @@ function rowPoint(
   return {
     ...location,
     row: { ...(ref ? { ref } : {}), ...row },
-    ...(ref ? {} : { seen: data.src ? 'computed by the system' : 'typed by the model' }),
+    ...(ref ? {} : { seen: seenOf(data, sourceRow) }),
   };
+}
+/** How a row with no reference into a result was seen: read from a data file (its own row there, row 1 its header),
+ *  computed by the system, or typed by the model. */
+function seenOf(data: Resolved, row: Row): string {
+  const line = data.file?.index.get(row);
+  if (data.file && line !== undefined) return `read by the system from ${data.file.name}, its row ${line}`;
+  if (data.file) return `computed by the system from ${data.file.name}`;
+  return data.src ? 'computed by the system' : 'typed by the model';
 }
 
 /** Resolve only the selected part of a card, using the fields and source references visible there. */

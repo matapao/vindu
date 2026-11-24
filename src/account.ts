@@ -33,10 +33,13 @@ export function account(view: ViewSpec, data: Record<string, Resolved>, wide: Su
 
   const panels = panelsOf(view).map(p => {
     const pid = pidFor(p.id); const m = shown[pid] ?? {}; const d = data[p.id]; const kind = kindOf(p.card, ctx.cards)!;
-    const o: Record<string, unknown> = { id: p.id, card: p.card, from: p.from ?? kind.origin ?? 'typed' };
+    const o: Record<string, unknown> = { id: p.id, card: p.card, from: p.from ?? d.file?.from ?? kind.origin ?? 'typed' };
     if (d.src) {
       o.ref = refOf(d.src.id, basePointer(d.src)); o.seen = d.src.fidelity;
       if (d.src.digest) o.digest = d.src.digest.slice(0, 19); // sha256: and 12 hex
+    } else if (d.file) {
+      o.seen = 'exact: the file, read by the system';
+      o.file = { name: d.file.name, format: d.file.format, rows: d.file.rows, columns: d.file.columns, ...(d.file.format === 'json' ? {} : { cells: 'a number written exactly as a number is that number; every other cell is its text as written' }) };
     } else if (o.from === 'typed') o.seen = 'typed by you';
     if (d.steps?.length) o.steps = d.steps;
     if (d.inputs && Object.keys(d.inputs).length) o.inputs = d.inputs; // what the values were computed with

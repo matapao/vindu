@@ -154,8 +154,8 @@ export const CONTACTS = block({
 
 // ── a sheet: rows with formulas per column, inputs, and scenarios side by side, all computed by the system ─────────
 export const SHEET = block({
-  name: 'sheet', component: 'VSheet', about: 'a spreadsheet model: rows with computed columns (compute), inputs ($name) and scenarios side by side; every computed cell says its formula',
-  roles: {},
+  name: 'sheet', component: 'VSheet', about: 'a spreadsheet model: rows with computed columns (compute), inputs ($name) and scenarios side by side; every computed cell says its formula. Its columns are lettered A, B, … and its rows numbered, row 1 the header. A CSV, TSV or JSON file as rows: from, its attachment id, or path, the file in the working folder; the system reads it, and draws up to 1,000 rows and 200 columns of it. notes: your notes on its cells, by A1 address',
+  roles: {}, cells: { rows: 1000, columns: 200 },
   fields: { scenarios: panelOption(z.record(z.string(), z.record(z.string(), z.number())).optional().describe('sheet: named sets of inputs, e.g. {"low": {"growth": 0.02}, "base": {"growth": 0.04}}; totals is computed for each')),
     totals: panelOption(z.record(z.string(), z.string()).optional().describe('sheet: values over all rows, e.g. {"Budget": "sum(budget)"}; with scenarios, one column per scenario')) },
   check: rows => (rows.length ? null : 'a sheet needs rows'),

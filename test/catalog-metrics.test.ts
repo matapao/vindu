@@ -43,6 +43,7 @@ const examples: Record<string, Example> = {
   VMap: { part: '.vb-small', property: 'font-size' },
   VContacts: { part: '.vb-card', property: 'padding-left' },
   VSheet: { part: 'th', property: 'font-size' },
+  VNotedTable: { props: { cells: ref('cells') }, part: 'td', property: 'padding-left' },
   VSlides: { part: '.vb-slidetitle', property: 'font-size' },
   VSignature: { part: '.vb-item', property: 'padding-top' },
   VDiagram: { props: { nodes: ref('nodes') }, part: '.vb-nodelabel', property: 'font-size' },
@@ -63,6 +64,7 @@ function catalogView(): View {
   const data = {
     rows: [row], map: Object.fromEntries(Object.keys(row).map(k => [k, k])), name: '', included: false, selected: [], date: '2026-06-01',
     marks: [{ x: 0.2, y: 0.3, w: 0.4, h: 0.1, label: 'Area' }], nodes: [{ id: 'Step', layer: 0, order: 0 }],
+    cells: { fields: ['title'], notes: [{ n: 1, cell: 'A2', note: 'Checked', row: 0, column: 0 }] },
   };
   const blocks = children.map(name => ({
     id: name, component: name,

@@ -41,6 +41,7 @@ export type ViewContext = {
     workFile(rel: string): string | null;           // a page in the working folder, as a path under it
     workUrl(rel: string, query: string, uses: string[], hash: string): string; // its address: on a work origin for its uses
     workAny?(rel: string): string | null;           // any file there (an image, a sound), as a path under it
+    workPath?(rel: string): { rel: string; file: string } | null; // any file there: its path under it and on disk, for a table or a sheet to read
     workPages(): string[];                          // the pages there, for a refusal that lists them
     writeView(name: string, html: string): string;  // keep a page the model wrote; its path under /view/, with a version
     workText?(rel: string): { rel: string; text: string } | { why: string };  // a text file there, for code and diff panels

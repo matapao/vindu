@@ -1,12 +1,15 @@
-// vindu's blocks in the window: one component each, for the cards of blocks.ts. Each draws the exact rows it is sent,
-// written by the same rules as the cards (format.ts), in the process's locale and time zone. Every row it draws carries
-// data-panel and data-row, so what the person points at is found by reference, never read from the screen. A block
-// that lets the person act (a device's switch) sends a vindu-action event; the shell carries it to the UI server.
+// vindu's blocks in the window: one component each, for the cards of blocks.ts, and one for a table with notes. Each
+// draws the exact rows it is sent, written by the same rules as the cards (format.ts), in the process's locale and time
+// zone. Every row it draws carries data-panel and data-row, so what the person points at is found by reference, never
+// read from the screen. A block that lets the person act (a device's switch, a table's head) sends a vindu-action
+// event; the shell carries it to the UI server.
 import type { VinduComponent } from './define.js';
 import { VMessages, VDocument } from './blocks/communications.js';
 import { VEvents } from './blocks/calendar.js';
 import { VTasks } from './blocks/tasks.js';
-import { VMoney, VFiles, VMap, VContacts, VSheet } from './blocks/records.js';
+import { VMoney, VFiles, VMap, VContacts } from './blocks/records.js';
+import { VSheet } from './blocks/sheet.js';
+import { VNotedTable } from './blocks/table.js';
 import { VSlides, VSignature, VDiagram } from './blocks/presentation.js';
 import { VDevices, VBatch, VChanges, VDecision } from './blocks/operations.js';
 import { VMediaMarks, VChart } from './blocks/media.js';
@@ -30,4 +33,5 @@ export const BLOCK_COMPONENTS: VinduComponent[] = [
   VChanges,
   VDecision,
   VMediaMarks,
+  VNotedTable,
 ];

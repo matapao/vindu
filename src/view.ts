@@ -10,6 +10,7 @@ import { compile, type Surface } from './a2ui.js';
 import { account, type Account } from './account.js';
 import { check, kindOf } from './card-kinds/registry.js';
 import { addFields } from './compute.js';
+import { dataFileOf } from './data-files.js';
 import { groupsBehind } from './pointing.js';
 import { hookWords } from './gates.js';
 import { checkSurface } from './surface-check.js';
@@ -48,7 +49,7 @@ export function showView(input: Record<string, unknown>, ctx: ViewContext): Show
       if ((p.follow || p.live) && newest && newest !== given) d.follows = given;
       else if (!p.follow && !p.live && newest && newest !== given) d.newer = newest;
       const kind = kindOf(p.card, ctx.cards)!;
-      if (!p.from && kind.typed !== false && !kind.source && ctx.marks !== false) d.typed = true; // the model's own words and numbers
+      if (!p.from && !d.file && kind.typed !== false && !kind.source && ctx.marks !== false) d.typed = true; // the model's own words and numbers
       if (p.from && ctx.classify) { const e = ctx.results.get(p.from); const label = e ? ctx.classify(e) : undefined; if (label) d.label = label; }
       const problem = check(p, d, ctx.cards);
       if (problem) { problems.push(`panel ${p.id}: ${problem}`); continue; }
@@ -145,7 +146,9 @@ function resolve(p: PanelSpec, view: ViewSpec, ctx: ViewContext, notes: string[]
   if (p.from && !e) throw new Refusal(`panel ${p.id}: no result "${p.from}". This task has: ${listing(ctx.results)}`);
   const direct = kind.direct?.(p, e); if (direct) return direct;
   let rows: Row[]; let src: Resolved['src'];
-  if (e) {
+  const read = kind.cells ? dataFileOf(p, e, ctx, notes) : undefined; // a CSV, TSV or JSON file, read by the system
+  if (read) rows = read.rows;
+  else if (e) {
     const got = rowsOf(e, p, notes, !!kind.one); rows = got.rows;
     src = { id: e.id, pointer: got.pointer, index: new Map(rows.map((r, i) => [r, i])), of: rows.length,
       fidelity: e.kind === 'answer' ? (e.by === 'app' ? 'app-reported' : e.by === 'host' ? 'host' : e.by === 'page' ? 'page' : 'person') : e.kind === 'result' ? e.fidelity ?? 'reported' : 'attachment',
@@ -155,13 +158,14 @@ function resolve(p: PanelSpec, view: ViewSpec, ctx: ViewContext, notes: string[]
   else if (p.data && typeof p.data === 'object') rows = [p.data as Row];
   else if (kind.source) { try { rows = kind.source(p, id => ctx.results.get(id)); } catch (x) { throw new Refusal(`panel ${p.id}: ${(x as Error).message}`); } }
   else throw new Refusal(`panel ${p.id}: ${p.card} needs "from" (a result id such as r3) or rows you worked out`);
+  const file = read?.file, at = src ?? file; // where each row is in what it was read from
   const steps: Record<string, unknown>[] = [];
   const inputs = inputsOf(p, view, ctx);
   const given: Pick<Resolved, 'inputs'> = Object.keys(inputs).length ? { inputs } : {}; // what the values were computed with, if anything
   if (p.compute && Object.keys(p.compute).length) { // fields computed for each row, by the system: kept with the row they came from
     let got: ReturnType<typeof addFields>;
     try { got = addFields(rows, p.compute, inputs); } catch (e) { throw new Refusal(`panel ${p.id}: compute: ${(e as Error).message}`); }
-    reindex(src, rows, got.rows);
+    reindex(at, rows, got.rows);
     rows = got.rows;
     steps.push({ compute: p.compute, rows: rows.length, ...(Object.keys(got.empty).length ? { empty: got.empty } : {}) });
     for (const [k, n] of Object.entries(got.empty)) notes.push(`panel ${p.id}: ${k} is empty in ${n} of ${rows.length} rows (a field missing or not a number, or a division by zero)`);
@@ -170,7 +174,7 @@ function resolve(p: PanelSpec, view: ViewSpec, ctx: ViewContext, notes: string[]
     let got: ReturnType<typeof addDates>;
     const holidays = [...(ctx.holidays ?? []), ...(p.holidays ?? [])]; // the host's, and the panel's own
     try { got = addDates(rows, p.dates, { timeZone: ctx.format?.timeZone, holidays }); } catch (e) { throw new Refusal(`panel ${p.id}: dates: ${(e as Error).message}`); }
-    reindex(src, rows, got.rows);
+    reindex(at, rows, got.rows);
     rows = got.rows;
     steps.push({ dates: p.dates, ...(holidays.length ? { holidays: holidays.length } : {}), ...(Object.keys(got.empty).length ? { empty: got.empty } : {}) });
     for (const [k, n] of Object.entries(got.empty)) notes.push(`panel ${p.id}: ${k} is empty in ${n} of ${rows.length} rows (its date field holds no date)`);
@@ -186,18 +190,18 @@ function resolve(p: PanelSpec, view: ViewSpec, ctx: ViewContext, notes: string[]
     try { made = kind.rows(rows, p, id => ctx.results.get(id), { inputs }); } catch (x) { throw new Refusal(`panel ${p.id}: ${(x as Error).message}`); }
     const { rows: out, ...worked } = Array.isArray(made) ? { rows: made } : made;
     rows = out; if (Object.keys(worked).length) shaped = worked;
-    if (rows !== before && !behind) reindex(src, before, rows); // a group's rows stand for the rows behind them
+    if (rows !== before && !behind) reindex(at, before, rows); // a group's rows stand for the rows behind them
   }
-  return { rows, src, steps, ...(behind ? { behind } : {}), ...given, ...(shaped ? { shaped } : {}) };
+  return { rows, src, steps, ...(behind ? { behind } : {}), ...given, ...(shaped ? { shaped } : {}), ...(file ? { file } : {}) };
 }
 
 /** Rows made from the rows before (fields computed for each, a block's own shaping), each kept at its place in its
- *  result: the same row (a block that sorts), the row it was made from (SOURCE), or, for rows made one for one in the
- *  same order (an invoice's lines with their amounts), the row at its place. */
-function reindex(src: Resolved['src'], before: Row[], rows: Row[]) {
-  if (!src) return;
-  const idx = src.index;
-  src.index = new Map(rows.map((r, i) => [r, idx.get(r) ?? idx.get(sourceRow(r)) ?? idx.get(before[i]) ?? i]));
+ *  result or data file: the same row (a block that sorts), the row it was made from (SOURCE), or, for rows made one for
+ *  one in the same order (an invoice's lines with their amounts), the row at its place. */
+function reindex(at: { index: Map<Row, number> } | undefined, before: Row[], rows: Row[]) {
+  if (!at) return;
+  const idx = at.index;
+  at.index = new Map(rows.map((r, i) => [r, idx.get(r) ?? idx.get(sourceRow(r)) ?? idx.get(before[i]) ?? i]));
 }
 
 /** A panel's inputs (what-ifs): the model's values, unless the person set one in the window. */

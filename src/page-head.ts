@@ -78,12 +78,12 @@ export function gitHead(work: string): (rel: string) => HeadText {
 }
 
 /** A file read through one descriptor, so that the size checked is the size of what is read: its size, and its bytes
- *  when it is at most TEXT_MAX. */
-export function readText(file: string): { size: number; bytes?: Buffer } {
+ *  when it is at most max (TEXT_MAX by default). */
+export function readText(file: string, max = TEXT_MAX): { size: number; bytes?: Buffer } {
   const fd = fs.openSync(file, 'r');
   try {
     const { size } = fs.fstatSync(fd);
-    return size > TEXT_MAX ? { size } : { size, bytes: fs.readFileSync(fd) };
+    return size > max ? { size } : { size, bytes: fs.readFileSync(fd) };
   } finally { fs.closeSync(fd); }
 }
 
