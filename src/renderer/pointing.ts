@@ -5,7 +5,7 @@
 //     and mouse-only way: no dragging is needed.) On a touch screen, a long press marks one, or takes it back;
 //   - a plain click on a bar of a grouped chart, or a double-click on a grouped row: open what it stands for, in place;
 //   - "In the chat" on a pane: each message carries that pane;
-//   - what a block asks to do (a device's switch) goes to the server too (what a page asks: shell-frames.ts).
+//   - what a block asks to do (a device's switch, a draft's Send) goes to the server too (what a page asks: shell-frames.ts).
 // Blocks mark rows with data-panel and data-row; A2UI's own components carry their data path (/panels/<pid>/rows/<i>).
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { BLOCK_ACTION, paneOf, viewOf } from './dom.js';
@@ -111,7 +111,7 @@ export function mountPointing(o: Opts): { mark: (picked: PointItem[], attached: 
   const onAction = (e: Event) => {
     const d = (e as CustomEvent).detail; if (!d || typeof d !== 'object') return;
     if (d.type === 'operation' && typeof d.name === 'string' && d.name) o.emit(d);
-    else if (d.type === 'view' && typeof d.action === 'string') { // an action inside a view (a process moved, a slide changed): for the pane it is in
+    else if ((d.type === 'view' || d.type === 'message') && typeof d.action === 'string') { // an action inside a view (a process moved, a slide changed), or the person's edit or Send in a mail drafted for them: for the pane it is in
       const target = e.target as Element | null, view = target?.closest ? viewOf(target) : undefined;
       if (view) o.emit({ ...d, view });
     }

@@ -3,6 +3,7 @@ import type { AppsProvider, AppsSwitch } from '../apps.js';
 import type { CardDef } from '../cards.js';
 import type { PreviewRule } from '../frames.js';
 import type { LayoutOptions } from '../layout.js';
+import type { DraftFile, DraftFormat, DraftOriginal, SendResult } from '../message-draft.js';
 import type { Ask, Binding, Operation, Words } from '../operations.js';
 import type { PageDriver } from '../page-check.js';
 import type { HeadText, Library } from '../pages.js';
@@ -14,6 +15,7 @@ import type { ModelArrange, ShellState, ViewMark } from '../shell.js';
 import type { Template } from '../templates.js';
 import type { PartialViewWords } from '../view-words.js';
 import type { ViewsSetup } from '../views/views.js';
+import type { SavedDraft } from './message-drafts.js';
 import type { Fill, Gate } from './state.js';
 
 /** What the window gets for each view: its two surfaces; what to read back after drawing (probes) and which showing it is
@@ -56,6 +58,7 @@ export type ViewCheckpoint = {
   mode?: { template: Template; inputs: Record<string, unknown>; fills: [string, Fill][] };
   /** How far each panel of each view has been read: by view, each panel's share. */
   read?: [string, [string, number][]][];
+  drafts?: SavedDraft[]; // the person's drafts of the mails drafted for them, as they changed them, and how each send went
 };
 export type { HeadText }; // a file of the working folder as the last commit has it, or why not
 /** One process, as Vindu sees it: its results, a folder of its own (logs, written pages), and its working folder if it
@@ -73,6 +76,23 @@ export type UiProcess = {
   sync?: () => Promise<void>;
 }; // the copy brought up to date with the folder there, before a show or a check reads it
 
+/** A mail the person sends from the window (a message block's draft, its Send pressed): a stable id for this draft
+ *  (the same through the person's changes and every try, for the host to key its own record on), the view and panel it
+ *  is in, its fields exactly as the person sees them, the files it attaches (each its path in the working folder, its
+ *  name and size, read by the system as Send was pressed), and who pressed Send, as the window says. */
+export type MessageDraft = {
+  id: string;
+  view: string;
+  panel: string;
+  to: string[];
+  cc: string[];
+  subject: string;
+  body: string;
+  format: DraftFormat;
+  in_reply_to?: DraftOriginal;
+  attachments: DraftFile[];
+  by: { name: string; window: string };
+};
 /** What a host adds when it opens a process: MCP Apps (their servers, reached through the host), and what an app asks of the person. */
 export type OpenMore = {
   apps?: AppsProvider;
@@ -132,6 +152,18 @@ export type OpenMore = {
     writes: boolean;
     snapshot: ViewSnapshot;
   }) => Promise<{ id?: string; refused?: string }>;
+  /** The person pressed Send on a mail drafted for them (a message block's draft): the host sends it as it decides, and
+   *  says how it went; unknown when it may not have arrived. Their click is their yes: there is no ask after it, and
+   *  only that click calls this, never the model. Until it answers the draft says "Sending…"; once sent it is
+   *  read-only; after failed or unknown the person may change it and send it again. A throw counts as unknown. */
+  onSendMessage?: (draft: MessageDraft) => Promise<SendResult>;
+  /** Whether this window can send mail now: true, or the host's own action in place of Send, with its label (a window
+   *  with no mail connection yet, say), which onMessageAction then runs. Read each time a draft is drawn; call the opened
+   *  window's messagesChanged when it changes, and every draft is drawn again. Without it, Send is there wherever
+   *  onSendMessage is; without either, a draft has Copy alone. */
+  messageSending?: () => true | { action: string };
+  /** The person clicked the host's own action in place of Send (messageSending): the draft, where it is, and who. */
+  onMessageAction?: (a: { id: string; view: string; panel: string; by: { name: string; window: string } }) => void;
   /** false: this process starts no jobs (a job's own process: what it shows never starts another). */
   jobs?: boolean;
   /** false: no hook runs in this process (a job's own process: its views are its source's, and their hooks ran there). */

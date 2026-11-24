@@ -3,6 +3,7 @@
 // is resolved, which no input schema can see.
 import { z } from 'zod';
 import type { ViewAction } from './actions.js';
+import type { DraftContext } from './block-drafts.js';
 import type { Entry, Row } from './results.js';
 import type { ViewWords } from './view-words.js';
 
@@ -24,7 +25,7 @@ export type CardDef = {
   /** The rows shaped for the card after where, group, sort and limit, with the process's other results at hand (a
    *  document's earlier version, say) and the inputs the values are computed with. What it adds is computed by the
    *  system, and its account says so: the rows, or the rows with what it worked out from them (Shaped). */
-  rows?: (rows: Row[], panel: PanelSpec, read: (id: string) => Entry | undefined, context: { inputs: Record<string, number> }) => Row[] | Shaped;
+  rows?: (rows: Row[], panel: PanelSpec, read: (id: string) => Entry | undefined, context: RowsContext) => Row[] | Shaped;
   /** Rows for a panel with neither from nor data, made from other results (one row per call of a batch, say). */
   source?: (panel: PanelSpec, read: (id: string) => Entry | undefined) => Row[];
   /** Files it shows as they are (a document's Markdown): a panel that names one, with from (an attachment) or path (a
@@ -66,6 +67,9 @@ export type CardFile = {
   most: number;
   rows: (text: string, panel: PanelSpec) => { rows: Row[]; cut?: string };
 };
+/** What a card's rows are shaped with besides them: the inputs the values are computed with, and the person's own draft
+ *  of the panel, where the window keeps one (a message block's draft: block-drafts.ts). */
+type RowsContext = { inputs: Record<string, number>; draft?: DraftContext };
 /** What a card's own shaping worked out besides its rows, so nothing is kept on the panel: props for its component (an
  *  invoice's totals, where nodes go), what its account adds, and the rows its check reads when not these (free time is
  *  checked against the events it was found between). */

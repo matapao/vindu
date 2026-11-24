@@ -1,7 +1,7 @@
 // The words Vindu draws on a view's own surface, besides what the model wrote: what a panel says of itself, the way
-// back and through steps and a gallery, the system's own suggestions, and each hook's line with its switch. English by
-// default; a host gives its own, whole or word by word (view-words-norwegian.ts has Bokmål and Nynorsk). What the model
-// is told stays in English, whatever the person reads.
+// back and through steps and a gallery, the system's own suggestions, each hook's line with its switch, and a mail
+// drafted for the person to send. English by default; a host gives its own, whole or word by word
+// (view-words-norwegian.ts has Bokmål and Nynorsk). What the model is told stays in English, whatever the person reads.
 
 /** A hook's line, as the person reads it: when it runs, then each thing it does; and why it is off where it cannot be
  *  turned on. Panels come by their titles, an operation by its name with spaces. */
@@ -19,6 +19,31 @@ export type HookWords = {
   nothing: string;                                                              // what a hook that does nothing does
   idle: string;                                                                 // a job's hook in a job's own task
   unavailable: string;                                                          // a job's hook where the app starts no jobs
+};
+/** A mail drafted for the person to send (a message block's draft), as they read and change it: each field's label,
+ *  the files it attaches, the mail it replies to, Send and how it went, and Copy. Plain words, which the window puts
+ *  together with what they go with ("Failed: " and the host's reason). */
+export type MessageWords = {
+  to: string;            // "To"
+  cc: string;            // "Cc"
+  subject: string;       // "Subject"
+  body: string;          // "Message": the body's label, for a screen reader
+  attachments: string;   // "Attachments"
+  remove: string;        // "Remove", before a file's name
+  missing: string;       // after a file it attaches that is no longer there
+  inReplyTo: string;     // "In reply to", above the mail it replies to
+  from: string;          // "From", that mail's sender
+  date: string;          // "Date", when that mail was sent
+  edit: string;          // "Edit": a Markdown body's source, to change it
+  preview: string;       // "Preview": a Markdown body drawn as it reads
+  send: string;          // "Send"
+  sending: string;       // "Sending…", while the host sends it
+  sent: string;          // "Sent"
+  failed: string;        // "Failed", before the host's reason
+  unknown: string;       // the host cannot say whether it went
+  check: string;         // a draft that cannot go as it is: its fields that need a change are marked
+  copy: string;          // "Copy": the whole mail as plain text, on the clipboard
+  copied: string;        // "Copied"
 };
 /** The words of a view's own surface. An arrow goes with the word it points with; the compiler adds only the
  *  punctuation between words (" · " and parentheses). */
@@ -40,9 +65,10 @@ export type ViewWords = {
   turnOn: string;                                        // the switch of a hook's job, or of a device
   turnOff: string;
   hook: HookWords;
+  message: MessageWords;
 };
 /** Words a host gives: any of them; each one it leaves out is the one under it. */
-export type PartialViewWords = Partial<Omit<ViewWords, 'hook'>> & { hook?: Partial<HookWords> };
+export type PartialViewWords = Partial<Omit<ViewWords, 'hook' | 'message'>> & { hook?: Partial<HookWords>; message?: Partial<MessageWords> };
 
 /** The line a crosses hook looks at, in the words given: "above 50000 or below 100". */
 export const lineIn = (
@@ -85,6 +111,28 @@ export const VIEW_WORDS: ViewWords = {
     idle: 'off: a job\'s own task runs no hooks',
     unavailable: 'off: jobs are off in this app',
   },
+  message: {
+    to: 'To',
+    cc: 'Cc',
+    subject: 'Subject',
+    body: 'Message',
+    attachments: 'Attachments',
+    remove: 'Remove',
+    missing: 'no longer in the working folder',
+    inReplyTo: 'In reply to',
+    from: 'From',
+    date: 'Date',
+    edit: 'Edit',
+    preview: 'Preview',
+    send: 'Send',
+    sending: 'Sending…',
+    sent: 'Sent',
+    failed: 'Failed',
+    unknown: 'It may not have arrived. Check before you send it again.',
+    check: 'Check the marked fields',
+    copy: 'Copy',
+    copied: 'Copied',
+  },
 };
 
 /** The words given, without those left undefined. */
@@ -92,4 +140,4 @@ const given = <T extends object>(words: T | undefined): Partial<T> =>
   Object.fromEntries(Object.entries(words ?? {}).filter(([, word]) => word !== undefined)) as Partial<T>;
 /** Words over others, word by word: each one given in place of the one under it. */
 export const viewWordsOver = (under: ViewWords, words?: PartialViewWords): ViewWords =>
-  ({ ...under, ...given(words), hook: { ...under.hook, ...given(words?.hook) } });
+  ({ ...under, ...given(words), hook: { ...under.hook, ...given(words?.hook) }, message: { ...under.message, ...given(words?.message) } });

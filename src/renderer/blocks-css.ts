@@ -107,6 +107,20 @@ export const BLOCKS_CSS = `
 .vindu-theme .vb-chart{position:relative;display:block;max-width:100%} .vindu-theme .vb-chart img{display:block;max-width:100%;height:auto}
 .vindu-theme .vb-strips{position:absolute;top:0;bottom:0;display:flex} .vindu-theme .vb-strip{flex:1 1 0} .vindu-theme .vb-strip[data-opens]{cursor:pointer}
 .vindu-theme .vb-strip:hover{background:rgba(42,120,214,.07)} .vindu-theme .vb-strip:focus-visible{outline:2px solid var(--v-accent);outline-offset:-2px} .vindu-theme .vb-strip.vb-picked{background:rgba(42,120,214,.16);outline:2px solid var(--v-accent)}
+.vindu-theme .vb-draft{display:flex;flex-direction:column;gap:${rhythm(8)} 0;max-width:80ch}
+.vindu-theme .vb-dhead{display:grid;grid-template-columns:auto minmax(0,1fr);gap:${rhythm(4)} ${space(10)};align-items:center;padding-bottom:${rhythm(6)};border-bottom:1px solid var(--v-hair)} .vindu-theme .vb-dfield{display:contents}
+.vindu-theme .vb-dlabel{color:var(--v-muted);font-size:${captionSize(12)}}
+.vindu-theme .vb-draft input,.vindu-theme .vb-draft textarea{font:inherit;color:var(--v-ink);background:var(--v-pane);border:1px solid var(--v-line);border-radius:5px;padding:${rhythm(3)} ${space(7)};width:100%;min-width:0;box-sizing:border-box}
+.vindu-theme .vb-draft textarea.vb-dbody{min-height:${rhythm(150)};max-height:60vh;field-sizing:content;resize:vertical;line-height:1.5}
+.vindu-theme .vb-draft input[readonly],.vindu-theme .vb-draft textarea[readonly]{background:transparent;border-color:var(--v-hair)}
+.vindu-theme .vb-draft [aria-invalid="true"],.vindu-theme .vb-dinvalid .vb-chip{border-color:#b3261e;box-shadow:0 0 0 1px #b3261e}
+.vindu-theme .vb-dpreview{border:1px solid var(--v-hair);border-radius:5px;padding:${rhythm(2)} ${space(10)}} .vindu-theme .vb-dtools{display:flex;justify-content:flex-end}
+.vindu-theme .vb-dfiles{display:flex;flex-wrap:wrap;gap:${rhythm(4)} ${space(8)};align-items:baseline} .vindu-theme .vb-dfiles .vb-chips{margin-top:0}
+.vindu-theme .vb-dremove{border:0;background:none;color:var(--v-muted);font:inherit;cursor:pointer;padding:0 0 0 ${space(4)}} .vindu-theme .vb-dremove:hover{color:var(--v-ink)}
+.vindu-theme .vb-dquote{border-left:3px solid var(--v-line);padding:${rhythm(2)} ${space(10)};color:var(--v-ink-2)} .vindu-theme .vb-dquote blockquote{margin:0}
+.vindu-theme .vb-dactions{display:flex;flex-wrap:wrap;gap:${rhythm(6)} ${space(8)};align-items:center;justify-content:flex-end} .vindu-theme .vb-dstatus{margin-right:auto}
+.vindu-theme .vb-dsent .vb-dstatus{color:#12805a;font-weight:600}
+.vindu-theme .vb-btn.vb-primary{background:var(--v-accent);border-color:var(--v-accent);color:var(--v-pane)} .vindu-theme .vb-btn:disabled{opacity:.5;cursor:default}
 .vindu-band{position:fixed;z-index:50;border:1.5px dashed var(--v-accent,#2a78d6);background:rgba(42,120,214,.08);pointer-events:none}
 .vindu-theme .vindu-pane-tools .vindu-chat[aria-pressed="true"]{background:var(--v-accent);color:var(--v-pane)}
 .vindu-theme .vindu-pane-tools .vindu-chat[aria-pressed="true"]:hover{background:var(--v-accent);color:var(--v-pane)}

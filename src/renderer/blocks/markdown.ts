@@ -65,6 +65,8 @@ function block(b: unknown, depth: number): unknown {
   return nothing;
 }
 const blocks = (v: unknown, depth = 0) => listOf(v).map(b => block(b, depth + 1));
+/** Blocks of Markdown, as a document draws them (a mail's body, say). */
+export const markdownBlocks = (v: unknown) => blocks(v);
 
 /** The section with this anchor, brought into view in its document. */
 const goTo = (anchor: string) => (e: Event) => {

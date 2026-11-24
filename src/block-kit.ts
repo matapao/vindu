@@ -3,6 +3,7 @@
 // kept on the panel.
 import { z } from 'zod';
 import { panelOption, rowFields, type CardAction, type CardDef, type PanelSpec, type Shaped } from './cards.js';
+import type { DraftContext } from './block-drafts.js';
 import type { Entry, Row } from './results.js';
 import { asText } from './format.js';
 
@@ -30,7 +31,7 @@ const MAP = z.record(z.string(), z.string()).optional();
  *  the rows its check reads), given the roles found (map). Nothing it works out is kept on the panel. */
 type Spec = { name: string; about: string; component: string; roles: Roles; layouts?: string[]; fields?: Record<string, z.ZodType>; one?: boolean; cells?: CardDef['cells'];
   check?: (rows: Row[], p: PanelSpec, map: Record<string, string>) => string | null;
-  rows?: (rows: Row[], p: PanelSpec, map: Record<string, string>, read: (id: string) => Entry | undefined, inputs?: Record<string, number>) => Row[] | Shaped;
+  rows?: (rows: Row[], p: PanelSpec, map: Record<string, string>, read: (id: string) => Entry | undefined, inputs?: Record<string, number>, draft?: DraftContext) => Row[] | Shaped;
   source?: CardDef['source'];
   file?: CardDef['file'];                            // files it shows as they are (a document's Markdown)
   props?: (p: PanelSpec) => Record<string, unknown>; // fixed props for its component
@@ -55,7 +56,7 @@ export function block(o: Spec): CardDef {
     rows: (rows, p, read, context) => {
       if (badLayout(p)) return rows; // the check says so
       const map = rolesOf(rows, p, o.roles);
-      const made = o.rows?.(rows, p, map, read, context?.inputs) ?? rows;
+      const made = o.rows?.(rows, p, map, read, context?.inputs, context?.draft) ?? rows;
       const { rows: out, props: worked, account: more, checkRows } = Array.isArray(made) ? { rows: made } as Shaped : made;
       const props = { ...fixed(p), map, ...o.props?.(p), ...worked };
       const account = { roles: map, ...(props.layout ? { layout: props.layout } : {}), ...o.account?.(out, p, map, props), ...more };

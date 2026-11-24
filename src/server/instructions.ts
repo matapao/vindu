@@ -1,3 +1,5 @@
+import { MESSAGE } from '../blocks.js';
+import type { CardDef } from '../cards.js';
 import { Views } from '../views/views.js';
 
 /** A short note for the first prompt: how the person sees things. */
@@ -62,5 +64,11 @@ export const readText = (h: Has) =>
       ? ` What you read from ${either(h, 'a terminal', 'a page', 'a terminal or page')} is kept under an id, as any result.`
       : '',
   ].join('');
+/** What the model is told of a mail meant to be sent, where the message block is offered: it is a view the person
+ *  sends, never words in the model's answer. */
+export const DRAFTS_TEXT =
+  ' A mail meant to be sent is shown as a message draft ({"card": "message", "layout": "draft", "data": {"to", "subject", "body", …}}), never written as text in your answer: the person reads it, edits it and sends it in the window; you never press Send, and you are told how it went.';
+/** Whether this window offers Vindu's message block, and so its drafts. */
+export const offersDrafts = (cards: ReadonlyMap<string, CardDef>) => cards.get('message') === MESSAGE;
 export const showText = (h: Has) =>
   `Show the person a view next to the chat, as a pane in their window: one page of panels, several tabs${h.pages ? ', or a browser page of your own ("browser": {"url"}), which you then read with read_view and use with act_in_view' : ''}. Point panels at results with "from". A page panel shows a web page ("path" in the working folder, or "html" you write). Showing a name again replaces that view in its pane, keeping the tab the person has open; a view the person collapsed into the shelf stays there, updated and marked. Returns a JSON account of what rendered, how each value went in, what the window read back, and where its pane is; a page panel's account says how the page loaded${h.pages ? ", and a browser page's gives its accessibility tree" : ''}.`;

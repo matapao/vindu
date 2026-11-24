@@ -21,6 +21,7 @@ import { wake } from './gates.js';
 import { fire } from './hooks.js';
 import { hostRequests } from './host-requests.js';
 import { hasOf, NOTE, noteViews } from './instructions.js';
+import { messagesChanged } from './message-drafts.js';
 import { unheard } from './page-messages.js';
 import { present } from './present.js';
 import { settle } from './receipts.js';
@@ -110,6 +111,7 @@ export function openSession(
     hookRuns: new Map(),
     hooksDue: [],
     files: new Map(),
+    drafts: new Map(),
   };
   const layoutToken = randomBytes(16).toString('hex');
   endpoints.set(token, () => serverFor(session));
@@ -261,6 +263,9 @@ export function openSession(
     /** The words drawn on this window's views, in place of those it opened with (over the provider's): every view shown
      *  is drawn again in them at once, where it is. What the model is told stays in English. */
     setViewWords: (words?: PartialViewWords) => setViewWords(session, words),
+    /** The host's messageSending says something else now (a mail connection made, or gone): every mail drafted for the
+     *  person is drawn again, with Send, or the host's own action in its place. */
+    messagesChanged: () => messagesChanged(session),
     /** What the person's yeses let go, and how each went. */
     receipts: () => session.receipts.map((r) => ({ ...r })),
     /** How far the person has read each panel of the views shown, now: for the host alone, never the model. */

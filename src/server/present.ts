@@ -6,6 +6,7 @@ import type { Place } from '../layout.js';
 import { presentationOf } from '../presentation.js';
 import { showView } from '../view.js';
 import { afterShown } from './live-panels.js';
+import { draftLook, dropDrafts } from './message-drafts.js';
 import { check, REPORT_MS } from './page-checks.js';
 import { log } from './records.js';
 import { readBack, windowSaid } from './render-reports.js';
@@ -39,6 +40,7 @@ export const present = async (
   // Commit resources together after the entire replacement has passed validation.
   for (const panel of Object.values(session.data.get(v.spec.name) ?? {}))
     if (panel.app) session.runtime.host.removeApp(panel.app.url);
+  dropDrafts(session, v.spec.name); // the drafts this showing draws are kept by its mounts, and only those
   for (const mount of mounts) mount();
   const { place: _place, ...kept } = args; // where a view goes is said once: drawn again, it stays where it is
   session.specs.set(v.spec.name, kept);
@@ -178,6 +180,7 @@ const ctxFor = (
   cues: (view) => session.cues.get(view) ?? [],
   gate: (view, p, spec) => gateOf(session, view, p, spec),
   step: (view) => session.steps.get(view) ?? 1,
+  draft: (view, panel, model) => draftLook(session, view, panel, model, anew, mounts),
   hookState: (view, n) =>
     session.more.hooks === false
       ? 'idle'

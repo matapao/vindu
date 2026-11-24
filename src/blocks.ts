@@ -7,26 +7,32 @@
 // (blocks: [names]), or none (blocks: false); the model is told only of those offered.
 import { z } from 'zod';
 import { block, needOne, type Roles } from './block-kit.js';
+import { draftShaped } from './block-drafts.js';
 import { EVENTS } from './block-events.js';
 import { countIds, panelOption, resultIds, resultRef, rowFields, type CardDef } from './cards.js';
 import { changedFields } from './changes.js';
 import { addFields, num, parse as parseExpr, setValue } from './compute.js';
 import { MARKDOWN_FILE, isMarkdownSection, markdownAccount } from './markdown-document.js';
+import { DRAFT_LIMITS, megabytes } from './message-draft.js';
 import type { Row } from './results.js';
 import { asText } from './format.js';
 
 const T = /^(time|date|sent|received|at|timestamp|created|when|datetime)$/i;
 export const MESSAGE = block({
-  name: 'message', component: 'VMessages', about: 'mail, chat or SMS: one message, a thread, or an inbox', one: true,
+  name: 'message', component: 'VMessages', one: true,
+  about: `mail, chat or SMS: one message, a thread, or an inbox. Or, with layout draft, a mail for the person to send, as one object in data: {to, cc, subject, body, format: "text" or "markdown", in_reply_to: the original mail {from, time, subject, body}, attachments: paths of files in the working folder}; at most ${DRAFT_LIMITS.addresses} addresses in to and cc, a subject of ${DRAFT_LIMITS.subject} characters, a body of ${DRAFT_LIMITS.body.toLocaleString('en-GB')}, ${DRAFT_LIMITS.attachments} attachments of ${megabytes(DRAFT_LIMITS.bytes)} in all. A mail meant to be sent is always a draft, never text in your answer: the person reads it, edits it and sends it in the window; you never press Send, and are told how it went`,
   roles: { from: /^(from|sender|author|by|user)$/i, to: /^(to|recipients?)$/i, cc: /^cc$/i, subject: /^(subject|title|topic)$/i,
-    body: /^(body|text|content|message|preview|snippet|html)$/i, time: T, attachments: /^attach/i, thread: /^(thread|conversation|thread_?id)$/i, state: /^(state|status|read|unread|flags?)$/i },
-  layouts: ['one', 'thread', 'inbox'],
-  check: (rows, _p, m) => needOne(m, ['subject', 'body'], 'a message', rows),
-  rows: (rows, p, m) => {
+    body: /^(body|text|content|message|preview|snippet|html)$/i, time: T, attachments: /^attach/i, thread: /^(thread|conversation|thread_?id)$/i, state: /^(state|status|read|unread|flags?)$/i,
+    format: /^(format|body_?format|markup)$/i, in_reply_to: /^(in_?reply_?to|replying_?to|original)$/i },
+  layouts: ['one', 'thread', 'inbox', 'draft'],
+  check: (rows, p, m) => (p.layout === 'draft' ? (rows.length > 1 ? `a draft is one mail: send its fields as one object in data, not ${rows.length} rows` : null) : needOne(m, ['subject', 'body'], 'a message', rows)),
+  rows: (rows, p, m, _read, _inputs, draft) => {
+    if (p.layout === 'draft') return draftShaped(rows, m, draft);
     const layout = asText(p.layout || (rows.length === 1 ? 'one' : m.thread && new Set(rows.map(r => String(r[m.thread]))).size === 1 ? 'thread' : 'inbox'));
     return { rows: layout === 'thread' && m.time ? [...rows].sort((a, b) => String(a[m.time]).localeCompare(String(b[m.time]))) : rows, props: { layout } };
   },
-  account: (rows, _p, _m, props) => ({ messages: rows.length, shows: props.layout === 'inbox' ? 'from, subject and time of each, newest as given' : props.layout === 'thread' ? 'each message in time order, with its body' : 'the whole message' }),
+  account: (rows, _p, _m, props) => (props.layout === 'draft' ? { shows: 'a mail drafted for the person to send, which they may change in the window' } : { messages: rows.length, shows: props.layout === 'inbox' ? 'from, subject and time of each, newest as given' : props.layout === 'thread' ? 'each message in time order, with its body' : 'the whole message' }),
+  words: w => ({ ...w.message }),
 });
 
 // ── documents: sections with anchors to cite; what changed since an earlier version, as tracked changes; or a Markdown

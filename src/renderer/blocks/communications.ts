@@ -10,9 +10,11 @@ import {
   defineBlock,
 } from './shared.js';
 import { markdownDocument } from './markdown.js';
+import { messageDraft } from './message-draft.js';
 import { asText } from '../../format.js';
 
-export const VMessages = defineBlock('VMessages', 'vindu-messages', {}, (props) => {
+export const VMessages = defineBlock('VMessages', 'vindu-messages', { draft: 'value', words: 'value' }, (props, element) => {
+  if (props.layout === 'draft') return messageDraft(props, element); // a mail for the person to send
   const rows = props.rows;
   const header = (row: BlockRow) =>
     html`<div class="vb-meta"><b>${

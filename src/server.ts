@@ -19,6 +19,7 @@ export type {
   OpenMore,
   ReadProgress,
   UiServerOptions,
+  MessageDraft,
 } from './server/contracts.js';
 export { NOTE } from './server/instructions.js';
 

@@ -4,6 +4,7 @@ import { FROM_ALIASES, fieldRoles, resultIds } from '../cards.js';
 import type { AnswerEntry } from '../results.js';
 import type { ViewCheckpoint, ViewSnapshot } from './contracts.js';
 import { readForCheckpoint, restoreRead } from './read-progress.js';
+import { restoreDrafts, savedDrafts } from './message-drafts.js';
 import { keep, log } from './records.js';
 import { setPicked } from './selection.js';
 import type { Session } from './state.js';
@@ -139,6 +140,7 @@ export const checkpoint = (session: Session): ViewCheckpoint => {
     tickets: session.tickets,
     ...(session.mode ? { mode: { ...session.mode, fills: [...session.mode.fills] } } : {}),
     read: readForCheckpoint(session), // how far the person has read each panel, like their what-ifs: their own state of the view
+    ...(session.drafts.size ? { drafts: savedDrafts(session) } : {}),
   };
 };
 export const restore = async (session: Session, saved: ViewCheckpoint) => {
@@ -164,6 +166,7 @@ export const restore = async (session: Session, saved: ViewCheckpoint) => {
   session.gates = new Map(saved.gates);
   session.fresh = new Map(saved.fresh);
   if (saved.mode) session.mode = { ...saved.mode, fills: new Map(saved.mode.fills) };
+  restoreDrafts(session, saved.drafts);
   const refused: string[] = [];
   for (const v of saved.views) {
     try {

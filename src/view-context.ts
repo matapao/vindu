@@ -1,3 +1,4 @@
+import type { DraftLook, ModelDraft } from './block-drafts.js';
 import type { CardDef, PanelSpec, ViewSpec } from './cards.js';
 import type { HeadText } from './pages.js';
 import { brief, type Entry, type ResultSource } from './results.js';
@@ -35,6 +36,9 @@ export type ViewContext = {
   step?: (view: string) => number;
   /** A view's hook, as the person sees it: a job they turned on or not (or jobs are off here), or the system's own. */
   hookState?: (view: string, n: number) => 'on' | 'off' | 'unavailable' | 'system' | 'idle';
+  /** The person's draft of a panel (a message block's draft), as the window keeps it, given the model's: what they
+   *  changed, the files it attaches as read now, how its send went, and what the window offers in place of Send. */
+  draft?: (view: string, panel: string, model: ModelDraft) => DraftLook;
   /** The values the person set for a panel's inputs in the window (what-ifs), which win over the model's own. */
   inputs?: (view: string, panel: string, defaults: Record<string, number>) => Record<string, number>;
   pages?: {

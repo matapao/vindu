@@ -1,0 +1,223 @@
+// The person's own draft of each mail drafted for them (a message block's draft, block-drafts.ts), as the window keeps
+// it: what they changed, through the system's redraws and in the checkpoint; the files it attaches, read through the
+// page host's path guard (their names and sizes, never their contents); and how its send went. The model's showing
+// anew starts a new draft. Send is the person's alone: only their click in the window sends the mail, as they see it,
+// and the click is their yes; the host sends it and says how it went (onSendMessage). Each event about a draft carries
+// the token only the window that draws it has. The model is told each outcome once, with the fields as they were sent,
+// and never what the person changes while they draft.
+import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { filesProblem, type DraftLook, type LookedFile, type ModelDraft } from '../block-drafts.js';
+import { checkDraftEdit, draftProblems, fieldsWithin, type DraftFields, type DraftSending, type DraftState as DraftWhere, type SendResult } from '../message-draft.js';
+import type { MessageDraft } from './contracts.js';
+import { keep, log, stableJson, whoOf } from './records.js';
+import type { Session } from './state.js';
+import { asText } from '../format.js';
+
+/** One draft, as the session keeps it: the view and panel it is in, its id for the host, the token the window's events
+ *  about it carry, the model's draft it is of, the person's fields where they changed them, where its send is (and why
+ *  it failed), how many times that changed (the window's own "Sending…" waits for the next), and when the window's last
+ *  edits came. */
+export type KeptDraft = {
+  view: string; panel: string; id: string; token: string; model: ModelDraft;
+  edited?: DraftFields; state: DraftWhere; reason?: string; rev: number; edits: number[];
+};
+/** A draft as a checkpoint keeps it: a send under way is kept as unknown, since its answer is lost with the task. */
+export type SavedDraft = Pick<KeptDraft, 'view' | 'panel' | 'id' | 'model' | 'edited' | 'state' | 'reason'>;
+
+const keyOf = (view: string, panel: string) => `${view}/${panel}`;
+const newDraft = (view: string, panel: string, model: ModelDraft): KeptDraft =>
+  ({ view, panel, id: randomUUID(), token: randomBytes(16).toString('hex'), model, state: 'draft', rev: 0, edits: [] });
+
+/** The files a draft attaches, by their paths in the working folder: each one's name and size, read now through the
+ *  page host's path guard (inside the folder, never a folder itself), and missing where it is not there. */
+function filesOf(session: Session, paths: readonly string[]): (LookedFile & { rel?: string })[] {
+  return paths.map((given) => {
+    const name = path.posix.basename(given.replace(/\/+$/, ''));
+    try {
+      const found = session.process.work ? session.runtime.host.workPath(session.key, given) : null;
+      const folder = !!found && path.posix.basename(found.rel) === 'index.html' && name !== 'index.html'; // a folder's page
+      if (found && !folder) return { path: given, rel: found.rel, name: path.posix.basename(found.rel), size: fs.statSync(found.file).size };
+    } catch {
+      // gone while it was read, or not readable: missing, as any file that is not there
+    }
+    return { path: given, name, size: 0, missing: true as const };
+  });
+}
+
+/** What the window offers in place of Send, as the host says now: Send where it sends mail, its own action (a label of
+ *  at most 60 characters, and a way to run it) where it cannot yet, or nothing. */
+function sendingOf(session: Session): DraftSending {
+  const more = session.more;
+  let said: unknown;
+  try {
+    said = more.messageSending ? more.messageSending() : true;
+  } catch (e) {
+    log(session, { drafts: { sending: 'failed', why: String((e as Error).message).slice(0, 200) } });
+    return 'none';
+  }
+  if (said === true) return more.onSendMessage ? 'send' : 'none';
+  const action = said && typeof said === 'object' ? (said as { action?: unknown }).action : undefined;
+  const label = typeof action === 'string' ? action.replace(/\s+/g, ' ').trim().slice(0, 60) : '';
+  return label && more.onMessageAction ? { action: label } : 'none';
+}
+
+/** The person's draft of a panel, for a drawing of it: the one kept, while the model's draft is the same and this is
+ *  not the model's showing anew, or a new one; with the files it attaches as read now. A new draft whose files are not
+ *  all there, or too large together, is refused. mounts: where a showing keeps it, once it has passed its checks. */
+export function draftLook(session: Session, view: string, panel: string, model: ModelDraft, anew: boolean, mounts?: (() => void)[]): DraftLook {
+  const had = session.drafts.get(keyOf(view, panel));
+  const kept = !anew && had && stableJson(had.model) === stableJson(model) ? had : undefined;
+  const d = kept ?? newDraft(view, panel, model);
+  const files = filesOf(session, (d.edited ?? model.fields).attachments);
+  const refused = kept ? undefined : filesProblem(files);
+  if (refused) throw new Error(refused);
+  mounts?.push(() => session.drafts.set(keyOf(view, panel), d));
+  const theirs = d.edited ? { fields: d.edited, modelFiles: filesOf(session, model.fields.attachments) } : {}; // the model's account is of its own draft
+  return { token: d.token, state: d.state, rev: d.rev, ...(d.reason ? { reason: d.reason } : {}), ...theirs, files, sending: sendingOf(session) };
+}
+/** A view's drafts go: before a showing keeps those it draws, and with the view. */
+export const dropDrafts = (session: Session, view: string) => {
+  for (const [k, d] of session.drafts) if (d.view === view) session.drafts.delete(k);
+};
+
+/** A view with drafts drawn again by the system, where it is, as a restored view is: nothing in it is read again. */
+const redraw = (session: Session, view: string) => {
+  const args = session.specs.get(view);
+  if (args && !session.closed)
+    void session.present(args, true, true).catch((e) => log(session, { drafts: { redraw: view, failed: String((e as Error).message) } }));
+};
+/** Every view with a draft, drawn again: the host's messageSending says something else now. */
+export const messagesChanged = (session: Session) => {
+  for (const view of new Set([...session.drafts.values()].map((d) => d.view))) redraw(session, view);
+};
+
+/** Whether an event carries the token of the draft it is about: only the window that draws the draft has it. */
+const fromWindow = (d: KeptDraft, token: unknown) => {
+  const given = Buffer.from(typeof token === 'string' ? token : ''), own = Buffer.from(d.token);
+  return given.length === own.length && timingSafeEqual(given, own);
+};
+/** What the window says of a draft: the person's edit, their Send, or their click on the host's own action. Only from
+ *  the window that draws it (its token), for a draft shown; anything else is ignored (false). */
+export function draftEvent(session: Session, x: Record<string, unknown>): boolean {
+  const d = session.drafts.get(keyOf(asText(x.view ?? ''), asText(x.panel ?? '')));
+  if (!d || !session.shown.has(d.view) || !fromWindow(d, x.token)) return false;
+  if (x.action === 'edit') return edited(d, x.fields);
+  if (x.action === 'send') return sendFromWindow(session, d, x);
+  if (x.action === 'host') return hostAction(session, d, whoOf(x));
+  return false;
+}
+
+/** The person's fields, as they change them: kept for the next drawing and the checkpoint, within a draft's sizes and
+ *  as often as the window may say (checkDraftEdit), with only the files the model attached. Never told to the model. */
+const edited = (d: KeptDraft, fields: unknown): boolean => {
+  if (d.state === 'sending' || d.state === 'sent') return false;
+  const { recent, why } = checkDraftEdit(d.edits, fields), got = fieldsWithin(fields);
+  if (why || !got || !got.attachments.every((p) => d.model.fields.attachments.includes(p))) return false;
+  d.edits = [...recent, Date.now()];
+  d.edited = got;
+  return true;
+};
+
+/** The person's Send, with the fields as they see them: checked as a draft is (each address, each limit, each file
+ *  still there), sent by the host, and told. A Send that cannot go is drawn again, so the window shows why. */
+function sendFromWindow(session: Session, d: KeptDraft, x: Record<string, unknown>): boolean {
+  if (d.state === 'sending' || d.state === 'sent' || sendingOf(session) !== 'send') return false;
+  const fields = fieldsWithin(x.fields);
+  if (!fields || !fields.attachments.every((p) => d.model.fields.attachments.includes(p))) return false;
+  const files = filesOf(session, fields.attachments);
+  const why = draftProblems(fields).map((p) => p.why).join('; ') || filesProblem(files);
+  d.edited = fields;
+  d.rev++;
+  if (why) {
+    log(session, { person: { draft: d.id, view: d.view, send: 'refused', why } });
+    redraw(session, d.view);
+    return false;
+  }
+  const by = whoOf(x);
+  d.state = 'sending';
+  delete d.reason;
+  redraw(session, d.view);
+  log(session, { person: { draft: d.id, view: d.view, panel: d.panel, send: true, by } });
+  const { format, original } = d.model;
+  const draft: MessageDraft = {
+    id: d.id, view: d.view, panel: d.panel, ...fields, format, ...(original ? { in_reply_to: original } : {}),
+    attachments: files.map((f) => ({ path: f.rel ?? f.path, name: f.name, size: f.size })), by,
+  };
+  void sent(session, d, draft);
+  return true;
+}
+
+/** How the host said it went, as a send's outcome: anything else, or a throw, is unknown, as it may have gone. */
+const outcomeOf = (r: unknown): SendResult => {
+  const o = (r && typeof r === 'object' ? r : {}) as { outcome?: unknown; reason?: unknown };
+  const reason = typeof o.reason === 'string' ? o.reason.replace(/\s+/g, ' ').trim().slice(0, 500) : '';
+  if (o.outcome === 'sent') return { outcome: 'sent' };
+  if (o.outcome === 'failed') return { outcome: 'failed', reason: reason || 'the host gave no reason' };
+  if (o.outcome === 'unknown') return reason ? { outcome: 'unknown', reason } : { outcome: 'unknown' };
+  return { outcome: 'unknown', reason: 'the host said nothing of how it went' };
+};
+async function sent(session: Session, d: KeptDraft, draft: MessageDraft) {
+  let result: SendResult;
+  try {
+    result = outcomeOf(await session.more.onSendMessage!(structuredClone(draft)));
+  } catch (e) {
+    result = { outcome: 'unknown', reason: String((e as Error)?.message ?? e).replace(/\s+/g, ' ').slice(0, 500) };
+  }
+  if (session.closed) return;
+  d.state = result.outcome;
+  if ('reason' in result && result.reason) d.reason = result.reason;
+  d.rev++;
+  told(session, draft, result);
+  if (session.drafts.get(keyOf(d.view, d.panel)) === d) redraw(session, d.view); // a draft the model showed anew since is not this one
+}
+
+/** How a send went, as the model is told it. */
+const OUTCOME = {
+  sent: () => 'the host sent it',
+  failed: (why?: string) => `the host could not send it (${why}): it did not go, and the person may change it and send it again`,
+  unknown: (why?: string) => `the host cannot say whether it went${why ? ` (${why})` : ''}: it may not have arrived, and the person checks before sending it again`,
+};
+/** What the model hears of a Send, once, with the next message: how it went, and the fields as they were sent (the body's
+ *  start), with all of them kept as the person's answer (a p-id) for ctx_read. */
+function told(session: Session, draft: MessageDraft, result: SendResult) {
+  const reason = 'reason' in result ? result.reason : undefined;
+  const { id: _id, view, panel, by, ...fields } = draft;
+  const e = keep(session, { to: `Send on the mail drafted in view "${view}"`, by: 'person', values: { outcome: result.outcome, ...(reason ? { reason } : {}), ...fields }, who: [by.name] });
+  session.heard.add(e.id); // told here, with what went: not again as an answer
+  const who = by.name === 'the person' ? 'the person' : `${by.name} (${by.window})`;
+  const body = draft.body.length > 200 ? `${JSON.stringify(draft.body.slice(0, 199))}…` : JSON.stringify(draft.body);
+  const parts = [
+    `to ${draft.to.join(', ')}`, draft.cc.length ? `cc ${draft.cc.join(', ')}` : '', `subject ${JSON.stringify(draft.subject)}`,
+    `body (${draft.body.length} characters${draft.format === 'markdown' ? ', Markdown' : ''}) ${body}`,
+    draft.attachments.length ? `attached ${draft.attachments.map((f) => `${f.path} (${f.size} bytes)`).join(', ')}` : '',
+    draft.in_reply_to?.subject ? `in reply to ${JSON.stringify(draft.in_reply_to.subject)}` : '',
+  ].filter(Boolean);
+  session.shell.say(`${who} pressed Send on the mail drafted in "${session.shown.get(view)?.title ?? view}" (${panel}), and ${OUTCOME[result.outcome](reason)}; as it was sent: ${parts.join('; ')} (all of it: ctx_read ${e.id})`);
+  log(session, { drafts: { draft: draft.id, view, panel, outcome: result.outcome, ...(reason ? { reason } : {}), entry: e.id } });
+}
+
+/** The person clicked the host's own action in place of Send: the host runs it. */
+function hostAction(session: Session, d: KeptDraft, by: { name: string; window: string }): boolean {
+  const sending = sendingOf(session);
+  if (typeof sending !== 'object' || !session.more.onMessageAction) return false;
+  try {
+    session.more.onMessageAction({ id: d.id, view: d.view, panel: d.panel, by });
+  } catch (e) {
+    log(session, { drafts: { draft: d.id, action: sending.action, failed: String((e as Error).message).slice(0, 200) } });
+  }
+  log(session, { person: { draft: d.id, view: d.view, action: sending.action, by } });
+  return true;
+}
+
+/** The drafts, for a checkpoint. */
+export const savedDrafts = (session: Session): SavedDraft[] =>
+  [...session.drafts.values()].map((d) => ({
+    view: d.view, panel: d.panel, id: d.id, model: d.model, ...(d.edited ? { edited: d.edited } : {}),
+    ...(d.state === 'sending' ? { state: 'unknown' as const, reason: 'the task was kept while it was being sent' } : { state: d.state, ...(d.reason ? { reason: d.reason } : {}) }),
+  }));
+/** The drafts a checkpoint kept, each with a token of this window's. */
+export const restoreDrafts = (session: Session, saved: readonly SavedDraft[] = []) => {
+  session.drafts = new Map(saved.map((s) => [keyOf(s.view, s.panel), { ...structuredClone(s), token: randomBytes(16).toString('hex'), rev: 0, edits: [] }]));
+};

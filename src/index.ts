@@ -1,13 +1,14 @@
 // Node provider for a web backend or Electron main process. The window entry is @matapao/vindu/renderer.
 export { startVindu, type Vindu, type VinduSession, type VinduOptions, type VinduProcess, type VinduSessionOptions, type UiEndpoint } from './provider.js';
-export { NOTE, type HeadText, type TemplateStart, type Shown, type OpenMore, type ReadProgress, type ViewCheckpoint, type ViewSnapshot } from './server.js';
+export { NOTE, type HeadText, type TemplateStart, type Shown, type OpenMore, type ReadProgress, type ViewCheckpoint, type ViewSnapshot, type MessageDraft } from './server.js';
+export { DRAFT_LIMITS, type SendResult } from './message-draft.js'; // a mail drafted for the person to send: what it takes at most, and how its send went
 export { type ViewPresentation, type PanelPresentation } from './presentation.js';
 export { applyAction, ACTIONS, type ViewAction } from './actions.js';
 export { rowKey } from './row-keys.js';
 export { addDates, addTime, dayOf, parseDateExpr, today, type DateExpr } from './dates.js';
 export { whenOf, instantOf, localOf, sayTime, remindersSurface, REMINDER_WORDS, DEFAULT_TIME, type Reminder, type ReminderWords } from './reminders.js';
 export { FieldSchema, formBinding, readAnswer, fieldsOf, checkValue, checkDigits, FORMATS, CHECKS, permissionDetails, lineDiff, confirms, HINTS, WORDS, type Format, type Check, type Operation, type Effect, type Field, type Form, type Detail, type Ask, type Binding, type Words } from './operations.js';
-export { VIEW_WORDS, type ViewWords, type HookWords, type PartialViewWords } from './view-words.js';
+export { VIEW_WORDS, type ViewWords, type HookWords, type MessageWords, type PartialViewWords } from './view-words.js';
 export { VIEW_WORDS_NB, VIEW_WORDS_NN } from './view-words-norwegian.js';
 export { fromApp, appHtml, resultFor, textOnly, appsOn, anyAppsOn, resourceOf, toolResourceUri, toolVisibleTo, type AppsProvider, type AppsSwitch, type AppPanel, type AppSubmission } from './apps.js';
 export { memoryResults, brief, shapeOf, amountsOf, fileOf, readRef, refOf, dataOf, withOwn, type ResultSource, type Entry, type ResultEntry, type AttachmentEntry, type AnswerEntry, type Row } from './results.js';

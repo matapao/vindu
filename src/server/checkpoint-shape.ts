@@ -3,6 +3,7 @@
 // model may show. Its template is checked as any template is when it loads.
 import { z } from 'zod';
 import { CARDS } from '../cards.js';
+import { DRAFT_LIMITS } from '../message-draft.js';
 import { keptFor } from '../shell-roles.js';
 import { checkTemplate } from '../templates.js';
 import type { ViewCheckpoint } from './contracts.js';
@@ -38,6 +39,30 @@ const Fill = z.object({
   failed: z.string().optional(),
 });
 const Numbers = z.record(z.string(), z.number());
+const Texts = (most: number, each: number) => z.array(z.string().max(each)).max(most);
+const DraftFields = z.object({
+  to: Texts(DRAFT_LIMITS.addresses, DRAFT_LIMITS.address),
+  cc: Texts(DRAFT_LIMITS.addresses, DRAFT_LIMITS.address),
+  subject: z.string().max(DRAFT_LIMITS.subject),
+  body: z.string().max(DRAFT_LIMITS.body),
+  attachments: Texts(DRAFT_LIMITS.attachments, DRAFT_LIMITS.path),
+});
+const Draft = z.object({
+  view: Name,
+  panel: Name,
+  id: z.string().min(1).max(100),
+  model: z.object({
+    fields: DraftFields,
+    format: z.enum(['text', 'markdown']),
+    original: z
+      .object({ id: z.string().max(500), from: z.string().max(DRAFT_LIMITS.address), time: z.string().max(100), subject: z.string().max(DRAFT_LIMITS.subject), body: z.string().max(DRAFT_LIMITS.body) })
+      .partial()
+      .optional(),
+  }),
+  edited: DraftFields.optional(),
+  state: z.enum(['draft', 'sent', 'failed', 'unknown']), // a send under way is kept as unknown
+  reason: z.string().max(1000).optional(),
+});
 const Checkpoint = z.object({
   views: z.array(View).max(200),
   layout: z.unknown(),
@@ -65,6 +90,7 @@ const Checkpoint = z.object({
     .array(z.tuple([Name, z.array(z.tuple([z.string().max(80), z.number().min(0).max(1)])).max(200)]))
     .max(200)
     .optional(),
+  drafts: z.array(Draft).max(200).optional(),
 });
 
 /** The checkpoint, as a checkpoint, or why it is not one: what is wrong, in a few words for the host's log. */

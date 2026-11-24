@@ -2,6 +2,7 @@
 // check each against its card, compile to A2UI, check the surface, and tell the model what rendered.
 // Nothing is done otherwise than asked without saying so: what cannot be shown is refused, every panel's problem in one
 // refusal, and a field no card reads is told back as ignored.
+import type { ModelDraft } from './block-drafts.js';
 import { addDates } from './dates.js';
 import { keyField, rowKey } from './row-keys.js';
 import type { Row } from './results.js';
@@ -189,7 +190,8 @@ function resolve(p: PanelSpec, view: ViewSpec, ctx: ViewContext, notes: string[]
   let shaped: Resolved['shaped'];
   if (kind.rows && rows.length) { // a block's own shaping (totals, free slots, tracked changes, a layout), by the system
     const before = rows; let made: ReturnType<NonNullable<typeof kind.rows>>;
-    try { made = kind.rows(rows, p, id => ctx.results.get(id), { inputs }); } catch (x) { throw new Refusal(`panel ${p.id}: ${(x as Error).message}`); }
+    const draft = ctx.draft && ((model: ModelDraft) => ctx.draft!(view.name, p.id, model)); // the person's own draft of it, where the window keeps one
+    try { made = kind.rows(rows, p, id => ctx.results.get(id), { inputs, ...(draft ? { draft } : {}) }); } catch (x) { throw new Refusal(`panel ${p.id}: ${(x as Error).message}`); }
     const { rows: out, ...worked } = Array.isArray(made) ? { rows: made } : made;
     rows = out; if (Object.keys(worked).length) shaped = worked;
     if (rows !== before && !behind) reindex(at, before, rows); // a group's rows stand for the rows behind them

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { HINTS } from '../operations.js';
 import { Shell } from '../shell.js';
 import { registerArrange, registerInspectionTools } from './inspection-tools.js';
-import { hasOf, INSTRUCTIONS, viewsText } from './instructions.js';
+import { DRAFTS_TEXT, hasOf, INSTRUCTIONS, offersDrafts, viewsText } from './instructions.js';
 import { registerOperationTools } from './operation-tools.js';
 import { registerPageCheck } from './page-checks.js';
 import { json } from './records.js';
@@ -14,7 +14,7 @@ export const serverFor = (session: Session): McpServer => {
   const has = hasOf(session.live); // the model is told of terminals and pages only where this window has them
   const server = new McpServer(
     { name: 'ui', version: '0.3.0' },
-    { instructions: INSTRUCTIONS + viewsText(has) },
+    { instructions: INSTRUCTIONS + viewsText(has) + (offersDrafts(session.runtime.cards) ? DRAFTS_TEXT : '') },
   );
 
   registerShowTools(server, session, has);

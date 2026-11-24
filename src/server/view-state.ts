@@ -2,6 +2,7 @@
 // what the system offered on its pane, the person's yes to each of its hooks' jobs, how far the person has read it, and,
 // once a view leaves the window for good, everything it was shown with.
 import type { Hook } from '../cards.js';
+import { dropDrafts } from './message-drafts.js';
 import { stableJson } from './records.js';
 import type { Session } from './state.js';
 
@@ -47,6 +48,7 @@ export const dropView = (session: Session, view: string) => {
     session.pages.delete(`${view}/${id}`);
   }
   session.views.delete(view);
+  dropDrafts(session, view);
   session.steps.delete(view);
   session.drills.delete(view);
   for (const k of [...session.inputs.keys(), ...session.gates.keys()])

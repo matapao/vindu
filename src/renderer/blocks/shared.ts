@@ -64,14 +64,14 @@ export const defineBlock = (
   name: string,
   tag: string,
   props: Parameters<typeof defineComponent>[0]['props'],
-  render: (props: RowBlockProps) => unknown,
+  render: (props: RowBlockProps, element: HTMLElement) => unknown,
 ): VinduComponent =>
   defineComponent({
     name,
     tag,
     props: { ...ROW_PROPS, ...props },
-    render: (x: Record<string, unknown>) => {
+    render: (x: Record<string, unknown>, element) => {
       const props = x as BlockProps;
-      return props.rows ? render(props as RowBlockProps) : nothing;
+      return props.rows ? render(props as RowBlockProps, element) : nothing;
     },
   });

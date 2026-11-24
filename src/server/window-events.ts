@@ -3,6 +3,7 @@ import { routeAppMessage } from './app-events.js';
 import { answerFromWindow } from './ask-events.js';
 import { answered } from './asks.js';
 import { readNow } from './live-panels.js';
+import { draftEvent } from './message-drafts.js';
 import { personRuns } from './operations.js';
 import { pageSaid, sent } from './page-messages.js';
 import { readFromWindow } from './read-progress.js';
@@ -55,6 +56,7 @@ export function dispatchEvent(session: Session, e: unknown, replyToWindow = sess
     drawRem(session, true);
     return true;
   } // the bar's chip
+  if (x.type === 'message') return draftEvent(session, x); // a mail drafted for the person: their edit, their Send
   if (x.type === 'operation')
     return (
       typeof x.name === 'string' &&

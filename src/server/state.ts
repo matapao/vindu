@@ -13,6 +13,7 @@ import type { Template } from '../templates.js';
 import type { ViewWords } from '../view-words.js';
 import { Views } from '../views/views.js';
 import type { OpenMore, Shown, UiProcess } from './contracts.js';
+import type { KeptDraft } from './message-drafts.js';
 import type { RecordFile } from './record-files.js';
 import type { ServerRuntime } from './runtime.js';
 
@@ -138,6 +139,7 @@ export type Session = {
   hookRuns: Map<string, number[]>; // view#n: when its job ran, for its budget
   hooksDue: { view: string; event: HookEvent; only?: number }[]; // hooks set off, to run in order once what set them off is done
   files: Map<RecordFile, number>; // the session's files with its process, each open from its first line until close
+  drafts: Map<string, KeptDraft>; // view/panel: the person's draft of each mail drafted for them (message-drafts.ts)
   waking?: Promise<void>;
   wakeAgain?: boolean; // a wake running, and whether another is due after it
 };
