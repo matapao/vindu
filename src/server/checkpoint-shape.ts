@@ -7,6 +7,7 @@ import { DRAFT_LIMITS } from '../message-draft.js';
 import { keptFor } from '../shell-roles.js';
 import { checkTemplate } from '../templates.js';
 import type { ViewCheckpoint } from './contracts.js';
+import { digestOf } from './message-drafts.js';
 import type { Session } from './state.js';
 
 const Name = z.string().min(1).max(200);
@@ -29,7 +30,7 @@ const Shelved = z.object({
   slot: z.unknown().optional(),
   updated: z.boolean().optional(),
 });
-const Gate = z.object({ want: z.string(), since: Count, sinceOwn: Count, got: z.string().optional() });
+const Gate = z.object({ want: z.string(), since: Count, sinceOwn: Count, got: z.string().optional(), why: z.string().max(1000).optional() });
 const Fill = z.object({
   by: z.enum(['source', 'model', 'person']),
   id: z.string().optional(),
@@ -51,17 +52,46 @@ const Draft = z.object({
   view: Name,
   panel: Name,
   id: z.string().min(1).max(100),
-  model: z.object({
+  of: z.string().regex(/^[a-f0-9]{64}$/).optional(), // the mail the model drafted, by its digest
+  model: z.object({ // the mail itself, as a checkpoint kept it before it kept only its digest
     fields: DraftFields,
     format: z.enum(['text', 'markdown']),
     original: z
       .object({ id: z.string().max(500), from: z.string().max(DRAFT_LIMITS.address), time: z.string().max(100), subject: z.string().max(DRAFT_LIMITS.subject), body: z.string().max(DRAFT_LIMITS.body) })
       .partial()
       .optional(),
-  }),
+  }).optional(),
   edited: DraftFields.optional(),
   state: z.enum(['draft', 'sent', 'failed', 'unknown']), // a send under way is kept as unknown
   reason: z.string().max(1000).optional(),
+});
+const Text = (most: number) => z.string().max(most);
+const Pointer = z.discriminatedUnion('kind', [
+  z.object({ id: z.string().regex(/^r\d+$/), kind: z.literal('result'), server: Text(200), tool: Text(200), input: z.unknown().optional(), ref: Text(1000).optional() }),
+  z.object({ id: z.string().regex(/^a\d+$/), kind: z.literal('attachment'), name: Text(1000), mime: Text(200), file: Text(4096) }),
+]);
+const Answer = z.object({
+  id: z.string().regex(/^p\d+$/),
+  to: Text(2000),
+  values: z.record(z.string(), z.unknown()).nullable(),
+  who: z.array(Text(300)).max(20).optional(),
+  at: Text(100),
+});
+const When = z.string().max(100).refine((t) => Number.isFinite(Date.parse(t)), 'a time');
+const Kept = z.object({
+  id: z.string().regex(/^m\d+$/),
+  what: Text(500),
+  at: When,
+  said: Text(200),
+  how: Text(2000),
+  by: z.enum(['person', 'model']),
+  who: Text(300).optional(),
+  about: Text(200).optional(),
+  state: z.enum(['set', 'due', 'done']),
+  set_at: When,
+  due_at: When.optional(),
+  done_at: When.optional(),
+  done_by: z.enum(['person', 'model']).optional(),
 });
 const Checkpoint = z.object({
   views: z.array(View).max(200),
@@ -91,6 +121,9 @@ const Checkpoint = z.object({
     .max(200)
     .optional(),
   drafts: z.array(Draft).max(200).optional(),
+  pointers: z.array(Pointer).max(5000).optional(),
+  answers: z.array(Answer).max(1000).optional(),
+  reminders: z.array(Kept).max(1000).optional(),
 });
 
 /** The checkpoint, as a checkpoint, or why it is not one: what is wrong, in a few words for the host's log. */
@@ -121,5 +154,11 @@ export const checkedCheckpoint = (session: Session, saved: unknown): ViewCheckpo
     mode = { ...cp.mode, template: t.template };
   }
   const picked = cp.picked as ViewCheckpoint['picked']; // each a view's, as pointing reads it; what does not fit it is dropped there
-  return { ...(cp as Omit<ViewCheckpoint, 'mode' | 'picked'>), picked, ...(mode ? { mode } : {}) };
+  const drafts = cp.drafts?.map(({ model, of, ...d }) => {
+    const mail = of ?? (model && digestOf(model)); // a checkpoint kept before drafts were kept by digest
+    if (!mail) throw new Error(`Not a task checkpoint: the draft in "${d.view}" names no mail`);
+    return { ...d, of: mail };
+  });
+  const rest = cp as Omit<ViewCheckpoint, 'mode' | 'picked' | 'drafts'>;
+  return { ...rest, picked, ...(mode ? { mode } : {}), ...(drafts ? { drafts } : {}) };
 };

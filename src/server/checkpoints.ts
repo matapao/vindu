@@ -1,62 +1,17 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { FROM_ALIASES, fieldRoles, resultIds } from '../cards.js';
+import type { PointItem } from '../pointing.js';
 import type { AnswerEntry } from '../results.js';
+import { answersFor, restoreAnswers } from './checkpoint-answers.js';
 import type { ViewCheckpoint, ViewSnapshot } from './contracts.js';
 import { readForCheckpoint, restoreRead } from './read-progress.js';
 import { restoreDrafts, savedDrafts } from './message-drafts.js';
 import { keep, log } from './records.js';
+import { NOT_KEPT, pointersFor, refetchAll, restoredView, type Restoring } from './refetch.js';
+import { restoreRem } from './reminders.js';
 import { setPicked } from './selection.js';
-import type { Session } from './state.js';
+import type { Fill, Gate, Session } from './state.js';
+import { idsIn, refsOf, swapIds } from './view-ids.js';
 
 // ── a new process from a view: the view as it is, and its entries, carried exactly ──────────────────────────────────
-const ID = /^[rap]\d+$/;
-/** The ids a value of a field that holds them names: a run written out (r5-r44); one longer than a panel can show is
- *  no run of ids, so it is carried as it is. */
-const idsOf = (v: string): string[] => {
-  try {
-    return resultIds([v]);
-  } catch {
-    return [v.trim()];
-  }
-};
-/** The fields of a panel that hold result ids, as the cards offered here mark them (resultRef): a panel's from (and the
- *  names show_view reads as from), a document's before, media and its marks, a page's uses, a batch's results, and any
- *  of a host's own. */
-const refsOf = (session: Session) => new Set([...fieldRoles([...session.runtime.cards.values()]).refs, ...FROM_ALIASES]);
-/** Every id a view points at: in each field that holds ids (a run, such as r5-r44, as each of its ids), and each ctx:
- *  reference. */
-const idsIn = (x: unknown, refs: Set<string>, out = new Set<string>(), k?: string): Set<string> => {
-  if (typeof x === 'string') {
-    if (k && refs.has(k) && ID.test(x)) out.add(x);
-    for (const m of x.matchAll(/ctx:([rap]\d+)/g)) out.add(m[1]);
-  } else if (Array.isArray(x))
-    for (const v of x) {
-      if (k && refs.has(k) && typeof v === 'string') for (const id of idsOf(v).filter((y) => ID.test(y))) out.add(id);
-      else idsIn(v, refs, out);
-    }
-  else if (x && typeof x === 'object') for (const [kk, v] of Object.entries(x)) idsIn(v, refs, out, kk);
-  return out;
-};
-/** The view with each id it points at swapped for its new one: in each field that holds ids (a run written out), and
- *  in each ctx: reference. */
-const swapIds = (x: unknown, refs: Set<string>, map: Record<string, string>, k?: string): unknown => {
-  const now = (id: string) => (Object.hasOwn(map, id) ? map[id] : undefined); // an id's new one: never what objects inherit
-  if (typeof x === 'string')
-    return ((k && refs.has(k) && now(x)) || x).replace(/ctx:([rap]\d+)/g, (m, id: string) => {
-      const swapped = now(id);
-      return swapped ? `ctx:${swapped}` : m;
-    });
-  if (Array.isArray(x))
-    return x.flatMap((v) => {
-      if (!(k && refs.has(k) && typeof v === 'string')) return [swapIds(v, refs, map)];
-      const ids = idsOf(v), run = ids.length !== 1 || ids[0] !== v.trim(); // r5-r44: each of its ids, swapped
-      return run && ids.every((id) => now(id)) ? ids.map((id) => map[id]) : [now(v) ?? swapIds(v, refs, map)];
-    });
-  if (x && typeof x === 'object')
-    return Object.fromEntries(Object.entries(x).map(([kk, v]) => [kk, swapIds(v, refs, map, kk)]));
-  return x;
-};
 export const snapshotOf = (session: Session): ViewSnapshot => {
   const views = session.shell
     .state()
@@ -124,53 +79,96 @@ export const startFrom = async (session: Session, snap: ViewSnapshot, carried: R
   log(session, { branch: { from: snap.at, shown, refused, map } });
   return { shown, refused, map };
 };
+// ── a task opened again from its checkpoint: the person's own state of its views, and where their results came from ──
+/** What the person points at, by where it is: what was under the pointer (a span's text, what a page reported) is read
+ *  again from the view as restored, never kept. */
+const placeOf = ({ text: _text, page: _page, note: _note, ...at }: PointItem): PointItem => at;
+/** The gates of the views a checkpoint keeps, by view/panel (a panel's id has no "/"). */
+const gatesOf = (session: Session, views: ReadonlySet<string>): [string, Gate][] =>
+  [...session.gates].filter(([k]) => views.has(k.slice(0, k.lastIndexOf('/'))));
 export const checkpoint = (session: Session): ViewCheckpoint => {
   const { views, layout, picked } = snapshotOf(session);
   const { focus, maximized, shelf, recent } = session.shell.state();
+  const gates = gatesOf(session, new Set(views.map((v) => v.name)));
+  const reminders = session.runtime.options.reminders ? session.reminders.map((r) => ({ ...r })) : [];
+  const refs = refsOf(session), ids = new Set<string>();
+  for (const v of views) idsIn(v.args, refs, ids);
+  const fresh = [...session.fresh].filter(([read]) => ids.has(read)); // the newest read of each the views show
+  for (const pair of fresh) for (const id of pair) ids.add(id);
+  for (const [, g] of gates) if (g.got) ids.add(g.got);
+  for (const [, f] of session.mode?.fills ?? []) if (f.id) ids.add(f.id);
+  for (const r of reminders) if (r.about) idsIn(r.about, refs, ids);
   return {
     views,
     layout,
-    picked,
+    picked: picked.map(placeOf),
     arrangement: { focus, maximized, shelf, recent },
     attached: [...session.attached],
     inputs: [...session.inputs],
     steps: [...session.steps],
-    gates: [...session.gates],
-    fresh: [...session.fresh],
+    gates,
+    fresh,
     tickets: session.tickets,
     ...(session.mode ? { mode: { ...session.mode, fills: [...session.mode.fills] } } : {}),
     read: readForCheckpoint(session), // how far the person has read each panel, like their what-ifs: their own state of the view
-    ...(session.drafts.size ? { drafts: savedDrafts(session) } : {}),
+    ...(session.drafts.size || session.savedDrafts.size ? { drafts: savedDrafts(session) } : {}),
+    pointers: pointersFor(session, ids), // where each result came from, never what it held
+    answers: answersFor(session, ids, gates),
+    ...(reminders.length ? { reminders } : {}),
   };
 };
+/** A gate as restored: on what was read again, or waiting for what comes after the restore (since), saying why. */
+const restoredGate = (g: Gate, since: number, sinceOwn: number, got: string | undefined, why: string | undefined): Gate => {
+  const gate: Gate = { want: g.want, since, sinceOwn };
+  if (got) gate.got = got;
+  else if (why) gate.why = why;
+  return gate;
+};
+/** A template's fill, on the id read again; without one where it was not. */
+const restoredFill = ({ id, ...fill }: Fill, now: (id?: string) => string | undefined): Fill => {
+  const again = now(id);
+  return again ? { ...fill, id: again } : fill;
+};
+/** The task, as the person left it: their answers kept again; each result and attachment the views show read again
+ *  by the host (more.refetch), and the views drawn from what came; a panel whose result was not read again waits for
+ *  it, saying why, and the model is told once. The titles of the views that could not be drawn at all. */
 export const restore = async (session: Session, saved: ViewCheckpoint) => {
   if (session.specs.size || session.own.length || session.asks.size)
     throw new Error('Restore into a newly opened task.');
-  const file = path.join(session.process.dir, 'answers.jsonl');
-  const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
-  // a crash while an answer was written leaves its line cut short, without its newline: it goes, so the next one is whole
-  const whole = text.slice(0, text.lastIndexOf('\n') + 1);
-  if (whole.length < text.length) fs.truncateSync(file, Buffer.byteLength(whole));
-  for (const line of whole.split('\n').filter(Boolean)) {
-    const a = JSON.parse(line) as AnswerEntry;
-    if (a.kind !== 'answer' || a.id !== `p${session.own.length + 1}`)
-      throw new Error('The saved task answers are inconsistent.');
-    session.own.push(a);
-    if (a.from) session.heard.add(a.id);
-  }
-  // Historical answers stay in the record. Only new submissions should appear as a new message.
-  session.told = session.own.length;
+  const answered = restoreAnswers(session, saved.answers);
+  const read = await refetchAll(session, saved.pointers ?? []);
+  const map = { ...read.map, ...answered.map };
+  const now = (id?: string) => (id !== undefined && Object.hasOwn(map, id) ? map[id] : undefined); // never what objects inherit
+  const since = session.results.all().length; // what waits, waits for what comes after the restore
   session.tickets = saved.tickets;
   session.inputs = new Map(saved.inputs);
   session.steps = new Map(saved.steps);
-  session.gates = new Map(saved.gates);
-  session.fresh = new Map(saved.fresh);
-  if (saved.mode) session.mode = { ...saved.mode, fills: new Map(saved.mode.fills) };
+  session.gates = new Map(
+    saved.gates.map(([k, g]) => {
+      const why = g.got ? (read.missing.get(g.got) ?? NOT_KEPT) : g.why;
+      return [k, restoredGate(g, since, answered.sinceOwn(g.sinceOwn), now(g.got), why)];
+    }),
+  );
+  session.fresh = new Map(saved.fresh.flatMap(([was, newest]): [string, string][] => {
+    const a = now(was), b = now(newest);
+    return a && b && a !== b ? [[a, b]] : [];
+  }));
+  if (saved.mode)
+    session.mode = { ...saved.mode, fills: new Map(saved.mode.fills.map(([n, f]) => [n, restoredFill(f, now)])) };
   restoreDrafts(session, saved.drafts);
+  const refs = refsOf(session);
+  restoreRem(session, saved.reminders?.map((r) => (r.about ? { ...r, about: swapIds(r.about, refs, map) as string } : r)));
+  const restoring: Restoring = {
+    refs,
+    map,
+    missing: read.missing,
+    pointers: new Map((saved.pointers ?? []).map((p) => [p.id, p])),
+    waits: [],
+  };
   const refused: string[] = [];
   for (const v of saved.views) {
     try {
-      await session.present(v.args, false, true);
+      await session.present(restoredView(session, v.args, restoring), false, true);
       if (v.mark) session.shell.mark(v.name, v.mark);
     } catch {
       refused.push(v.title);
@@ -180,6 +178,12 @@ export const restore = async (session: Session, saved: ViewCheckpoint) => {
   session.attached = new Set(saved.attached.filter((name) => session.shown.has(name)));
   restoreRead(session, saved.read);
   setPicked(session, saved.picked);
+  const { waits } = restoring;
+  if (waits.length)
+    session.shell.say(
+      `this task was opened again where the person left it, its views drawn from their results read again; ${waits.length === 1 ? 'one panel waits for its result' : `${waits.length} panels wait for their results`}: ${waits.slice(0, 12).join('; ')}${waits.length > 12 ? '; …' : ''}`,
+    );
+  log(session, { restore: { read: Object.keys(read.map), missing: [...read.missing.keys()], waits: waits.length, refused } });
   return refused;
 };
 export const branchNote = (session: Session) => {

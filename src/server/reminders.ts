@@ -54,6 +54,20 @@ const dueRem = (session: Session, r: Reminder, now: number) => {
   if (r.about && session.shown.has(r.about))
     unawaited(session, { reminder: r.id, hook: r.about }, session.fireHooks(r.about, { due: true }));
 };
+/** The reminders a checkpoint kept, the process's again beside those it has (each by its id): in its record, on the
+ *  bar's chip, and due ones due now. */
+export const restoreRem = (session: Session, kept: readonly Reminder[] = []) => {
+  if (!session.runtime.options.reminders || !kept.length) return;
+  const had = new Set(session.reminders.map((r) => r.id));
+  for (const r of kept)
+    if (!had.has(r.id)) {
+      const again = { ...r };
+      session.reminders.push(again);
+      keepRem(session, again);
+    }
+  session.shell.setReminders(remCount(session));
+  armRem(session);
+};
 /** Due ones now, and a timer for the next. */
 export const armRem = (session: Session) => {
   clearTimeout(session.remTimer);

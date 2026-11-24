@@ -5,7 +5,7 @@
 // and the click is their yes; the host sends it and says how it went (onSendMessage). Each event about a draft carries
 // the token only the window that draws it has. The model is told each outcome once, with the fields as they were sent,
 // and never what the person changes while they draft.
-import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { filesProblem, type DraftLook, type LookedFile, type ModelDraft } from '../block-drafts.js';
@@ -23,12 +23,21 @@ export type KeptDraft = {
   view: string; panel: string; id: string; token: string; model: ModelDraft;
   edited?: DraftFields; state: DraftWhere; reason?: string; rev: number; edits: number[];
 };
-/** A draft as a checkpoint keeps it: a send under way is kept as unknown, since its answer is lost with the task. */
-export type SavedDraft = Pick<KeptDraft, 'view' | 'panel' | 'id' | 'model' | 'edited' | 'state' | 'reason'>;
+/** A draft as a checkpoint keeps it: the person's fields where they changed them and how its send went, and which mail
+ *  the model drafted (of: a digest of it), never the mail itself, which may be what a result held. A send under way is
+ *  kept as unknown, since its answer is lost with the task. */
+export type SavedDraft = Pick<KeptDraft, 'view' | 'panel' | 'id' | 'edited' | 'state' | 'reason'> & { of: string };
 
 const keyOf = (view: string, panel: string) => `${view}/${panel}`;
 const newDraft = (view: string, panel: string, model: ModelDraft): KeptDraft =>
   ({ view, panel, id: randomUUID(), token: randomBytes(16).toString('hex'), model, state: 'draft', rev: 0, edits: [] });
+/** Which mail the model drafted, as a checkpoint names it: the same draft is always the same digest. */
+export const digestOf = (model: ModelDraft): string => createHash('sha256').update(stableJson(model)).digest('hex');
+/** A draft a checkpoint kept, of the mail drawn now: as the person left it, with a token of this window's. */
+const fromSaved = (s: SavedDraft, model: ModelDraft): KeptDraft => ({
+  view: s.view, panel: s.panel, id: s.id, token: randomBytes(16).toString('hex'), model,
+  ...(s.edited ? { edited: structuredClone(s.edited) } : {}), state: s.state, ...(s.reason ? { reason: s.reason } : {}), rev: 0, edits: [],
+});
 
 /** The files a draft attaches, by their paths in the working folder: each one's name and size, read now through the
  *  page host's path guard (inside the folder, never a folder itself), and missing where it is not there. */
@@ -67,8 +76,10 @@ function sendingOf(session: Session): DraftSending {
  *  not the model's showing anew, or a new one; with the files it attaches as read now. A new draft whose files are not
  *  all there, or too large together, is refused. mounts: where a showing keeps it, once it has passed its checks. */
 export function draftLook(session: Session, view: string, panel: string, model: ModelDraft, anew: boolean, mounts?: (() => void)[]): DraftLook {
-  const had = session.drafts.get(keyOf(view, panel));
-  const kept = !anew && had && stableJson(had.model) === stableJson(model) ? had : undefined;
+  const had = session.drafts.get(keyOf(view, panel)), saved = session.savedDrafts.get(keyOf(view, panel));
+  let kept: KeptDraft | undefined;
+  if (!anew && had && stableJson(had.model) === stableJson(model)) kept = had;
+  else if (!anew && saved && saved.of === digestOf(model)) kept = fromSaved(saved, model); // a checkpoint's, drawn again
   const d = kept ?? newDraft(view, panel, model);
   const files = filesOf(session, (d.edited ?? model.fields).attachments);
   const refused = kept ? undefined : filesProblem(files);
@@ -77,9 +88,10 @@ export function draftLook(session: Session, view: string, panel: string, model: 
   const theirs = d.edited ? { fields: d.edited, modelFiles: filesOf(session, model.fields.attachments) } : {}; // the model's account is of its own draft
   return { token: d.token, state: d.state, rev: d.rev, ...(d.reason ? { reason: d.reason } : {}), ...theirs, files, sending: sendingOf(session) };
 }
-/** A view's drafts go: before a showing keeps those it draws, and with the view. */
+/** A view's drafts go: before a showing keeps those it draws, and with the view; a checkpoint's with them. */
 export const dropDrafts = (session: Session, view: string) => {
   for (const [k, d] of session.drafts) if (d.view === view) session.drafts.delete(k);
+  for (const [k, d] of session.savedDrafts) if (d.view === view) session.savedDrafts.delete(k);
 };
 
 /** A view with drafts drawn again by the system, where it is, as a restored view is: nothing in it is read again. */
@@ -211,13 +223,16 @@ function hostAction(session: Session, d: KeptDraft, by: { name: string; window: 
   return true;
 }
 
-/** The drafts, for a checkpoint. */
-export const savedDrafts = (session: Session): SavedDraft[] =>
-  [...session.drafts.values()].map((d) => ({
-    view: d.view, panel: d.panel, id: d.id, model: d.model, ...(d.edited ? { edited: d.edited } : {}),
+/** The drafts, for a checkpoint: those drawn, and those a checkpoint kept that no view has drawn again. */
+export const savedDrafts = (session: Session): SavedDraft[] => [
+  ...[...session.drafts.values()].map((d) => ({
+    view: d.view, panel: d.panel, id: d.id, of: digestOf(d.model), ...(d.edited ? { edited: d.edited } : {}),
     ...(d.state === 'sending' ? { state: 'unknown' as const, reason: 'the task was kept while it was being sent' } : { state: d.state, ...(d.reason ? { reason: d.reason } : {}) }),
-  }));
-/** The drafts a checkpoint kept, each with a token of this window's. */
+  })),
+  ...[...session.savedDrafts.values()].map((d) => structuredClone(d)),
+];
+/** The drafts a checkpoint kept: each one the person's again once its view draws the same mail. */
 export const restoreDrafts = (session: Session, saved: readonly SavedDraft[] = []) => {
-  session.drafts = new Map(saved.map((s) => [keyOf(s.view, s.panel), { ...structuredClone(s), token: randomBytes(16).toString('hex'), rev: 0, edits: [] }]));
+  session.drafts = new Map();
+  session.savedDrafts = new Map(saved.map((s) => [keyOf(s.view, s.panel), structuredClone(s)]));
 };

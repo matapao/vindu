@@ -43,7 +43,20 @@ export type ViewSnapshot = {
 /** How far the person has read one panel of a view: the furthest share of it they have had in view, from 0 to 1, as the
  *  window measures it (renderer/shell-reading.ts). For the host alone: the model is never told. */
 export type ReadProgress = { view: string; panel: string; read: number };
-/** Passive UI state for reopening a task against its original result record. */
+/** What a checkpoint keeps of a result or an attachment the views point at, to read it again on restore: where it came
+ *  from, never what it held. A result by its server, its tool and the input it was called with, or by the host's own
+ *  ref where the entry has one (and then without its input); an attachment by the file the person gave. id: what the
+ *  checkpoint's views call it. */
+export type ResultPointer =
+  | { id: string; kind: 'result'; server: string; tool: string; input?: unknown; ref?: string }
+  | { id: string; kind: 'attachment'; name: string; mime: string; file: string };
+/** One of the person's own answers, as a checkpoint keeps it for the views and waits that point at it: what they gave,
+ *  never what a call returned with it (an answer's output) nor what they pointed at (read from results). */
+export type KeptAnswer = { id: string; to: string; values: Record<string, unknown> | null; who?: string[]; at: string };
+/** The view as the person left it, for a task opened again: the model's views, the layout and the person's own state of
+ *  them (their what-ifs, steps, drafts as they changed them, how far they read, their reminders and the answers the
+ *  views point at), and a pointer to each result and attachment the views show (pointers), read again on restore
+ *  through the host's refetch. It never holds what a result held: its rows, values, text or pictures. */
 export type ViewCheckpoint = {
   views: ViewSnapshot['views'];
   layout: unknown;
@@ -59,17 +72,23 @@ export type ViewCheckpoint = {
   /** How far each panel of each view has been read: by view, each panel's share. */
   read?: [string, [string, number][]][];
   drafts?: SavedDraft[]; // the person's drafts of the mails drafted for them, as they changed them, and how each send went
+  pointers?: ResultPointer[];
+  answers?: KeptAnswer[];
+  reminders?: Reminder[]; // the process's reminders, as the Reminders pane has them
 };
 export type { HeadText }; // a file of the working folder as the last commit has it, or why not
-/** One process, as Vindu sees it: its results, a folder of its own (logs, written pages), and its working folder if it
- *  has one, where the window reads it (work). When the processor runs elsewhere (in a box), work is a copy here: cwd is
- *  the folder where the processor is, for its terminals. head gives each file as the last commit has it, for diff
+/** One process, as Vindu sees it: its results, a folder for what Vindu writes while its session is open, and its working
+ *  folder if it has one, where the window reads it (work). Without dir, the session makes a temporary folder of its own
+ *  (under tempDir), readable by this user alone. Either way, what Vindu writes there goes when the session closes, or as
+ *  the process exits: its records (ui-calls.jsonl, answers.jsonl, reminders.jsonl), the pages the model writes (views)
+ *  and its terminals' logs (terminals); the host's own files in a dir of its own stay. When the processor runs
+ *  elsewhere (in a box), work is a copy here: cwd is the folder where the processor is, for its terminals. head gives each file as the last commit has it, for diff
  *  panels: Vindu runs no git of its own, so without head a diff panel says there is nothing to compare with. Pass
  *  gitHead(work) to read the folder's own repository with git, hardened (plumbing only, no fetch, git 2.45 or later):
  *  running git on a folder the model and what it clones can write in is the host's decision. */
 export type UiProcess = {
   results: ResultSource;
-  dir: string;
+  dir?: string;
   work?: string;
   cwd?: string;
   head?: (rel: string) => HeadText;
@@ -122,6 +141,12 @@ export type OpenMore = {
     resource?: string;
     args: Record<string, unknown>;
   }) => Promise<string>;
+  /** A result or attachment a restored view points at, read again (restore): the host calls the tool again with the same
+   *  input, or looks up its own ref, or attaches the person's file again; keeps what came as a new entry; and says its
+   *  id. undefined, or a throw, when it cannot: the panels that showed it wait, saying why. Called once for each pointer
+   *  the checkpoint keeps, as restore begins; never for a tool its server says changes things (isRead false) unless the
+   *  result carries the host's own ref. Without it, every panel that shows a result restores waiting. */
+  refetch?: (p: ResultPointer) => Promise<string | undefined>;
   /** Whether a tool only reads, as its server says (MCP's readOnlyHint): only reads may be a template's sources. */
   isRead?: (server: string, tool: string) => boolean | undefined;
   /** A slot the person fills by capturing (a photo, a file, a signature): the host's own way to take it, kept as attachments.
@@ -182,6 +207,7 @@ export type OpenMore = {
 };
 
 export type UiServerOptions = {
+  tempDir?: string; // where each session without a dir of its own makes its temporary folder (the system's temporary folder by default)
   driver?: PageDriver; // the browser page checks run in (none: pages are shown, not checked)
   cards?: CardDef[]; // the host's own cards
   blocks?: boolean | string[]; // Vindu's blocks (message, document, events, processes, money, files, map, …): all (default), some by name, or none

@@ -84,6 +84,8 @@ export const setPicked = (session: Session, items: PointItem[]) => {
   session.shell.setPicked(session.picked, [...session.attached]);
 };
 
+/** What the answer that holds what the person pointed at answers: its values are read from results. */
+export const POINTED = 'what the person points at';
 /** What goes with the person's next message: what they point at, kept as their answer (p-id), and the panes they put in the chat. */
 export const contextFor = (session: Session, budget = 4000): { text: string; id?: string } => {
   const items = resolved(session);
@@ -107,7 +109,7 @@ export const contextFor = (session: Session, budget = 4000): { text: string; id?
   let id: string | undefined;
   if (items.length) {
     id = keep(session, {
-      to: 'what the person points at',
+      to: POINTED,
       by: 'person',
       values: { items },
       ...(session.pointedBy ? { who: [`${session.pointedBy.name} (${session.pointedBy.window})`] } : {}),

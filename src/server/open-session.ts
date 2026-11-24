@@ -32,6 +32,7 @@ import type { Endpoints, ServerRuntime } from './runtime.js';
 import { readProgressOf } from './read-progress.js';
 import { stopWaiting } from './render-reports.js';
 import { consumeWindowChanges, contextFor, resolved, setPicked } from './selection.js';
+import { holdResults, letGoResults, sessionFolder } from './session-folder.js';
 import type { Session } from './state.js';
 import { templateControls } from './templates.js';
 import { layoutServerFor, serverFor } from './tool-server.js';
@@ -51,13 +52,16 @@ export function openSession(
   const token = randomBytes(16).toString('hex');
   const own: AnswerEntry[] = [];
   const results = withOwn(proc.results, { all: () => own });
-  const key = host.add({ ...proc, results });
+  const folder = sessionFolder(proc.dir, o.tempDir);
+  const inFolder = { ...proc, dir: folder.dir };
+  const key = host.add({ ...inFolder, results });
+  holdResults(proc.results);
   const session: Session = {
     present: (args, redraw, restoring, committed, anew) => present(session, args, redraw, restoring, committed, anew),
     fireHooks: (view, event, only) => fire(session, view, event, only),
     resumeWaiting: () => wake(session),
     runtime,
-    process: proc,
+    process: inFolder,
     results,
     key,
     onShow,
@@ -99,7 +103,7 @@ export function openSession(
     vsuggest: new Map(),
     vunseen: new Map(),
     receipts: [],
-    reminders: o.reminders ? remindersFrom(readLines(path.join(proc.dir, 'reminders.jsonl'))) : [],
+    reminders: o.reminders ? remindersFrom(readLines(path.join(inFolder.dir, 'reminders.jsonl'))) : [],
     cues: new Map(),
     gates: new Map(),
     held: new Map(),
@@ -112,6 +116,7 @@ export function openSession(
     hooksDue: [],
     files: new Map(),
     drafts: new Map(),
+    savedDrafts: new Map(),
   };
   const layoutToken = randomBytes(16).toString('hex');
   endpoints.set(token, () => serverFor(session));
@@ -158,8 +163,8 @@ export function openSession(
   const requests = hostRequests(session);
   if (more.views)
     session.live = new Views(more.views, {
-      cwd: proc.cwd ?? proc.work ?? proc.dir,
-      dir: proc.dir,
+      cwd: proc.cwd ?? proc.work ?? inFolder.dir,
+      dir: inFolder.dir,
       pane: (p) => pane(p as Parameters<typeof pane>[0]),
       unpane,
       tell,
@@ -175,6 +180,9 @@ export function openSession(
   return {
     url: `http://127.0.0.1:${port}/mcp/${token}`,
     layoutUrl: `http://127.0.0.1:${port}/mcp/${layoutToken}`,
+    /** The folder this session writes in while it is open (its records, the pages the model writes, its terminals'
+     *  logs): the process's dir, or a temporary folder of its own, gone once it closes. */
+    dir: inFolder.dir,
     pages: host.base(key),
     refusals: session.refusals,
     provideFiles: (ticket: string, field: string, register: () => string[]) =>
@@ -312,8 +320,9 @@ export function openSession(
         sent: a.values?.sent,
         at: a.at,
       })),
-    /** The task is done here: nothing reads, waits or asks for it any longer, and its files are closed. Whatever was
-     *  still waiting has its answer now (cancelled, or nothing came), so no call is left hanging. */
+    /** The task is done here: nothing reads, waits or asks for it any longer, and what it wrote from results is gone: its
+     *  folder (or Vindu's files in the process's own dir), and the pictures of a store no other session reads. Whatever
+     *  was still waiting has its answer now (cancelled, or nothing came), so no call is left hanging. */
     close: () => {
       if (session.closed) return;
       session.closed = true;
@@ -331,6 +340,8 @@ export function openSession(
       session.live?.close();
       host.remove(key);
       closeFiles(session);
+      folder.remove();
+      letGoResults(proc.results);
     },
   };
 }

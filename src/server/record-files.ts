@@ -2,23 +2,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Session } from './state.js';
 
-/** The files a session keeps with its process, one JSON line each, never sent anywhere: every view call and answer
- *  (the log), the person's answers, and the reminders. Each is the person's own record: theirs alone to read. */
+/** The files a session keeps while it is open, one JSON line each, never sent anywhere: every view call and answer (the
+ *  log), the person's answers, and the reminders. Each is the person's own record: theirs alone to read, and gone with
+ *  the session's folder once it closes (session-folder.ts). */
 export type RecordFile = 'ui-calls.jsonl' | 'answers.jsonl' | 'reminders.jsonl';
 
 /** A line written to one of the session's files, at once and in order. Each file is opened once, at its first line, and
- *  closed with the session; a line written after that (an answer that closing it settled) is appended on its own, when
- *  the process's folder is still there. */
+ *  closed with the session; a line that comes after (an answer that closing it settled) is kept nowhere, as the files
+ *  go with the session. */
 export const writeLine = (session: Session, file: RecordFile, line: string): void => {
+  if (session.closed) return;
   const at = path.join(session.process.dir, file);
-  if (session.closed) {
-    try {
-      fs.appendFileSync(at, `${line}\n`, { mode: 0o600 });
-    } catch {
-      // the folder went with the task: nothing is left to keep the line in
-    }
-    return;
-  }
   let fd = session.files.get(file);
   if (fd === undefined) session.files.set(file, (fd = fs.openSync(at, 'a', 0o600)));
   const bytes = Buffer.from(`${line}\n`);

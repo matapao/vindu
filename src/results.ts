@@ -3,13 +3,14 @@
 // the person answered in the window (p1, p2, …), which views can show like any result.
 // A value inside an entry is named by a reference: ctx:<id>#<JSON Pointer>, e.g. ctx:r3#/0/amount.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { amountsIn } from './amounts.js';
+import { removable, tempFolder } from './temp-folders.js';
 
 export type Row = Record<string, unknown>;
 export interface ResultEntry {
   id: string; kind: 'result'; tool: string; server: string; input?: unknown;
+  ref?: string;          // the host's own reference for it (its record's id, say): a checkpoint names it by this, not its input
   text: string; value?: unknown; rows?: Row[]; images: { file: string; mime: string }[];
   fidelity?: string; digest?: string; model?: string; // how it was seen, when the store says (exact or reported, say)
   error?: boolean;       // the call failed: the server said so (MCP's isError)
@@ -20,30 +21,43 @@ export interface AttachmentEntry { id: string; kind: 'attachment'; name: string;
  *  and values holds what it sent ({sent}). */
 export interface AnswerEntry { id: string; kind: 'answer'; to: string; by: 'person' | 'app' | 'host' | 'page'; values: Record<string, unknown> | null; output?: unknown; at: string; who?: string[]; from?: { view: string; panel: string } }
 export type Entry = ResultEntry | AttachmentEntry | AnswerEntry;
-/** Entries are only ever added, in order: r1, r2, … and a1, a2, … */
-export interface ResultSource { get(id: string): Entry | undefined; all(): readonly Entry[] }
+/** Entries are only ever added, in order: r1, r2, … and a1, a2, … release, where a store has it: what it wrote on the
+ *  computer from results (pictures) goes, once the last session that reads it has closed. */
+export interface ResultSource { get(id: string): Entry | undefined; all(): readonly Entry[]; release?(): void }
 
-/** Results held in memory, for a host that feeds Vindu itself (another agent loop, a test). */
-export function memoryResults(dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vindu-'))) {
+/** Results held in memory, for a host that feeds Vindu itself (another agent loop, a test). Their pictures are written
+ *  in dir, or in a temporary folder of the store's own, readable by this user alone, and go with release (once the last
+ *  session that reads the store closes) or as the process exits; dir itself stays. ref: the host's own reference for
+ *  a result, which a checkpoint then names it by. */
+export function memoryResults(dir?: string) {
   const order: Entry[] = []; const byId = new Map<string, Entry>(); let r = 0, a = 0;
   const keep = <E extends Entry>(e: E): E => { order.push(e); byId.set(e.id, e); return e; };
+  const written: (() => void)[] = []; let own: string | undefined; // each picture's removal, or the own folder's
+  const folder = (): string => {
+    if (dir) { fs.mkdirSync(dir, { recursive: true }); return dir; }
+    if (!own) { own = tempFolder('vindu-results-'); written.push(removable(own)); }
+    return own;
+  };
   return {
     get: (id: string) => byId.get(id),
     all: (): readonly Entry[] => order,
-    add(x: { tool: string; server: string; input?: unknown; text?: string; value?: unknown; images?: { data: Uint8Array; mime: string }[] }): ResultEntry {
+    add(x: { tool: string; server: string; input?: unknown; ref?: string; text?: string; value?: unknown; images?: { data: Uint8Array; mime: string }[] }): ResultEntry {
       const id = `r${++r}`;
       const rows = Array.isArray(x.value) && x.value.length && x.value.every(v => v && typeof v === 'object' && !Array.isArray(v)) ? x.value as Row[] : undefined;
       const images = (x.images ?? []).map((im, i) => {
         const subtype = /^[a-z\d.+-]+\/([a-z\d.+-]{1,64})(?:\s*;|$)/i.exec(im.mime)?.[1] ?? 'bin';
-        const file = path.join(dir, `${id}-${i + 1}.${subtype}`);
+        const file = path.join(folder(), `${id}-${i + 1}.${subtype}`);
         // a host's results are its own: readable by this user only, wherever the folder is (and kept so if it was there)
         fs.writeFileSync(file, im.data, { mode: 0o600 });
         fs.chmodSync(file, 0o600);
+        if (dir) written.push(removable(file));
         return { file, mime: im.mime };
       });
-      return keep({ id, kind: 'result', tool: x.tool, server: x.server, input: x.input, text: x.text ?? '', value: rows ? undefined : x.value, rows, images });
+      return keep({ id, kind: 'result', tool: x.tool, server: x.server, input: x.input, ...(x.ref ? { ref: x.ref } : {}), text: x.text ?? '', value: rows ? undefined : x.value, rows, images });
     },
     attach(name: string, mime: string, file: string): AttachmentEntry { return keep({ id: `a${++a}`, kind: 'attachment', name, mime, file }); },
+    /** The pictures it wrote, gone (its own folder with them); a picture added after is written again. */
+    release(): void { for (const remove of written.splice(0)) remove(); own = undefined; },
   };
 }
 

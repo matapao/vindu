@@ -86,6 +86,7 @@ export class Terminals {
     const term = new Headless({ cols, rows, scrollback: this.o.scrollback ?? 5000, allowProposedApi: true });
     const info: TerminalInfo = { id, title: c.title ?? `Terminal ${this.n}`, shell, cwd: c.cwd, shared: false, running: true, cols, rows, marks: setup.marks, commands: 0, busy: false };
     const log = fs.createWriteStream(path.join(this.o.dir, `terminal-${id}.log`), { flags: 'a', mode: 0o600 }); // what ran, and what it printed: the person's alone
+    log.on('error', () => undefined); // its folder went with its task: what is left of the output is kept nowhere
     const ser = new SerializeAddon(); term.loadAddon(ser);
     const t: Live = { info, proc, term, ser, log, listeners: new Set(), commands: [], waiters: [], subs: [] };
     this.marks(t);

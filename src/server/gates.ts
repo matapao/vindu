@@ -21,7 +21,8 @@ export const gateOf = (
   if (!p.awaits) return {};
   const awaited = p.awaits;
   if (!gate.got) gate.got = firstAfter(session.results.all(), gate.since, awaited)?.id;
-  if (!gate.got) return { wait: `Waiting for ${awaitName(awaited)}: it fills in here when it comes.` };
+  if (!gate.got)
+    return { wait: `${gate.why ? `${gate.why} ` : ''}Waiting for ${awaitName(awaited)}: it fills in here when it comes.` };
   const came = session.results.get(gate.got);
   return came?.kind === 'result' && came.error
     ? { from: gate.got, failed: `${awaitName(awaited)} failed (${gate.got}): ${came.text.slice(0, 600)}` }

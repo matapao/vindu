@@ -1,23 +1,21 @@
 // Run the public provider on the consumer's Node, including versions older than our build tools.
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 import test from 'node:test';
 import { memoryResults, startVindu } from '@matapao/vindu/server';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 
 test('a host can show a tool result and read its layout over MCP', async t => {
   const provider = await startVindu();
-  const dir = mkdtempSync(join(tmpdir(), 'vindu-runtime-'));
   const clients = [];
+  let task;
   t.after(async () => {
     try {
       await Promise.all(clients.map(client => client.close()));
     } finally {
       await provider.close();
-      rmSync(dir, { recursive: true, force: true });
     }
+    assert.equal(existsSync(task.dir), false, 'the session\'s temporary folder goes with it');
   });
   async function connect(endpoint) {
     const client = new Client({ name: 'runtime-check', version: '1' });
@@ -28,9 +26,10 @@ test('a host can show a tool result and read its layout over MCP', async t => {
     return client;
   }
 
-  const results = memoryResults(dir);
+  const results = memoryResults();
   const views = [];
-  const task = provider.open({ dir, results }, { onView: view => views.push(view) });
+  task = provider.open({ results }, { onView: view => views.push(view) });
+  assert.ok(existsSync(task.dir));
   const row = results.add({ server: 'inventory', tool: 'list', value: [{ quantity: 7 }] });
   task.result(row.id);
   const ui = await connect(task.mcpServer);

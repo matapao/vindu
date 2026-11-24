@@ -11,22 +11,22 @@ then `pnpm build`. A sibling app can depend on `@matapao/vindu` through `link:..
 
 ## Connect a task
 
-In the Node backend or Electron main process, open one session per task, with the host’s transport to its
-renderer (`ipc` here), and `taskDir` the task’s private directory.
+In the Node backend or Electron main process, open one session per task with the host’s transport (`ipc` here).
 
 ```ts
 import { memoryResults, startVindu } from '@matapao/vindu/server';
 
 const provider = await startVindu();
-const results = memoryResults(taskDir);
-const ui = provider.open({ dir: taskDir, results }, { onView: (v) => ipc.show(v), onState: (s) => ipc.layout(s) });
+const results = memoryResults();
+const ui = provider.open({ results }, { onView: (v) => ipc.show(v), onState: (s) => ipc.layout(s), refetch });
 ipc.onEvent((event) => ui.event(event));
 ui.result(results.add({ server, tool, input, value }).id);
 ```
 
 Call `ui.result` for every result. Give `ui.mcpServer` to the task’s trusted MCP client (its URL and headers grant
 access to the task; `mcpTokenIn: 'header'` keeps the token out of URLs), and `ui.layoutMcpServer` to a layout-only
-coordinator. Close with `ui.close()` and `await provider.close()`.
+coordinator. What a session writes from results goes with `ui.close()`, in a temporary folder (`tempDir`); its
+checkpoint keeps where each came from, read again by `refetch` on `restore`. Close the provider with `provider.close()`.
 
 ## Render and interact
 

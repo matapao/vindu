@@ -13,6 +13,8 @@ export type {
   Shown,
   ViewSnapshot,
   ViewCheckpoint,
+  ResultPointer,
+  KeptAnswer,
   HeadText,
   TemplateStart,
   UiProcess,

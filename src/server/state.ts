@@ -13,7 +13,7 @@ import type { Template } from '../templates.js';
 import type { ViewWords } from '../view-words.js';
 import { Views } from '../views/views.js';
 import type { OpenMore, Shown, UiProcess } from './contracts.js';
-import type { KeptDraft } from './message-drafts.js';
+import type { KeptDraft, SavedDraft } from './message-drafts.js';
 import type { RecordFile } from './record-files.js';
 import type { ServerRuntime } from './runtime.js';
 
@@ -74,7 +74,7 @@ export type Session = {
   fireHooks(view: string, event: HookEvent, only?: number): Promise<void>;
   resumeWaiting(): Promise<void>;
   runtime: ServerRuntime;
-  process: UiProcess;
+  process: UiProcess & { dir: string }; // dir: the folder it writes in while it is open (session-folder.ts)
   results: ResultSource;
   key: string;
   onShow: (v: Shown) => void;
@@ -140,11 +140,13 @@ export type Session = {
   hooksDue: { view: string; event: HookEvent; only?: number }[]; // hooks set off, to run in order once what set them off is done
   files: Map<RecordFile, number>; // the session's files with its process, each open from its first line until close
   drafts: Map<string, KeptDraft>; // view/panel: the person's draft of each mail drafted for them (message-drafts.ts)
+  savedDrafts: Map<string, SavedDraft>; // view/panel: a draft a checkpoint kept, until its view draws the same mail again
   waking?: Promise<void>;
   wakeAgain?: boolean; // a wake running, and whether another is due after it
 };
-/** What a panel or a held view waits for, and since when: the process's entries and the person's answers at that moment. */
-export type Gate = { want: string; since: number; sinceOwn: number; got?: string };
+/** What a panel or a held view waits for, and since when: the process's entries and the person's answers at that moment;
+ *  why, when the system made it wait (a restored panel whose result was not read again). */
+export type Gate = { want: string; since: number; sinceOwn: number; got?: string; why?: string };
 /** A live panel's source: what is read again, every read of it so far, what the last said, who shows it, and its stop. */
 export type Live = {
   server: string;

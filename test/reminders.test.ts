@@ -1,13 +1,13 @@
 // Reminders: set by the model or the person, with the time worked out by the system and said how; a due one is told to
-// both: the bar's chip, the Reminders pane, the host's own notice, and the model's next prompt. Kept with the process, so a
-// window opened again has them, and one that came due while it was closed is due at once. All synthetic.
+// both: the bar's chip, the Reminders pane, the host's own notice, and the model's next prompt. Kept in the task's checkpoint,
+// so a window opened again from it has them, and one that came due while it was closed is due at once. All synthetic.
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { startVindu, memoryResults, whenOf, instantOf, localOf, type Shown, type ShellState, type Reminder } from '../src/index.js';
+import { startVindu, memoryResults, whenOf, instantOf, localOf, type Shown, type ShellState, type Reminder, type ViewCheckpoint } from '../src/index.js';
 import { chromium, mcpClient, sleep } from './helpers.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -107,6 +107,7 @@ test('a reminder comes due: the host is told (its notice), the bar and the pane 
   const kept = (id: string, at: number, what: string): Reminder => ({ id, what, at: iso(at), said: 'then', how: 'given', by: id === 'm1' ? 'model' : 'person', state: 'set', set_at: iso(now - 86_400_000) });
   fs.writeFileSync(path.join(dir, 'reminders.jsonl'), [kept('m1', now + 600, 'Send the VAT report'), kept('m2', now - 7_200_000, 'Book the auditor')].map(r => JSON.stringify(r)).join('\n') + '\n');
   const w = await windowWith({ dir, notices });
+  let saved: ViewCheckpoint | undefined;
   try {
     assert.deepEqual(notices.map(r => [r.id, r.state]), [['m2', 'due']]); // due while the window was closed: at once
     await until(() => notices.length === 2, 5000);                           // and the other on its time
@@ -130,10 +131,13 @@ test('a reminder comes due: the host is told (its notice), the bar and the pane 
     assert.equal(m2.state, 'set'); assert.ok(Math.abs(Date.parse(m2.at) - Date.now() - 3_600_000) < 5000); assert.match(m2.how, /^put off at .*: an hour$/);
     assert.deepEqual(w.st.s!.reminders, { set: 1, due: 0 });
     assert.match(w.ui.delta(), /the person marked reminder m1 \("Send the VAT report"\) done; the person put off reminder m2 \("Book the auditor"\) to /);
+    saved = w.ui.checkpoint();
   } finally { await w.close(); }
-  // kept with the process: opened again, as they were
-  const again = await windowWith({ dir });
+  assert.equal(fs.existsSync(path.join(dir, 'reminders.jsonl')), false); // the record went with the session
+  // kept in the checkpoint: a task opened again from it has them, as they were
+  const again = await windowWith();
   try {
+    assert.deepEqual(await again.ui.restore(saved), []);
     assert.deepEqual(again.ui.reminders().map(r => [r.id, r.state]), [['m1', 'done'], ['m2', 'set']]);
     assert.deepEqual(again.st.s!.reminders, { set: 1, due: 0 });
     assert.equal(again.ui.delta(), ''); // nothing came due while it was closed
