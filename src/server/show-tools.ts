@@ -14,7 +14,6 @@ import { checkCtxFor } from './present.js';
 import { json, log, loggedJson, text } from './records.js';
 import type { Gate, Session } from './state.js';
 import { fillSlot } from './template-slots.js';
-import { shownAnew } from './view-state.js';
 import { asText } from '../format.js';
 
 /** How long a text alone may be to count as short: what a tool answers when all it says is that it did it ("written"). */
@@ -148,9 +147,7 @@ export function registerShowTools(server: McpServer, session: Session, has: Has)
         }
         session.held.delete(named); // shown now: no longer held
         // shown anew by the model: what was made or allowed inside the old one goes with it, as it is replaced
-        const acc = await session.present(args, false, false, () =>
-          shownAnew(session, named),
-        );
+        const acc = await session.present(args, false, false, undefined, true);
         return loggedJson(session, { tool: 'show_view', ok: true, args }, 'account', toldNow(session, acc));
       } catch (e) {
         if (!(e instanceof Refusal)) throw e;

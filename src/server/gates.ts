@@ -2,7 +2,6 @@ import { type After, panelsOf, type PanelSpec, type ViewSpec } from '../cards.js
 import { awaitName, firstAfter, panelRef } from '../gates.js';
 import { log } from './records.js';
 import type { Gate, Session } from './state.js';
-import { shownAnew } from './view-state.js';
 
 export const gateOf = (
   session: Session,
@@ -78,7 +77,7 @@ export const wake = async (session: Session): Promise<void> => {
         if (session.closed || notYet(session, heldView.after, name, undefined, heldView)) continue;
         session.held.delete(name);
         try {
-          await session.present(heldView.args, false, false, () => shownAnew(session, name)); // the model's, shown now
+          await session.present(heldView.args, false, false, undefined, true); // the model's, shown now
           session.shell.say(
             `${heldView.title} is shown now, by the system: what it was written to wait for has happened`,
           );

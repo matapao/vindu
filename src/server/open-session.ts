@@ -49,7 +49,7 @@ export function openSession(
   const results = withOwn(proc.results, { all: () => own });
   const key = host.add({ ...proc, results });
   const session: Session = {
-    present: (args, redraw, restoring, committed) => present(session, args, redraw, restoring, committed),
+    present: (args, redraw, restoring, committed, anew) => present(session, args, redraw, restoring, committed, anew),
     fireHooks: (view, event, only) => fire(session, view, event, only),
     resumeWaiting: () => wake(session),
     runtime,

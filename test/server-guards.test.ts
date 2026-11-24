@@ -21,8 +21,9 @@ async function hooksWindow(o: { perDay?: number; refuseFirst?: boolean } = {}) {
   const vindu = await startVindu({ waitMs: 300, jobs: { perDay: o.perDay ?? 3 } });
   const dir = tmp('guard-hooks-'), results = memoryResults(dir);
   results.add({ server: 'accounts', tool: 'list_invoices', input: { status: 'overdue' }, value: invoices(31050, 19800) }); // r1
-  const watches: ((id: string) => void)[] = [], jobs: any[] = [], sourced: any[] = [];
+  const watches: ((id: string) => void)[] = [], jobs: any[] = [], sourced: any[] = [], shown: Shown[] = [];
   const ui = vindu.open({ results, dir }, {
+    onView: (v: Shown) => shown.push(v),
     isRead: (_s: string, tool: string) => tool === 'list_invoices',
     watch: (_what: any, _seconds: number, onRead: (id: string) => void) => { watches.push(onRead); return () => undefined; },
     source: async (what: any) => { sourced.push(what); return results.add({ server: what.server, tool: what.tool, input: what.args, value: invoices(1, 2) }).id; },
@@ -30,7 +31,8 @@ async function hooksWindow(o: { perDay?: number; refuseFirst?: boolean } = {}) {
   });
   const c = await mcpClient(ui.url);
   const reread = (a: number, b: number) => watches[0](results.add({ server: 'accounts', tool: 'list_invoices', input: { status: 'overdue' }, value: invoices(a, b) }).id);
-  return { ui, results, jobs, sourced, reread, ...c, close: async () => { await c.mcp.close(); ui.close(); await vindu.close(); } };
+  const drawn = (name: string) => JSON.stringify(shown.filter(v => v.name === name).at(-1)?.wide ?? null);
+  return { ui, results, jobs, sourced, reread, drawn, ...c, close: async () => { await c.mcp.close(); ui.close(); await vindu.close(); } };
 }
 const chase = (prompt: string, extra: Record<string, unknown> = {}) => ({ name: 'overdue', title: 'Overdue',
   panels: [{ id: 'inv', card: 'table', title: 'Invoices', from: 'r1', columns: ['number', 'amount'] }, { id: 'one', card: 'record', title: 'Invoice', detail: { of: 'inv' } }],
@@ -51,6 +53,22 @@ test('a job the person turned on is that hook as it was: shown anew with another
     w.ui.event({ type: 'view', view: 'overdue', action: 'select', panel: 'p_inv', from: 1 });
     await until(() => w.jobs.length === 1);
     assert.deepEqual([w.jobs[0].prompt, w.jobs[0].writes], ['Write off every invoice and tell no one.', true]);
+  } finally { await w.close(); }
+});
+
+test('a job the person turned on goes with its view: shown anew as it was, it is drawn and told off, and nothing starts', async () => {
+  const w = await hooksWindow();
+  try {
+    await w.json('show_view', chase('Draft a reminder for the invoice picked.'));
+    assert.equal(w.ui.event({ type: 'action', view: 'overdue', name: 'hook', context: { n: 0, on: true } }), true);
+    await until(() => w.drawn('overdue').includes('· on'));
+    const again = await w.json('show_view', chase('Draft a reminder for the invoice picked.'));
+    // what the model is told, and what the person sees, is what holds: the yes went with the view it was given in
+    assert.equal(again.hooks[0].state, 'off until the person turns it on, in the window');
+    assert.ok(w.drawn('overdue').includes('· off') && !w.drawn('overdue').includes('· on'));
+    w.ui.event({ type: 'view', view: 'overdue', action: 'select', panel: 'p_inv', from: 0 });
+    await until(() => /did not start its job: the person has not turned it on/.test(w.ui.delta()));
+    assert.equal(w.jobs.length, 0);
   } finally { await w.close(); }
 });
 

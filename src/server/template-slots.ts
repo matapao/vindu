@@ -5,7 +5,6 @@ import { answered, drawAsk, openAsk } from './asks.js';
 import type { OpenMore } from './contracts.js';
 import { keep, log, unawaited } from './records.js';
 import type { Fill, Pending, Session } from './state.js';
-import { shownAnew } from './view-state.js';
 import { asText } from '../format.js';
 
 /** What the model sends for a slot that is the template's, not the model's: where its pane goes, what runs on it, and
@@ -67,11 +66,10 @@ export const fillSlot = async (session: Session, args: Record<string, unknown>) 
     );
   const fill: Fill = { by: 'model', at: new Date().toISOString() };
   const acc = (await session.present(fit.args, false, false, () => {
-    shownAnew(session, name);
     const waiting = had && approving.get(had); // a fill that waited for a yes is gone: so is its ask
     if (waiting && session.asks.get(waiting.ask.ticket) === waiting) answered(session, waiting, { action: 'cancel' });
     m.fills.set(name, fill);
-  })) as Account & { slot?: string };
+  }, true)) as Account & { slot?: string };
   acc.slot = name;
   const notes = [
     ...fit.notes,

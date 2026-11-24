@@ -22,6 +22,8 @@ const setPage = (session: Session, view: string, id: string, pg: PageEntry) => {
  *  put it before the person, check its pages, and say what rendered. redraw: the system draws a shown view again
  *  (a read that changed since), and its pane stays as it is, shown or hidden. committed: told once the view passed its
  *  checks and is shown, before anything is awaited, so whatever goes with the showing is done with it, or not at all.
+ *  anew: the model's view in place of the one under its name, so what was made or allowed inside the old one goes with
+ *  it once this showing passes its checks (shownAnew), and its hooks' jobs are drawn and told as off, as they then are.
  *  A showing drawn again while its checks run leaves the rest to the newer one: its account says so. */
 export const present = async (
   session: Session,
@@ -29,10 +31,11 @@ export const present = async (
   redraw = false,
   restoring = false,
   committed?: () => void,
+  anew = false,
 ): Promise<Account> => {
   if (session.closed) throw new Error('This task is closed');
   const mounts: (() => void)[] = [];
-  const v = showView(args, ctxFor(session, mounts, args));
+  const v = showView(args, ctxFor(session, mounts, args, anew));
   // Commit resources together after the entire replacement has passed validation.
   for (const panel of Object.values(session.data.get(v.spec.name) ?? {}))
     if (panel.app) session.runtime.host.removeApp(panel.app.url);
@@ -85,6 +88,7 @@ export const present = async (
     const d = v.data[p.id];
     if (d.page && d.code) setPage(session, v.spec.name, p.id, { url: d.page.url, label: d.page.label, uses: [] }); // check_page reads them like pages
   }
+  if (anew) shownAnew(session, v.spec.name);
   committed?.();
   /** Whether this is still the view's newest showing: once another has begun, it tells the window and checks. */
   const current = () => !session.closed && session.probes.get(v.spec.name)?.seq === seq;
@@ -150,14 +154,15 @@ import { appHtml, appsOn, resourceOf } from '../apps.js';
 import type { Hook } from '../cards.js';
 import type { ViewContext } from '../view-context.js';
 import { gateOf } from './gates.js';
-import { hookIsOn } from './view-state.js';
+import { hookIsOn, shownAnew } from './view-state.js';
 
 /** What a view reads as it is shown: the session's results, cards and pages, and the person's own state of it. drawing:
- *  what is being shown, whose hooks' switches are read as they are in it. */
+ *  what is being shown, whose hooks' switches are read as they are in it; anew, none is on: its yes goes with the old. */
 const ctxFor = (
   session: Session,
   mounts?: (() => void)[],
   drawing?: Record<string, unknown>,
+  anew = false,
 ): ViewContext => ({
   results: session.results,
   cards: session.runtime.cards,
@@ -175,7 +180,7 @@ const ctxFor = (
       ? 'idle'
       : !session.jobs
         ? 'unavailable'
-        : hookIsOn(session, view, n, (drawing?.hooks as Hook[] | undefined)?.[n])
+        : !anew && hookIsOn(session, view, n, (drawing?.hooks as Hook[] | undefined)?.[n])
           ? 'on'
           : 'off',
   // the person's what-ifs win, until the model gives that input a new value of its own

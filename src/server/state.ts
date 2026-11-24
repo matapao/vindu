@@ -59,12 +59,14 @@ type Read = {
   >;
 };
 export type Session = {
-  /** committed: called once the view has passed its checks and is shown, before anything is awaited (present.ts). */
+  /** committed: called once the view has passed its checks and is shown, before anything is awaited; anew: the
+   *  model's view in place of the one under its name, what was made or allowed in the old going with it (present.ts). */
   present(
     args: Record<string, unknown>,
     redraw?: boolean,
     restoring?: boolean,
     committed?: () => void,
+    anew?: boolean,
   ): Promise<Account>;
   fireHooks(view: string, event: HookEvent, only?: number): Promise<void>;
   resumeWaiting(): Promise<void>;
