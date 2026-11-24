@@ -1,3 +1,4 @@
+import { framesLeaving } from './dom.js';
 import { releaseSurface, rendered } from './surface-runtime.js';
 import { updateSurface, type View, type VinduComponent } from './surface.js';
 import type { HostPane } from './shell-options.js';
@@ -45,6 +46,7 @@ export function showLoading(body: HTMLElement, label: string) {
     pending.append(line);
   }
   releaseSurface(body);
+  framesLeaving(body);
   body.replaceChildren(pending);
 }
 

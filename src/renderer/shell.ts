@@ -22,11 +22,11 @@ import { place, resize, remove, insert, openView, slotOf, layoutOptions, viewsOf
 import type { ShellState, ShellEvent, ShownMeta, ViewMeta } from '../shell.js';
 import { roleFor } from '../shell-roles.js';
 import type { View } from './surface.js';
-import { elementsOf, iconOf } from './dom.js';
+import { elementsOf, framesLeaving, iconOf } from './dom.js';
 import { useMetricStyles, useTheme } from './theme.js';
 import { appFontVariables, setMetrics, type ViewMetrics } from './metrics.js';
 import { SHELL_LABELS, skinCss, type ShellLabels, type ShellOptions, type ShellHandle, type ShellSkin, type ShellCommand, type ShellAction, type ShownView } from './shell-options.js';
-import { connectShellFrames } from './shell-frames.js';
+import { connectShellFrames, isLeaving } from './shell-frames.js';
 import { measurePanes } from './shell-measurements.js';
 import { releaseSurface, rendered } from './surface-runtime.js';
 import { drawPaneSurface, fitPage, fitPages, placeHost, showLoading, tabTitle, type PaneEl } from './shell-pane.js';
@@ -170,7 +170,7 @@ export function mountShell(host: HTMLElement, o: ShellOptions = {}): ShellHandle
   // a host's pane: its drawer, mounted once into the body (again if the kind changes)
   const drawHost = (name: string, p: PaneEl, kind: string) => {
     if (p.host?.kind === kind) return;
-    releaseSurface(p.body); p.host?.pane?.destroy?.(); p.body.replaceChildren(); p.body.dataset.host = kind;
+    releaseSurface(p.body); framesLeaving(p.body); p.host?.pane?.destroy?.(); p.body.replaceChildren(); p.body.dataset.host = kind;
     const drawer = o.panes?.[kind]; const m = meta(name)!;
     if (!drawer) { const w = make('p', 'vindu-pane-wait'); w.textContent = L.noDrawer(kind); p.body.append(w); p.host = { kind, pane: null, box: '' }; return; }
     p.host = { kind, pane: drawer({ body: p.body, view: m, shell: handle, point: it => emit({ type: 'select', by: 'pane', items: [...((st?.pointing?.picked ?? []) as PointItem[]), { ...it, view: name }] }) }), box: '' };
@@ -226,7 +226,8 @@ export function mountShell(host: HTMLElement, o: ShellOptions = {}): ShellHandle
       if (pl.mode === 'single') Object.assign(s, { left: '', top: '', marginLeft: `${pp.box!.x}px`, width: `${pp.box!.w}px`, height: pp.fit ? '' : `${pp.box!.h}px`, maxHeight: `${pp.box!.h}px` });
       else if (pp.box) Object.assign(s, { left: `${pp.box.x}px`, top: `${pp.box.y}px`, marginLeft: '', width: `${pp.box.w}px`, height: `${pp.box.h}px`, maxHeight: '' });
       else Object.assign(s, { left: '', top: '', marginLeft: '', width: '', height: '', maxHeight: '' });
-      if (pl.mode === 'stacked' && desk.children[i] !== p.el) desk.insertBefore(p.el, desk.children[i] ?? null); // reading order
+      // reading order; a pane on its way out keeps its place until it goes, as a frame that moves loads its document again
+      if (pl.mode === 'stacked') { const at = [...desk.children].filter(child => !isLeaving(child))[i] ?? null; if (at !== p.el) desk.insertBefore(p.el, at); }
       const title = m?.title ?? pp.view;
       p.title.textContent = title; p.title.title = `${title} (${pp.view})`; p.sub.textContent = m?.subtitle ?? ''; drawMark(p, pp.view, m?.mark);
       // its role says whether it has "In the chat"; a state from before roles: not an ask, a reservation, or a host's
@@ -405,7 +406,7 @@ export function mountShell(host: HTMLElement, o: ShellOptions = {}): ShellHandle
   watch.observe(desk);
   root.addEventListener('scroll', placeHosts, { capture: true, passive: true }); // a stacked window scrolls: native views follow
 
-  const frames = connectShellFrames(root, emit);
+  const frames = connectShellFrames(root, emit, { locale: o.locale });
 
   const handle: ShellHandle = {
     view(v) {
@@ -418,13 +419,16 @@ export function mountShell(host: HTMLElement, o: ShellOptions = {}): ShellHandle
     state(s) {
       const before = st.views.map(v => v.name);
       st = { ...s, shelf: s.shelf ?? {} }; measurements.reset();
-      // a view that left the window (an answered ask, an ended terminal) takes its pane along; one collapsed stays, for the shelf
-      for (const [name, p] of panes) { const v = meta(name); if (!v || (p.host && !v.kind)) { p.seen?.disconnect(); releaseSurface(p.body); p.host?.pane?.destroy?.(); p.el.remove(); panes.delete(name); } }
+      // a view that left the window (an answered ask, an ended terminal) takes its pane along, once its MCP Apps have torn
+      // down; one collapsed stays, for the shelf
+      for (const [name, p] of panes) { const v = meta(name); if (!v || (p.host && !v.kind)) { p.seen?.disconnect(); releaseSurface(p.body); p.host?.pane?.destroy?.(); frames.remove(p.el); panes.delete(name); } }
       for (const name of before) if (!meta(name)) surfaces.delete(name);
       if (!dividers.dragging) layout();
       pointer.mark((s.pointing?.picked ?? []) as PointItem[], s.pointing?.attached ?? []);
     },
-    theme, tokens, command,
+    theme(t) { theme(t); frames.themeChanged(); },
+    locale: frames.setLocale,
+    tokens, command,
     metrics(value) {
       const previous = appFontVariables(root);
       resetMetrics();
@@ -440,10 +444,11 @@ export function mountShell(host: HTMLElement, o: ShellOptions = {}): ShellHandle
     placement: () => placed,
     app: frames.send,
     destroy() {
-      destroyed = true; pointer.destroy(); frames.destroy(); docking.destroy(); measurements.destroy();
+      destroyed = true; pointer.destroy(); docking.destroy(); measurements.destroy();
       watch.disconnect(); clearTimeout(winTimer); clearTimeout(peekTimer); clearTimeout(unpeekTimer); (doc.defaultView ?? window).cancelAnimationFrame(laying); laying = 0;
       for (const p of panes.values()) { p.seen?.disconnect(); releaseSurface(p.body); p.host?.pane?.destroy?.(); }
-      panes.clear(); surfaces.clear(); root.remove(); skin.remove(); // what still waits on a pane (a read back, a tab) finds none
+      panes.clear(); surfaces.clear(); // what still waits on a pane (a read back, a tab) finds none
+      frames.remove(root, () => { frames.destroy(); skin.remove(); }); // its MCP Apps hear the window go, and may answer
     },
   };
   layout();

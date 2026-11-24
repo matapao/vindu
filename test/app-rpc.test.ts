@@ -1,10 +1,11 @@
 // The window's plain JSON-RPC for MCP App frames (src/renderer/app-rpc.ts) takes exactly what the MCP SDK's own schemas
-// take, which the window no longer loads: every message here is checked both ways, and what passes is the same.
+// take, which the window no longer loads: every message here is checked both ways, and what passes is the same. Of the
+// responses, the window takes only an app's answer to the one request it sends it itself (ui/resource-teardown).
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { JSONRPCMessageSchema } from '@modelcontextprotocol/core';
+import { JSONRPCMessageSchema, JSONRPCResponseSchema } from '@modelcontextprotocol/core';
 import { LATEST_PROTOCOL_VERSION, McpUiInitializeRequestSchema } from '@modelcontextprotocol/ext-apps/app-bridge';
-import { APPS_PROTOCOL, appRpcOf, isDisplayMode, isInitializeParams } from '../src/renderer/app-rpc.js';
+import { APPS_PROTOCOL, appRpcOf, isDisplayMode, isInitializeParams, isResponseTo } from '../src/renderer/app-rpc.js';
 
 const json = (value: unknown) => JSON.parse(JSON.stringify(value));
 const each = <T>(lists: T[][]): T[][] => lists.reduce<T[][]>((all, list) => all.flatMap(a => list.map(b => [...a, b])), [[]]);
@@ -40,6 +41,28 @@ test('a message is a request or a notification exactly when the SDK says so, and
   const proto = JSON.parse('{"jsonrpc":"2.0","id":1,"method":"x","params":{"__proto__":{"polluted":true},"a":1}}');
   assert.deepEqual(json(appRpcOf(proto)), json(JSONRPCMessageSchema.parse(proto)));
   assert.equal(Object.getPrototypeOf(appRpcOf(proto)!.params), Object.prototype);
+});
+
+test('a response is the answer to the window\'s request exactly when the SDK reads it as a response with its id', () => {
+  const sent = 'vindu-teardown-1';
+  const ids = [MISSING, sent, 'vindu-teardown-2', 1, null];
+  const results = [MISSING, undefined, {}, { saved: true }, { _meta: {} }, { _meta: { other: 1 } }, { _meta: null }, { _meta: [] }, null, [], 'done', 1, new Date(0)];
+  const errors = [MISSING, undefined, { code: -32601, message: 'Method not found' }, { code: 1, message: 'm', data: [1], extra: 2 }, { code: 1.5, message: 'm' },
+    { code: 1 }, { message: 'm' }, { code: 1, message: 2 }, null, [], 'error'];
+  const versions = [MISSING, '2.0', '1.0'];
+  const methods = [MISSING, 'ui/resource-teardown'];
+  let answers = 0;
+  for (const [jsonrpc, id, result, error, method] of each<unknown>([versions, ids, results, errors, methods])) {
+    const message = build([['jsonrpc', jsonrpc], ['id', id], ['result', result], ['error', error], ['method', method]]);
+    const response = JSONRPCResponseSchema.safeParse(message).success;
+    const shown = JSON.stringify(message, (_k, v) => (v === undefined ? '(undefined)' : v));
+    assert.equal(isResponseTo(message, sent), response && message.id === sent, shown);
+    if (response) assert.equal(appRpcOf(message), undefined, shown); // every response, the answer among them, is no app's request
+    if (response && message.id === sent) answers++;
+  }
+  assert.ok(answers > 5);
+  assert.equal(isResponseTo({ jsonrpc: '2.0', id: 1, result: {} }, 1), true);
+  assert.equal(isResponseTo(null, sent), false);
 });
 
 test('ui/initialize params are valid exactly when MCP Apps says so', () => {

@@ -6,13 +6,14 @@ import { MISSING, type View, type VinduComponent } from './surface.js';
 export type ShellHandle = {
   view(v: View): void;              // a view's surfaces, as the UI server's onShow gives them
   state(s: ShellState): void;       // the shell's state, as its onShell gives it
-  theme(t: 'light' | 'dark' | 'auto'): void;
+  theme(t: 'light' | 'dark' | 'auto'): void; // MCP Apps hear the theme it makes
+  locale(tag?: string): void;       // the window's language, as MCP Apps hear it (see ShellOptions); none: the browser's
   metrics(value: ViewMetrics): void;  // replace spacing, type size and density in place; {} restores the stock appearance
   tokens(t: ShellSkin): void;       // a new look, in place of the one given to mountShell
   command(c: ShellCommand): boolean; // what the person can do with the mouse and keys, by name; false when there is nothing to do it to
   placement(): Placement | null;    // what is drawn now, as placed
   app(view: string, panel: string, msg: unknown): void; // a message from the UI server to an MCP App's frame
-  destroy(): void;
+  destroy(): void;                  // hidden at once; gone once its MCP Apps have answered their teardown, within half a second
 };
 
 /** The shell's look. Each is a CSS value for the variable of the same name (accent sets --v-accent, ink2 --v-ink-2),
@@ -94,6 +95,7 @@ export type ShellOptions = {
   onAction?: (a: unknown) => void;      // A2UI actions from inside surfaces
   components?: VinduComponent[];        // the host's own components, for its own cards
   theme?: 'light' | 'dark' | 'auto';
+  locale?: string;                      // the window's language, a BCP 47 tag ('nb-NO'), for MCP Apps; else the browser's
   tokens?: ShellSkin;
   metrics?: ViewMetrics;
   labels?: Partial<ShellLabels>;

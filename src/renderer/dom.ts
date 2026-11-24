@@ -32,6 +32,14 @@ export function sendBlockAction(from: Element, detail: Record<string, unknown>):
   from.dispatchEvent(new CustomEvent(BLOCK_ACTION, { bubbles: true, composed: true, detail }));
 }
 
+/** MCP Apps' frames about to go with what is drawn in place of them (a view drawn anew, a pane's loading note): an event
+ *  from the element whose contents go, just before they do, which the shell's MCP Apps bridge takes to ask each app in
+ *  it to tear down. The frames go at once after, so an app may not hear it. Sent only where there is an app's frame. */
+export const FRAMES_LEAVING = 'vindu-frames-leaving';
+export function framesLeaving(from: Element): void {
+  if (from.querySelector('iframe[data-app-panel]')) from.dispatchEvent(new Event(FRAMES_LEAVING, { bubbles: true }));
+}
+
 const SVG = 'http://www.w3.org/2000/svg';
 /** What an icon may draw with: shapes, groups, gradients and masks. Never a script, a foreign object, a link or an image. */
 const DRAWING = new Set(['svg', 'g', 'path', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'rect', 'title', 'desc',

@@ -1,6 +1,7 @@
 // The JSON-RPC 2.0 an MCP App's frame speaks with the window (MCP Apps, as ext-apps 2026-01-26 has it), checked as the
 // MCP SDK's own schemas check it, in plain code: the window carries an app's messages without the SDK, and so without
-// Zod, in the browser. Only requests and notifications: the window sends an app no requests, so it takes no responses.
+// Zod, in the browser. An app's requests and notifications; of its responses, only its answer to the one request the
+// window sends it (ui/resource-teardown, before its frame goes), and no other.
 
 /** The MCP Apps protocol the window speaks, and the older one it still answers in, for apps made before it. */
 export const APPS_PROTOCOL = '2026-01-26';
@@ -66,6 +67,19 @@ export function appRpcOf(data: unknown): AppRpc | undefined {
   const params = paramsOf(data.params);
   if (params === null) return undefined;
   return { jsonrpc: '2.0', ...(request ? { id: data.id as RpcId } : {}), method: data.method, ...(params ? { params } : {}) };
+}
+
+/** Whether data is the response to the request the window sent with id: a JSON-RPC 2.0 result or error with that id and
+ *  nothing else in it, as the MCP SDK's own schemas check a response. */
+export function isResponseTo(data: unknown, id: RpcId): boolean {
+  if (!isObject(data) || data.jsonrpc !== '2.0' || data.id !== id) return false;
+  const answer = Object.hasOwn(data, 'result') ? 'result' : 'error';
+  for (const key of Object.keys(data)) {
+    if (key !== 'jsonrpc' && key !== 'id' && key !== answer) return false;
+  }
+  const { result, error } = data;
+  if (answer === 'result') return isObject(result) && optional(result._meta, isObject);
+  return isObject(error) && Number.isSafeInteger(error.code) && isString(error.message);
 }
 
 const isIcon = (value: unknown) => isObject(value) && isString(value.src) && optional(value.mimeType, isString) &&

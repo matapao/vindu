@@ -10,10 +10,11 @@ const PAGE_ASKS = new Set(['send', 'select', 'ask']);
 type PageMessage = { vindu: string; n?: unknown; value?: unknown; items?: unknown; note?: unknown; prompt?: unknown; report?: unknown };
 
 /** The frames in a shell's panes: the pages the model wrote, and MCP Apps. Their messages reach the window in the
- *  shell's own document, whose window may not be the one this script runs in. */
-export function connectShellFrames(root: HTMLElement, emit: (event: ShellEvent) => void) {
+ *  shell's own document, whose window may not be the one this script runs in. locale: the window's language, for MCP
+ *  Apps. */
+export function connectShellFrames(root: HTMLElement, emit: (event: ShellEvent) => void, options: { locale?: string } = {}) {
   const doc = root.ownerDocument, win = doc.defaultView ?? window;
-  const apps = connectAppFrames(root, emit);
+  const apps = connectAppFrames(root, emit, options);
 
   // What a page asks, from a page's own frame: what it sends (task.send), what the person picked in it (vindu.select)
   // and a follow-up it proposes for the prompt box (vindu.ask). Taken only while the person is using that page (its
@@ -52,7 +53,27 @@ export function connectShellFrames(root: HTMLElement, emit: (event: ShellEvent) 
 
   return {
     setFonts(variables: Record<string, string>) { apps.setFonts(variables); },
+    themeChanged() { apps.themeChanged(); },
+    setLocale: (tag?: string) => { apps.setLocale(tag); },
     send: (view: string, panel: string, message: unknown) => { apps.send(view, panel, message); },
+    /** Takes element out of the window: hidden at once, and gone once each MCP App in it whose document has initialized
+     *  has answered its teardown, or its wait is over; at once, when there is none. Until then its frames stay where they
+     *  are, as a frame that moves loads its document again. after: what follows its going. */
+    remove(element: HTMLElement, after?: () => void) {
+      element.style.display = 'none';
+      element.setAttribute(LEAVING, '');
+      const go = () => {
+        element.remove();
+        after?.();
+      };
+      const waiting = apps.tearDown(element);
+      if (waiting) void waiting.then(go);
+      else go();
+    },
     destroy() { apps.destroy(); win.removeEventListener('message', onMessage); },
   };
 }
+
+const LEAVING = 'data-vindu-leaving';
+/** Whether element is on its way out of the window, its MCP Apps tearing down. */
+export const isLeaving = (element: Element) => element.hasAttribute(LEAVING);

@@ -7,6 +7,7 @@ import { basicCatalog, type LitComponentApi } from '@a2ui/lit/v0_9';
 import type { Surface } from '../a2ui.js';
 import { withinSurfaceLimits } from '../surface-limits.js';
 import { guardA2uiArrays } from './a2ui-limits.js';
+import { framesLeaving } from './dom.js';
 import { renderSnapshot, releaseSurface } from './surface-runtime.js';
 import { VINDU_CATALOG } from '../catalog-id.js';
 import { useTheme, useMetricStyles } from './theme.js';
@@ -101,6 +102,7 @@ export function updateSurface(host: HTMLElement, view: View, which: 'wide' | 'co
   const surface = view[which];
   if (!withinSurfaceLimits(surface)) {
     releaseSurface(host);
+    framesLeaving(host);
     host.textContent = 'This view is too large to display. Select fewer fields or split it into smaller panels.';
     return true;
   }

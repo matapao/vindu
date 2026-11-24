@@ -3,6 +3,7 @@
 import { A2uiMessageListSchema, MessageProcessor, type A2uiMessage, type Catalog } from '@a2ui/web_core/v0_9';
 import type { A2uiSurface, LitComponentApi } from '@a2ui/lit/v0_9';
 import type { Surface } from '../a2ui.js';
+import { framesLeaving } from './dom.js';
 
 type Action = (action: unknown) => void;
 type Snapshot = {
@@ -158,6 +159,7 @@ export function renderSnapshot(
     throw error;
   }
   releaseSurface(host);
+  framesLeaving(host);
   host.replaceChildren(element);
   mounts.set(host, fresh);
   return true;
