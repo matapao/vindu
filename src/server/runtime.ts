@@ -6,6 +6,7 @@ import { decisionOperation } from '../frames.js';
 import { type Binding, formBinding, type Operation, type Words, WORDS } from '../operations.js';
 import type { startPageHost } from '../pages.js';
 import { REMINDER_WORDS, type ReminderWords } from '../reminders.js';
+import { VIEW_WORDS, viewWordsOver } from '../view-words.js';
 import type { UiServerOptions } from './contracts.js';
 
 export type ServerRuntime = ReturnType<typeof configureServer> & {
@@ -31,6 +32,7 @@ export function configureServer(options: UiServerOptions) {
   const showViewPlain = showView.omit({ browser: true }); // a window without browser pages
   const kinds = offeredKinds({ kinds: options.kinds, apps: anyAppsOn(options.apps) });
   const words: Words = { ...WORDS, ...options.words };
+  const viewWords = viewWordsOver(VIEW_WORDS, options.viewWords);
   const bindings: Record<string, Binding> = { form: formBinding, ...options.bindings };
   const waitMs = options.waitMs ?? 45_000; // under a minute: what MCP clients commonly give a tool call before they give up
   const format = {
@@ -50,6 +52,7 @@ export function configureServer(options: UiServerOptions) {
     showViewPlain,
     kinds,
     words,
+    viewWords,
     bindings,
     waitMs,
     format,

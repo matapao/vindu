@@ -1,0 +1,68 @@
+// A view's own words in Norwegian: Bokmål (nb) and Nynorsk (nn), each a whole set (view-words.ts). Numbers a hook
+// looks at are written with a decimal comma.
+import { lineIn, type ViewWords } from './view-words.js';
+
+const decimalComma = (n: number) => String(n).replace('.', ',');
+const line = { above: 'over', or: 'eller', below: 'under' };
+
+export const VIEW_WORDS_NB: ViewWords = {
+  classified: label => `${label} · klassifisert av appen`,
+  written: 'Skrevet av modellen',
+  notUpToDate: (shows, newer) => `Ikke oppdatert: dette viser ${shows}, og kilden har endret seg siden (${newer})`,
+  recompute: 'Regn ut på nytt',
+  back: '‹ Tilbake',
+  pathSeparator: ' › ',
+  step: (at, of) => `Steg ${at} av ${of}`,
+  next: 'Neste ›',
+  bySystem: 'systemet',
+  on: 'på',
+  off: 'av',
+  turnOn: 'Slå på',
+  turnOff: 'Slå av',
+  hook: {
+    changed: panel => `Når ${panel} endrer seg`,
+    crosses: (panel, at) => `Når ${panel} er ${lineIn(at, line, decimalComma)}`,
+    picked: panel => `Når du velger en rad i ${panel}`,
+    answered: operation => `Når du svarer på «${operation}»`,
+    due: 'Når det er tid for en påminnelse om dette',
+    when: 'Når',
+    cue: label => `foreslå «${label}»`,
+    notify: text => `varsle deg: ${text}`,
+    read: panel => `hent ${panel} på nytt`,
+    job: prompt => `start en jobb: ${prompt}`,
+    nothing: 'ingenting',
+    idle: 'av: i oppgaven til en jobb skjer ingenting av seg selv',
+    unavailable: 'av: jobber er slått av i denne appen',
+  },
+};
+
+export const VIEW_WORDS_NN: ViewWords = {
+  classified: label => `${label} · klassifisert av appen`,
+  written: 'Skrive av modellen',
+  notUpToDate: (shows, newer) => `Ikkje oppdatert: dette viser ${shows}, og kjelda har endra seg sidan (${newer})`,
+  recompute: 'Rekn ut på nytt',
+  back: '‹ Tilbake',
+  pathSeparator: ' › ',
+  step: (at, of) => `Steg ${at} av ${of}`,
+  next: 'Neste ›',
+  bySystem: 'systemet',
+  on: 'på',
+  off: 'av',
+  turnOn: 'Slå på',
+  turnOff: 'Slå av',
+  hook: {
+    changed: panel => `Når ${panel} endrar seg`,
+    crosses: (panel, at) => `Når ${panel} er ${lineIn(at, line, decimalComma)}`,
+    picked: panel => `Når du vel ei rad i ${panel}`,
+    answered: operation => `Når du svarar på «${operation}»`,
+    due: 'Når det er tid for ei påminning om dette',
+    when: 'Når',
+    cue: label => `foreslå «${label}»`,
+    notify: text => `varsle deg: ${text}`,
+    read: panel => `hent ${panel} på nytt`,
+    job: prompt => `start ein jobb: ${prompt}`,
+    nothing: 'ingenting',
+    idle: 'av: i oppgåva til ein jobb skjer ingenting av seg sjølv',
+    unavailable: 'av: jobbar er slått av i denne appen',
+  },
+};

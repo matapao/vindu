@@ -3,16 +3,26 @@ import { changedFields } from '../../changes.js';
 import { fieldValue, formatCell, formatTime, rowContainer, displayNames, defineBlock } from './shared.js';
 import { sendBlockAction } from '../dom.js';
 import { asText } from '../../format.js';
+import { VIEW_WORDS } from '../../view-words.js';
 
 const ON = /^(on|true|yes|enabled|running|active|open|1)$/i;
+type DeviceWords = Pick<typeof VIEW_WORDS, 'on' | 'off' | 'turnOn' | 'turnOff'>;
+/** The words it draws: the view's, where the surface gives them, and English for each one it does not. */
+const deviceWords = (given: unknown): DeviceWords => {
+  const words = (given && typeof given === 'object' ? given : {}) as Record<string, unknown>;
+  const word = (name: keyof DeviceWords) => (typeof words[name] === 'string' ? words[name] : VIEW_WORDS[name]);
+  return { on: word('on'), off: word('off'), turnOn: word('turnOn'), turnOff: word('turnOff') };
+};
 export const VDevices = defineBlock(
   'VDevices',
   'vindu-devices',
-  { operation: 'string' },
-  (props) =>
-    html`<div class="vb-list">${props.rows.map((row, index) => {
+  { operation: 'string', words: 'value' },
+  (props) => {
+    const words = deviceWords(props.words);
+    return html`<div class="vb-list">${props.rows.map((row, index) => {
       const state = fieldValue(props, row, 'state');
       const on = state === true || ON.test(asText(state ?? ''));
+      const turn = on ? words.turnOff : words.turnOn;
       const act = (e: Event) =>
         sendBlockAction(e.currentTarget as HTMLElement, {
           type: 'operation',
@@ -32,16 +42,17 @@ export const VDevices = defineBlock(
               }</span>`
             : nothing
         }</span><span class=${`vb-pill ${on ? 'vb-on' : ''}`}>${
-          typeof state === 'boolean' ? (state ? 'on' : 'off') : formatCell(props, state)
+          typeof state === 'boolean' ? (state ? words.on : words.off) : formatCell(props, state)
         }</span>${
           props.operation
-            ? html`<button class="vb-btn" aria-label=${`${on ? 'Turn off' : 'Turn on'} ${asText(fieldValue(props, row, 'name') ?? '')}`.trim()} @click=${act}>${
-                on ? 'Turn off' : 'Turn on'
+            ? html`<button class="vb-btn" aria-label=${`${turn} ${asText(fieldValue(props, row, 'name') ?? '')}`.trim()} @click=${act}>${
+                turn
               }</button>`
             : nothing
         }`,
       );
-    })}</div>`,
+    })}</div>`;
+  },
 );
 
 export const VBatch = defineBlock('VBatch', 'vindu-batch', {}, (props) => {

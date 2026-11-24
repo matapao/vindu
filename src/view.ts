@@ -75,8 +75,9 @@ export function showView(input: Record<string, unknown>, ctx: ViewContext): Show
   }
   for (const c of ctx.cues?.(spec.name) ?? []) spec.suggestions.push({ label: c.label, prompt: c.prompt, by: 'system' });
   const build = () => {
-    const wide = compile(spec, data, { compact: false, cards: ctx.cards, locale: ctx.format?.locale, timeZone: ctx.format?.timeZone });
-    const compact = compile(spec, data, { compact: true, cards: ctx.cards, locale: ctx.format?.locale, timeZone: ctx.format?.timeZone });
+    const drawing = { cards: ctx.cards, locale: ctx.format?.locale, timeZone: ctx.format?.timeZone, words: ctx.words };
+    const wide = compile(spec, data, { compact: false, ...drawing });
+    const compact = compile(spec, data, { compact: true, ...drawing });
     const broken = [...checkSurface(wide), ...checkSurface(compact)];
     if (broken.length) throw new Error(`the view could not be built (${broken[0]}); a fault in the UI server, not in the view`);
     return { wide, compact, account: account(spec, data, wide, compact, ctx, notes, ignored) };

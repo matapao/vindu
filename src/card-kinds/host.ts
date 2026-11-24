@@ -2,10 +2,17 @@
 // checks, and the rows, exact, bound to the component the host's renderer registers.
 import { MAX_ROWS, PANEL_FIELDS, type CardDef, type PanelSpec, type Resolved } from '../cards.js';
 import { pointerStep } from '../results.js';
+import { VIEW_WORDS, type ViewWords } from '../view-words.js';
 import type { CardKind } from './kind.js';
 
 export function hostKind(def: CardDef): CardKind {
   const props = (p: PanelSpec, d: Resolved) => (def.props || d.shaped?.props ? { ...def.props?.(p), ...d.shaped?.props } : undefined);
+  // its component's words, where the view is drawn in other words than English, which its component has of its own
+  const words = (w: ViewWords) => {
+    if (!def.words) return {};
+    const own = def.words(w);
+    return JSON.stringify(own) === JSON.stringify(def.words(VIEW_WORDS)) ? {} : { words: own };
+  };
   return {
     reads: [...PANEL_FIELDS, ...Object.keys(def.fields ?? {})], // a host's card may read any shared field, besides its own
     ...(def.one ? { one: true } : {}), ...(def.rows ? { rows: def.rows } : {}), ...(def.source ? { source: def.source } : {}),
@@ -14,7 +21,7 @@ export function hostKind(def: CardDef): CardKind {
     draw: (p, d, k) => {
       k.model.rows = d.rows!.slice(0, MAX_ROWS);
       // A2UI takes plain values as they are and anything else bound by path: a block's maps and lists go in the data model
-      const bound = Object.fromEntries(Object.entries(props(p, d) ?? {}).map(([name, v]) => {
+      const bound = Object.fromEntries(Object.entries({ ...props(p, d), ...words(k.words) }).map(([name, v]) => {
         if (v === null || typeof v !== 'object') return [name, v];
         const held = (k.model.props ??= {}) as Record<string, unknown>; held[name] = v; return [name, { path: `/panels/${k.pid}/props${pointerStep(name)}` }];
       }));

@@ -36,7 +36,7 @@ type Spec = { name: string; about: string; component: string; roles: Roles; layo
   account?: (rows: Row[], p: PanelSpec, map: Record<string, string>, props: Record<string, unknown>) => Record<string, unknown>;
   derived?: string[];                                // fields of each row it works out itself, which a host's drawing gets too
   allFields?: (p: PanelSpec) => boolean;             // a host's drawing gets every field of each row, not only its roles'
-  actions?: Record<string, CardAction>; suggest?: CardDef['suggest'] };
+  actions?: Record<string, CardAction>; suggest?: CardDef['suggest']; words?: CardDef['words'] };
 export function block(o: Spec): CardDef {
   const badLayout = (p: PanelSpec) => !!(o.layouts && p.layout && !o.layouts.includes(asText(p.layout)));
   const fixed = (p: PanelSpec) => ({ map: p.map ?? {}, layout: p.layout ?? '', ...o.props?.(p) });
@@ -65,6 +65,6 @@ export function block(o: Spec): CardDef {
     presentFields: (rows, p, props) => (o.allFields?.(p)
       ? [...new Set(rows.flatMap(row => Object.keys(row).filter(key => !key.startsWith('__'))))]
       : [...new Set([...Object.values((props.map ?? {}) as Record<string, string>), ...(o.derived ?? [])])]),
-    ...(o.actions ? { actions: o.actions } : {}), ...(o.suggest ? { suggest: o.suggest } : {}),
+    ...(o.actions ? { actions: o.actions } : {}), ...(o.suggest ? { suggest: o.suggest } : {}), ...(o.words ? { words: o.words } : {}),
   };
 }

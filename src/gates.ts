@@ -2,6 +2,7 @@
 // something the person does (after): an answer, a pick, a panel filled. Pure: the UI server keeps the state.
 import type { Entry, ResultEntry } from './results.js';
 import type { Await, Hook } from './cards.js';
+import { VIEW_WORDS, type HookWords } from './view-words.js';
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 /** "accounts.list_invoices", or the tool alone. */
@@ -18,14 +19,15 @@ export const firstAfter = (all: readonly Entry[], since: number, a: Await): Resu
 /** A view and a panel, from "view/panel", or the panel of this view. */
 export const panelRef = (ref: string, view: string): [string, string] => { const i = ref.indexOf('/'); return i > 0 ? [ref.slice(0, i), ref.slice(i + 1)] : [view, ref]; };
 
-/** A hook in the person's words: "When Overdue is above 50000: tell you: …" (titleOf names a panel). */
-export function hookWords(h: Hook, titleOf: (panel: string) => string): string {
+/** A hook in the person's words: "When Overdue is above 50000: tell you: …" (titleOf names a panel), in English unless
+ *  other words are given (view-words.ts). What the model is told of a hook is always in English. */
+export function hookWords(h: Hook, titleOf: (panel: string) => string, say: HookWords = VIEW_WORDS.hook): string {
   const w = h.when, d = h.do;
-  const when = w.changed ? `When ${titleOf(w.changed)} changes`
-    : w.crosses ? `When ${titleOf(w.crosses.panel)} is ${w.crosses.above !== undefined ? `above ${w.crosses.above}` : ''}${w.crosses.above !== undefined && w.crosses.below !== undefined ? ' or ' : ''}${w.crosses.below !== undefined ? `below ${w.crosses.below}` : ''}`
-    : w.picked ? `When you pick a row in ${titleOf(w.picked)}` : w.answered ? `When you answer "${w.answered.replace(/_/g, ' ')}"` : w.due ? 'When a reminder about this comes due' : 'When';
-  const what = [d.cue ? `offer "${d.cue.label}"` : '', d.notify ? `tell you: ${d.notify}` : '', d.read ? `read ${titleOf(d.read)} again` : '', d.job ? `start a job: ${d.job.prompt}` : ''].filter(Boolean).join('; ');
-  return `${h.label ? `${h.label}: ` : ''}${when}, ${what || 'nothing'}`;
+  const when = w.changed ? say.changed(titleOf(w.changed))
+    : w.crosses ? say.crosses(titleOf(w.crosses.panel), w.crosses)
+    : w.picked ? say.picked(titleOf(w.picked)) : w.answered ? say.answered(w.answered.replace(/_/g, ' ')) : w.due ? say.due : say.when;
+  const what = [d.cue ? say.cue(d.cue.label) : '', d.notify ? say.notify(d.notify) : '', d.read ? say.read(titleOf(d.read)) : '', d.job ? say.job(d.job.prompt) : ''].filter(Boolean).join('; ');
+  return `${h.label ? `${h.label}: ` : ''}${when}, ${what || say.nothing}`;
 }
 /** Whether a hook's when matches what happened. */
 export function hookMatches(h: Hook, ev: HookEvent): boolean {

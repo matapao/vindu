@@ -8,6 +8,7 @@ import { plainList } from '../format.js';
 import type { PanelPresentation } from '../presentation.js';
 import type { Entry, Row } from '../results.js';
 import type { ViewContext } from '../view-context.js';
+import type { ViewWords } from '../view-words.js';
 
 /** What a card draws itself with: its part of the data model, components it adds below its title, the window it is for. */
 export type DrawKit = {
@@ -18,6 +19,7 @@ export type DrawKit = {
   list: (cells: string[], item?: 'Row' | 'Column') => string; // its rows (at /panels/<pid>/rows), each drawn with these cells
   cell: (v: unknown, field?: string) => string;          // a value as the person reads it, in the window's locale
   compact: boolean; locale: string; timeZone: string;
+  words: ViewWords;                                      // the words the view is drawn in (view-words.ts)
 };
 /** What a card's account is read from: its part of the data model, as drawn wide and as drawn narrow. */
 export type AccountKit = { model: Record<string, unknown>; narrow: Record<string, unknown> };

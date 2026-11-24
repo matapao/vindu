@@ -12,6 +12,7 @@ import type { Reminder, ReminderWords } from '../reminders.js';
 import type { AnswerEntry, Entry, ResultSource } from '../results.js';
 import type { ModelArrange, ShellState, ViewMark } from '../shell.js';
 import type { Template } from '../templates.js';
+import type { PartialViewWords } from '../view-words.js';
 import type { ViewsSetup } from '../views/views.js';
 import type { Fill, Gate } from './state.js';
 
@@ -126,6 +127,9 @@ export type OpenMore = {
   jobs?: boolean;
   /** false: no hook runs in this process (a job's own process: its views are its source's, and their hooks ran there). */
   hooks?: boolean;
+  /** The words drawn on this window's views, word by word over the provider's (viewWords there); setViewWords changes
+   *  them while it runs. */
+  viewWords?: PartialViewWords;
   /** A source kept fresh (a slot's source with every): the host reads it again every so many seconds, from the result
    *  it starts from (after), and says each new result's id when what it read changed. Returns a stop. */
   watch?: (
@@ -155,6 +159,7 @@ export type UiServerOptions = {
   asks?: 'panes' | 'host'; // asks as panes in the window (the default), or drawn by the host alone: no pane, each from onShow, onAskGone when it leaves
   questions?: boolean; // the ask tool: the model asks the person something in the window (on by default)
   words?: Partial<Words>; // the binding's buttons, in the host's words
+  viewWords?: PartialViewWords; // the words drawn on a view's own surface (its steps, its hooks, what a panel says of itself), word by word over English; what the model is told stays English
   apps?: AppsSwitch; // MCP Apps: off (the default), on, or per connection
   appsNetwork?: boolean; // let app frames reach the domains they declare (off: no fetch from the network at all)
   modelArrange?: ModelArrange; // the model arranges the window (allow), proposes (suggest) or not at all (off)

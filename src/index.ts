@@ -7,6 +7,8 @@ export { rowKey } from './row-keys.js';
 export { addDates, addTime, dayOf, parseDateExpr, today, type DateExpr } from './dates.js';
 export { whenOf, instantOf, localOf, sayTime, remindersSurface, REMINDER_WORDS, DEFAULT_TIME, type Reminder, type ReminderWords } from './reminders.js';
 export { FieldSchema, formBinding, readAnswer, fieldsOf, checkValue, checkDigits, FORMATS, CHECKS, permissionDetails, lineDiff, confirms, HINTS, WORDS, type Format, type Check, type Operation, type Effect, type Field, type Form, type Detail, type Ask, type Binding, type Words } from './operations.js';
+export { VIEW_WORDS, type ViewWords, type HookWords, type PartialViewWords } from './view-words.js';
+export { VIEW_WORDS_NB, VIEW_WORDS_NN } from './view-words-norwegian.js';
 export { fromApp, appHtml, resultFor, textOnly, appsOn, anyAppsOn, resourceOf, toolResourceUri, toolVisibleTo, type AppsProvider, type AppsSwitch, type AppPanel, type AppSubmission } from './apps.js';
 export { memoryResults, brief, shapeOf, amountsOf, fileOf, readRef, refOf, dataOf, withOwn, type ResultSource, type Entry, type ResultEntry, type AttachmentEntry, type AnswerEntry, type Row } from './results.js';
 export { showView } from './view.js';

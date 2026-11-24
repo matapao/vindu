@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import type { ViewAction } from './actions.js';
 import type { Entry, Row } from './results.js';
+import type { ViewWords } from './view-words.js';
 
 export const CARDS = ['kpi', 'table', 'list', 'record', 'timeline', 'bar-chart', 'line-chart', 'media', 'text', 'page', 'code', 'diff', 'app'] as const;
 export type CardName = (typeof CARDS)[number];
@@ -30,6 +31,9 @@ export type CardDef = {
   one?: boolean;
   /** Its component takes the window's locale and time zone, and the panel's id (Vindu's own blocks do). */
   context?: boolean;
+  /** The words its component draws, from the words the view is drawn in (Vindu's devices: each one's state and switch).
+   *  They go to it as its words prop where they are not the English ones, which its component draws by itself. */
+  words?: (words: ViewWords) => Record<string, string>;
   /** Actions inside a view only this card takes, by name (a calendar's plan, a deck's slide), for the person and the
    *  model alike: offered in act_in_view where a card that takes them is. */
   actions?: Record<string, CardAction>;

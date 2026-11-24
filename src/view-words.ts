@@ -1,0 +1,89 @@
+// The words Vindu draws on a view's own surface, besides what the model wrote: what a panel says of itself, the way
+// back and through steps, the system's own suggestions, and each hook's line with its switch. English by default; a
+// host gives its own, whole or word by word (view-words-norwegian.ts has Bokmål and Nynorsk). What the model is told
+// stays in English, whatever the person reads.
+
+/** A hook's line, as the person reads it: when it runs, then each thing it does; and why it is off where it cannot be
+ *  turned on. Panels come by their titles, an operation by its name with spaces. */
+export type HookWords = {
+  changed: (panel: string) => string;                                           // "When Invoices changes"
+  crosses: (panel: string, line: { above?: number; below?: number }) => string; // "When Total is above 50000"
+  picked: (panel: string) => string;                                            // "When you pick a row in Invoices"
+  answered: (operation: string) => string;                                      // "When you answer "record decision""
+  due: string;                                                                  // "When a reminder about this comes due"
+  when: string;                                                                 // a hook whose when names nothing
+  cue: (label: string) => string;                                               // "offer "What changed?""
+  notify: (text: string) => string;                                             // "tell you: …"
+  read: (panel: string) => string;                                              // "read Invoices again"
+  job: (prompt: string) => string;                                              // "start a job: …"
+  nothing: string;                                                              // what a hook that does nothing does
+  idle: string;                                                                 // a job's hook in a job's own task
+  unavailable: string;                                                          // a job's hook where the app starts no jobs
+};
+/** The words of a view's own surface. An arrow goes with the word it points with; the compiler adds only the
+ *  punctuation between words (" · " and parentheses). */
+export type ViewWords = {
+  classified: (label: string) => string;                 // "Confidential · classified by the host"
+  written: string;                                       // "Written by the model"
+  notUpToDate: (shows: string, newer: string) => string; // "Not up to date: this shows r1, and its source has changed since (r2)"
+  recompute: string;                                     // a panel's values computed again with the inputs the person set
+  back: string;                                          // "‹ Back", after a drill and on a step after the first
+  pathSeparator: string;                                 // between the steps of a drill's way in
+  step: (at: number, of: number) => string;              // "Step 2 of 3"
+  next: string;                                          // "Next ›"
+  bySystem: string;                                      // "the system", after what it offers or does by itself
+  on: string;                                            // a hook's job, or a device, that is on
+  off: string;
+  turnOn: string;                                        // the switch of a hook's job, or of a device
+  turnOff: string;
+  hook: HookWords;
+};
+/** Words a host gives: any of them; each one it leaves out is the one under it. */
+export type PartialViewWords = Partial<Omit<ViewWords, 'hook'>> & { hook?: Partial<HookWords> };
+
+/** The line a crosses hook looks at, in the words given: "above 50000 or below 100". */
+export const lineIn = (
+  line: { above?: number; below?: number },
+  words: { above: string; or: string; below: string },
+  number: (n: number) => string = String,
+): string =>
+  [line.above !== undefined ? `${words.above} ${number(line.above)}` : '', line.below !== undefined ? `${words.below} ${number(line.below)}` : '']
+    .filter(Boolean).join(` ${words.or} `);
+
+export const VIEW_WORDS: ViewWords = {
+  classified: label => `${label} · classified by the host`,
+  written: 'Written by the model',
+  notUpToDate: (shows, newer) => `Not up to date: this shows ${shows}, and its source has changed since (${newer})`,
+  recompute: 'Recompute',
+  back: '‹ Back',
+  pathSeparator: ' › ',
+  step: (at, of) => `Step ${at} of ${of}`,
+  next: 'Next ›',
+  bySystem: 'the system',
+  on: 'on',
+  off: 'off',
+  turnOn: 'Turn on',
+  turnOff: 'Turn off',
+  hook: {
+    changed: panel => `When ${panel} changes`,
+    crosses: (panel, line) => `When ${panel} is ${lineIn(line, { above: 'above', or: 'or', below: 'below' })}`,
+    picked: panel => `When you pick a row in ${panel}`,
+    answered: operation => `When you answer "${operation}"`,
+    due: 'When a reminder about this comes due',
+    when: 'When',
+    cue: label => `offer "${label}"`,
+    notify: text => `tell you: ${text}`,
+    read: panel => `read ${panel} again`,
+    job: prompt => `start a job: ${prompt}`,
+    nothing: 'nothing',
+    idle: 'off: a job\'s own task runs no hooks',
+    unavailable: 'off: jobs are off in this app',
+  },
+};
+
+/** The words given, without those left undefined. */
+const given = <T extends object>(words: T | undefined): Partial<T> =>
+  Object.fromEntries(Object.entries(words ?? {}).filter(([, word]) => word !== undefined)) as Partial<T>;
+/** Words over others, word by word: each one given in place of the one under it. */
+export const viewWordsOver = (under: ViewWords, words?: PartialViewWords): ViewWords =>
+  ({ ...under, ...given(words), hook: { ...under.hook, ...given(words?.hook) } });

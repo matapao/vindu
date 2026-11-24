@@ -8,6 +8,7 @@ import { BASIC_CATALOG, VINDU_CATALOG, dataModelOf, surfaceOf } from './catalog-
 import { cellIn } from './format.js';
 import { hookWords } from './gates.js';
 import { pointerStep } from './results.js';
+import { VIEW_WORDS, type ViewWords } from './view-words.js';
 import type { Probe } from './window-reports.js';
 
 export type Component = Required<Pick<AnyComponent, 'id' | 'component'>> & Record<string, unknown>;
@@ -16,8 +17,9 @@ export type Surface = Record<string, unknown>[];
 const KPI_ROW = 4; // kpis side by side, at most
 
 /** Each panel is drawn by its card's kind (card-kinds/), below what every panel has: its title, its label, and what
- *  the system says of it (written by the model, not up to date, inputs to change). */
-export function compile(view: ViewSpec, data: Record<string, Resolved>, { compact, cards, locale = 'en-GB', timeZone = 'UTC' }: { compact: boolean; cards?: ReadonlyMap<string, CardDef>; locale?: string; timeZone?: string }): Surface {
+ *  the system says of it (written by the model, not up to date, inputs to change). What the system says is in words,
+ *  English unless the view's words are given (view-words.ts). */
+export function compile(view: ViewSpec, data: Record<string, Resolved>, { compact, cards, locale = 'en-GB', timeZone = 'UTC', words = VIEW_WORDS }: { compact: boolean; cards?: ReadonlyMap<string, CardDef>; locale?: string; timeZone?: string; words?: ViewWords }): Surface {
   const cell = (v: unknown, field?: string) => cellIn(v, field, locale);
   const sid = view.name;
   // each panel's components and data go under its id's pid, which the window and the probes name it by: one each
@@ -33,20 +35,20 @@ export function compile(view: ViewSpec, data: Record<string, Resolved>, { compac
     const pid = add({ id: pidFor(p.id), component: 'Card', child: '', ...(weight ? { weight } : {}) }); // panel ids are unique, so this id is too; child set below
     const d = data[p.id]; const m: Record<string, unknown> = (model.panels[pid] = {}); const kids: string[] = [];
     if (p.title) kids.push(text(`${pid}__title`, p.title, 'h4'));
-    if (d.label) kids.push(text(`${pid}__label`, `${d.label} · classified by the host`, 'caption'));
-    if (d.typed) kids.push(text(`${pid}__made`, 'Written by the model', 'caption'));
-    if (d.newer) kids.push(text(`${pid}__newer`, `Not up to date: this shows ${d.src?.id ?? p.from}, and its source has changed since (${d.newer})`, 'caption'));
+    if (d.label) kids.push(text(`${pid}__label`, words.classified(d.label), 'caption'));
+    if (d.typed) kids.push(text(`${pid}__made`, words.written, 'caption'));
+    if (d.newer) kids.push(text(`${pid}__newer`, words.notUpToDate(String(d.src?.id ?? p.from), d.newer), 'caption'));
     if (d.inputs && Object.keys(d.inputs).length) { // what-ifs: the person changes a number and asks for the values again
       const names = Object.keys(d.inputs);
       m.inputs = Object.fromEntries(names.map(k => [k, String(d.inputs![k])]));
       const label = (k: string) => { const v = (p.inputs as Record<string, unknown> | undefined)?.[k]; return v && typeof v === 'object' && typeof (v as { label?: unknown }).label === 'string' ? String((v as { label: string }).label) : k; };
       const at = (k: string) => `/panels/${pid}/inputs${pointerStep(k)}`; // an input's name as one step of a JSON Pointer
       const fields = names.map((k, i) => add({ id: `${pid}__in${i}`, component: 'TextField', label: label(k), value: { path: at(k) }, variant: 'number', weight: 1 }));
-      const again = add({ id: `${pid}__recompute`, component: 'Button', child: text(`${pid}__recompute_label`, 'Recompute'),
+      const again = add({ id: `${pid}__recompute`, component: 'Button', child: text(`${pid}__recompute_label`, words.recompute),
         action: { event: { name: 'set_inputs', context: { panel: p.id, ...Object.fromEntries(names.map(k => [`in:${k}`, { path: at(k) }])) } } } });
       kids.push(add({ id: `${pid}__inputs`, component: 'Row', children: [...fields, again] }));
     }
-    kids.push(...kindOf(p.card, cards)!.draw(p, d, { pid, model: m, add, text, list: (cells, item) => list(pid, cells, item), cell, compact, locale, timeZone }));
+    kids.push(...kindOf(p.card, cards)!.draw(p, d, { pid, model: m, add, text, list: (cells, item) => list(pid, cells, item), cell, compact, locale, timeZone, words }));
     const body = add({ id: `${pid}__body`, component: 'Column', children: kids });
     comps.find(c => c.id === pid)!.child = body;
     return pid;
@@ -74,26 +76,27 @@ export function compile(view: ViewSpec, data: Record<string, Resolved>, { compac
   };
   const head = [text('title', view.title, 'h2'), ...(view.subtitle ? [text('subtitle', view.subtitle, 'caption')] : [])];
   if (view.path && view.path.length > 1) { // after a drill: the way in, and a way back, in the same pane
-    const back = add({ id: 'back', component: 'Button', child: text('back_label', '‹ Back'), action: { event: { name: 'drill_back', context: { depth: view.path.length - 1 } } } });
-    head.push(add({ id: 'path', component: 'Row', align: 'center', children: [back, text('path_text', view.path.join(' › '), 'caption')] }));
+    const back = add({ id: 'back', component: 'Button', child: text('back_label', words.back), action: { event: { name: 'drill_back', context: { depth: view.path.length - 1 } } } });
+    head.push(add({ id: 'path', component: 'Row', align: 'center', children: [back, text('path_text', view.path.join(words.pathSeparator), 'caption')] }));
   }
   const body = view.tabs
     ? add({ id: 'tabs', component: 'Tabs', tabs: view.tabs.map((t, i) => ({ title: t.title, child: add({ id: `tab_${i}`, component: 'Column', children: cardsOf(t.panels, `tab_${i}`) }) })) })
     : add({ id: 'panels', component: 'Column', children: cardsOf(view.step ? view.panels!.slice(0, view.step.at) : view.panels!, 'panels') });
   const stepper = view.step && view.step.of > 1 ? [add({ id: 'steps', component: 'Row', align: 'center', children: [
-    ...(view.step.at > 1 ? [add({ id: 'step_back', component: 'Button', child: text('step_back_label', '‹ Back'), action: { event: { name: 'step', context: { to: view.step.at - 1 } } } })] : []),
-    text('step_text', `Step ${view.step.at} of ${view.step.of}`, 'caption'),
-    ...(view.step.at < view.step.of ? [add({ id: 'step_next', component: 'Button', child: text('step_next_label', 'Next ›'), action: { event: { name: 'step', context: { to: view.step.at + 1 } } } })] : []),
+    ...(view.step.at > 1 ? [add({ id: 'step_back', component: 'Button', child: text('step_back_label', words.back), action: { event: { name: 'step', context: { to: view.step.at - 1 } } } })] : []),
+    text('step_text', words.step(view.step.at, view.step.of), 'caption'),
+    ...(view.step.at < view.step.of ? [add({ id: 'step_next', component: 'Button', child: text('step_next_label', words.next), action: { event: { name: 'step', context: { to: view.step.at + 1 } } } })] : []),
   ] })] : [];
-  const tips = (view.suggestions ?? []).slice(0, 6).map((sg, i) => add({ id: `suggest_${i}`, component: 'Button', child: text(`suggest_${i}_label`, sg.by === 'system' ? `${sg.label} (the system)` : sg.label),
+  const tips = (view.suggestions ?? []).slice(0, 6).map((sg, i) => add({ id: `suggest_${i}`, component: 'Button', child: text(`suggest_${i}_label`, sg.by === 'system' ? `${sg.label} (${words.bySystem})` : sg.label),
     action: { event: { name: 'suggest', context: { n: i, label: sg.label, prompt: sg.prompt } } } }));
   // the view's hooks, as the person sees them: what the system does by itself, and each job's switch
   const titleOf = (id: string) => panelTitle(view, id);
+  const states = { system: ` (${words.bySystem})`, on: ` · ${words.on}`, off: ` · ${words.off}`, idle: ` · ${words.hook.idle}`, unavailable: ` · ${words.hook.unavailable}` };
   const hooks = (view.hooks ?? []).map((h, i) => {
     const st = view.hookStates?.[i] ?? 'system';
-    const words = text(`hook_${i}_text`, `${hookWords(h, titleOf)}${st === 'system' ? ' (the system)' : st === 'on' ? ' · on' : st === 'off' ? ' · off' : st === 'idle' ? ' · off: a job\'s own task runs no hooks' : ' · off: jobs are off in this app'}`, 'caption');
-    const sw = st === 'on' || st === 'off' ? [add({ id: `hook_${i}_switch`, component: 'Button', child: text(`hook_${i}_switch_label`, st === 'on' ? 'Turn off' : 'Turn on'), action: { event: { name: 'hook', context: { n: i, on: st === 'off' } } } })] : [];
-    return add({ id: `hook_${i}`, component: 'Row', align: 'center', children: [words, ...sw] });
+    const line = text(`hook_${i}_text`, `${hookWords(h, titleOf, words.hook)}${states[st]}`, 'caption');
+    const sw = st === 'on' || st === 'off' ? [add({ id: `hook_${i}_switch`, component: 'Button', child: text(`hook_${i}_switch_label`, st === 'on' ? words.turnOff : words.turnOn), action: { event: { name: 'hook', context: { n: i, on: st === 'off' } } } })] : [];
+    return add({ id: `hook_${i}`, component: 'Row', align: 'center', children: [line, ...sw] });
   });
   add({ id: 'root', component: 'Column', children: [...head, body, ...stepper, ...(tips.length ? [add({ id: 'suggestions', component: 'Row', children: tips })] : []), ...(hooks.length ? [add({ id: 'hooks', component: 'Column', children: hooks })] : [])] });
   // a component the basic catalog does not have (a chart, a page, a host's own) is Vindu's catalog's, which has them all

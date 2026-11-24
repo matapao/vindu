@@ -233,6 +233,7 @@ export const DEVICES = block({
   fields: { operation: z.string().optional().describe('devices: a host operation the person can run on a row from the window, given that row\'s id') },
   check: (rows, _p, m) => needOne(m, ['name'], 'a device', rows),
   props: p => ({ operation: p.operation ?? '' }),
+  words: w => ({ on: w.on, off: w.off, turnOn: w.turnOn, turnOff: w.turnOff }),
   account: rows => ({ devices: rows.length }),
 });
 

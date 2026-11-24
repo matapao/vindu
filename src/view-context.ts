@@ -1,6 +1,7 @@
 import type { CardDef, PanelSpec, ViewSpec } from './cards.js';
 import type { HeadText } from './pages.js';
 import { brief, type Entry, type ResultSource } from './results.js';
+import type { ViewWords } from './view-words.js';
 
 export class Refusal extends Error {} // shown to the model as "not shown: …", with what to send instead
 
@@ -11,6 +12,7 @@ export type ViewContext = {
   cards?: Map<string, CardDef>;
   kinds?: Set<string>;                              // the built-in cards offered here (all, by default)
   format?: { locale: string; timeZone: string };    // how values are written, said in every account
+  words?: ViewWords;                                // the words the view's own surface is drawn in (English by default); the account stays English
   holidays?: string[];                              // the host's days that are not working days, for dates worked out in working days
   /** Cues the host noticed about this view (a receipt that went otherwise than approved, say): offered on the pane as
    *  the system's suggestions, for the person to take into their prompt box or not. */

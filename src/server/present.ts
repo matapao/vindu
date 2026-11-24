@@ -168,6 +168,7 @@ const ctxFor = (
   cards: session.runtime.cards,
   kinds: session.runtime.kinds,
   format: session.runtime.format,
+  words: session.viewWords,
   marks: session.runtime.options.marks,
   classify: session.runtime.options.classify,
   newest: (id) => session.fresh.get(id),

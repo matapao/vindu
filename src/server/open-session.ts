@@ -8,6 +8,7 @@ import { type AnswerEntry, type Entry, withOwn } from '../results.js';
 import { Shell, type ShellState } from '../shell.js';
 import { ROLES } from '../shell-roles.js';
 import { templateNote } from '../templates.js';
+import type { PartialViewWords } from '../view-words.js';
 import { Views } from '../views/views.js';
 import { appControls } from './app-events.js';
 import { arrived } from './arrivals.js';
@@ -32,6 +33,7 @@ import { consumeWindowChanges, contextFor, resolved, setPicked } from './selecti
 import type { Session } from './state.js';
 import { templateControls } from './templates.js';
 import { layoutServerFor, serverFor } from './tool-server.js';
+import { sessionWords, setViewWords } from './view-words.js';
 import { dispatchEvent } from './window-events.js';
 
 export function openSession(
@@ -69,6 +71,7 @@ export function openSession(
     reads: new Map(),
     waiting: new Map(),
     more,
+    viewWords: sessionWords(runtime, more.viewWords),
     jobs: more.jobs !== false && !!more.onJob,
     added: [],
     told: 0,
@@ -253,6 +256,9 @@ export function openSession(
       );
       arrived(session, session.results.get(id));
     },
+    /** The words drawn on this window's views, in place of those it opened with (over the provider's): every view shown
+     *  is drawn again in them at once, where it is. What the model is told stays in English. */
+    setViewWords: (words?: PartialViewWords) => setViewWords(session, words),
     /** What the person's yeses let go, and how each went. */
     receipts: () => session.receipts.map((r) => ({ ...r })),
     /** The view as it is now, for a new process (or a fresh run of this one) to start from. */
