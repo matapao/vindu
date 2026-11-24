@@ -7,6 +7,7 @@
 - Run the provider in the consumer’s backend or Electron main process. The host owns harness startup,
   credentials, model selection, execution policy, device permissions and cancellation.
 - Keep consumer names and app-specific prompts or tool descriptions out of the SDK.
+- Vindu installs no app and is installed in none. `mountShell` is a UI component a host mounts in its own window.
 
 ## Code style
 

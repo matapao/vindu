@@ -1,4 +1,5 @@
-// vindu's shell, drawn: a process's views as panes, IDE-style. 1 px gray lines between panes and nothing else, a title
+// vindu's shell, drawn: a component a host mounts in an element of its own window, never one anything is installed in,
+// that shows a process's views as panes, IDE-style. 1 px gray lines between panes and nothing else, a title
 // bar per pane, and the shelf at the bottom: every view, the open ones first and then those collapsed into it. A lone
 // view sits in the middle; a phone-width window stacks the panes. The boxes come from layout.ts's place(), the same code
 // the UI server tells the model about, so what the model is told is what is drawn. A split drawn as a stack has a strip
@@ -51,6 +52,8 @@ const ICON = {
 };
 let skins = 0, paneIds = 0;
 
+/** Draws a process's views as panes in host, an element of the host's own window: a UI component, which installs nothing
+ *  and in which nothing is installed. Give it what the UI server shows (handle.view, handle.state). */
 export function mountShell(host: HTMLElement, o: ShellOptions = {}): ShellHandle {
   guardA2uiArrays();
   const doc = host.ownerDocument;

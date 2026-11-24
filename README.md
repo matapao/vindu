@@ -30,8 +30,8 @@ coordinator. Close with `ui.close()` and `await provider.close()`.
 
 ## Render and interact
 
-- `mountShell` from `@matapao/vindu` draws views and layout (`shell.view`, `shell.state`); route `onEvent` to
-  `ui.event`. `mountWorkspace` adds the Activity sidebar and composer.
+- `mountShell` (`@matapao/vindu`) is a component the host mounts in its own window; nothing installs into it. It draws
+  views and layout (`shell.view`, `shell.state`); route `onEvent` to `ui.event`. `mountWorkspace` adds a composer.
 - Register host cards, operations and MCP Apps (`apps`) in `startVindu`, and relay `onApp` to `shell.app`.
 - `views` on `provider.open` gives a task terminals and browser pages (`ViewsSetup`).
 - Diff panels read the last commit through the host’s `head`. Vindu runs no git of its own; `gitHead(work)` is a
