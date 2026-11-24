@@ -124,6 +124,7 @@ export function codeOf(p: PanelSpec, view: ViewSpec, ctx: ViewContext, against =
 /** A PDF in Vindu's own viewer (pdf-page.ts): an attachment (media, or from) or a file in the working folder (path),
  *  of at most PDF_MAX bytes, and a PDF by its header: "%PDF-", within its first 1024 bytes, as PDF readers allow. */
 export function pdfOf(p: PanelSpec, view: ViewSpec, ctx: ViewContext): Resolved {
+  if (Array.isArray(p.media)) throw new Refusal(`panel ${p.id}: a pdf shows one PDF: "media" is one attachment id or file name, not a list`);
   const pages = ctx.pages, want = p.media ?? p.from;
   if (!pages) throw new Refusal(`panel ${p.id}: this host shows no files`);
   if (want !== undefined && p.path !== undefined) throw new Refusal(`panel ${p.id}: a pdf shows "media" (an attachment) or "path" (a file in the working folder), not both`);

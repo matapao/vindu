@@ -43,14 +43,16 @@ test('a pdf panel shows a PDF attachment, or a PDF in the working folder; the ac
   assert.match(show, /pdf: a PDF, shown inline in its own viewer, page by page/); // the card list the model reads
 });
 
-test('refused, each with why: over 50 MB, not a PDF, a picture, neither or both', async () => {
+test('refused, each with why: over 50 MB, not a PDF, a picture, neither or both, or a list of them', async () => {
   const bad = await call('show_view', { name: 'bad', title: 'Bad', panels: [
     { card: 'pdf', id: 'scan', path: 'docs/scan.pdf' }, { card: 'pdf', id: 'archive', media: huge }, { card: 'pdf', id: 'notes', path: 'docs/notes.txt' },
     { card: 'pdf', id: 'minutes', media: fake }, { card: 'pdf', id: 'photo', media: photo }, { card: 'pdf', id: 'none' },
     { card: 'pdf', id: 'both', media: brief, path: 'docs/report.pdf' }, { card: 'pdf', id: 'gone', path: 'docs/gone.pdf' }, { card: 'pdf', id: 'result', media: 'r9' },
+    { card: 'pdf', id: 'many', media: [brief, brief] },
   ] });
   assert.equal(bad.ok, false);
-  assert.match(bad.text, /^not shown: 9 panels need changes/);
+  assert.match(bad.text, /^not shown: 10 panels need changes/);
+  assert.match(bad.text, /panel many: a pdf shows one PDF: "media" is one attachment id or file name, not a list/);
   assert.match(bad.text, /panel scan: scan\.pdf is 50\.0 MB; a pdf panel shows PDFs up to 50 MB/);
   assert.match(bad.text, /panel archive: archive\.pdf is 60\.0 MB; a pdf panel shows PDFs up to 50 MB/);
   assert.match(bad.text, /panel notes: notes\.txt is not a PDF: it does not begin with "%PDF-"/);

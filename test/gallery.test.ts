@@ -66,7 +66,7 @@ test('more than 40 items, or a run of ids that makes more, are refused; so is ev
   const bad = await call('show_view', { name: 'bad', title: 'Bad', panels: [{ id: 'g', card: 'gallery', media: [A.dent, A.song, A.notes, 'nope.png', R.rows, 'plan.docx'] }] });
   assert.equal(bad.ok, false);
   assert.equal(bad.text, `not shown: panel g: 5 of the 6 items cannot be shown in a gallery: item 2: song.mp3 is audio; a gallery shows pictures and videos: play it with a media panel ("media": "${A.song}"); `
-    + `item 3: notes.txt is text/plain; a gallery shows pictures and videos (show it with a text panel, "from": "${A.notes}"); item 4: nothing to show as "nope.png": no such file in the working folder; `
+    + `item 3: notes.txt is text/plain; a gallery shows pictures and videos; show it with a text panel ("from": "${A.notes}"); item 4: nothing to show as "nope.png": no such file in the working folder; `
     + `item 5: ${R.rows} holds no image: show it with a table or another card of rows; item 6: nothing to show as "plan.docx": .docx is not an image, video or audio file (svg, png, jpg, jpeg, gif, webp, ico, mp3, ogg, wav, mp4, webm). `
     + `Media the task has: ${Object.values(A).join(', ')}, ${R.snapshot}`);
   const none = await call('show_view', { name: 'bad', title: 'Bad', panels: [{ id: 'g', card: 'gallery' }] });
