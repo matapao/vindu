@@ -136,6 +136,9 @@ function updateView(session: Session, x: Record<string, unknown>): boolean | und
     return true;
   }
   if (x.type === 'attach' && typeof x.view === 'string') {
+    // in the chat only where the pane's role says so (an ask's pane, a reserved one and a terminal do not), whatever a
+    // host's window drew; out of it, always
+    if (x.on && !session.shell.viewOf(x.view)?.role.chat) return false;
     if (x.on) session.attached.add(x.view);
     else session.attached.delete(x.view);
     session.shell.setPicked(session.picked, [...session.attached]);

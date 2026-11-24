@@ -97,6 +97,28 @@ test('whose each view is: the model, the system, the host or an ask, in the stat
   } finally { await w.close(); }
 });
 
+test('only a pane whose role says so goes in the chat: not an ask\'s, a reserved one, a terminal, or one that is not there', async () => {
+  const w = await windowWith({ modelArrange: 'allow' });
+  try {
+    await w.json('show_view', { name: 'hours', title: 'Hours', panels: [{ id: 'list', card: 'table', from: 'r1' }] });
+    w.ui.pane({ name: 'terminal-1', title: 'Terminal 1', kind: 'terminal' });
+    assert.equal((await w.call('arrange', { reserve: [{ name: 'later', title: 'Later' }] })).ok, true);
+    const asked = w.call('ask', { question: 'Which client first?', choices: ['Havgap Media', 'Brattli Verksted'] });
+    await until(() => w.shown.some(v => v.ask));
+    const ask = w.shown.find(v => v.ask)!.name;
+    // a host's own window sends what it likes: the server holds to each pane's role, whatever the window draws
+    for (const view of [ask, 'later', 'terminal-1', 'nowhere']) assert.equal(w.ui.event({ type: 'attach', view, on: true }), false, view);
+    assert.equal(w.ui.context().text, '');
+    assert.equal(w.ui.event({ type: 'attach', view: 'hours', on: true }), true);
+    const told = JSON.parse(/^\[the window: (\{.*\})\]/s.exec(w.ui.context().text)![1]) as { in_the_chat: { view: string }[] };
+    assert.deepEqual(told.in_the_chat.map(v => v.view), ['hours']);
+    assert.equal(w.ui.event({ type: 'attach', view: 'hours', on: false }), true); // out of the chat, always
+    assert.equal(w.ui.context().text, '');
+    w.ui.event({ type: 'close', view: ask });
+    await asked;
+  } finally { await w.close(); }
+});
+
 test("a tool's short answers share one line in results, by tool; anything else keeps its own", async () => {
   const w = await windowWith();
   try {

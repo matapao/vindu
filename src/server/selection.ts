@@ -88,7 +88,7 @@ export const setPicked = (session: Session, items: PointItem[]) => {
 export const contextFor = (session: Session, budget = 4000): { text: string; id?: string } => {
   const items = resolved(session);
   const attached = [...session.attached]
-    .filter((v) => session.shell.viewOf(v) !== undefined)
+    .filter((v) => session.shell.viewOf(v)?.role.chat) // a pane whose role changed since it was put there goes no further
     .map((v) => ({
       view: v,
       ...session.shell.account({ view: v }),
