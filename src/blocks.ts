@@ -25,7 +25,10 @@ export const MESSAGE = block({
     body: /^(body|text|content|message|preview|snippet|html)$/i, time: T, attachments: /^attach/i, thread: /^(thread|conversation|thread_?id)$/i, state: /^(state|status|read|unread|flags?)$/i,
     format: /^(format|body_?format|markup)$/i, in_reply_to: /^(in_?reply_?to|replying_?to|original)$/i },
   layouts: ['one', 'thread', 'inbox', 'draft'],
-  check: (rows, p, m) => (p.layout === 'draft' ? (rows.length > 1 ? `a draft is one mail: send its fields as one object in data, not ${rows.length} rows` : null) : needOne(m, ['subject', 'body'], 'a message', rows)),
+  check: (rows, p, m) => {
+    if (p.layout !== 'draft') return needOne(m, ['subject', 'body'], 'a message', rows);
+    return rows.length > 1 ? `a draft is one mail: send its fields as one object in data, not ${rows.length} rows` : null;
+  },
   rows: (rows, p, m, _read, _inputs, draft) => {
     if (p.layout === 'draft') return draftShaped(rows, m, draft);
     const layout = asText(p.layout || (rows.length === 1 ? 'one' : m.thread && new Set(rows.map(r => String(r[m.thread]))).size === 1 ? 'thread' : 'inbox'));

@@ -2,7 +2,7 @@
 // per field) and text (plain short paragraphs).
 import { GUIDE, recordFields } from '../cards.js';
 import { aggregate, textOf } from '../view-rows.js';
-import { nested, rowsAsTheyAre, type CardKind } from './kind.js';
+import { drawnFrom, nested, rowsAsTheyAre, type CardKind } from './kind.js';
 import { asText } from '../format.js';
 
 export const KPI: CardKind = {
@@ -32,8 +32,8 @@ export const RECORD: CardKind = {
     return null;
   },
   draw: (p, d, k) => {
-    const f = recordFields(p, d.record!);
-    k.model.record = Object.fromEntries(f.map((x, i) => [`f${i}`, k.cell(d.record![x], x)]));
+    const record = drawnFrom(p, d, 'record'), f = recordFields(p, record);
+    k.model.record = Object.fromEntries(f.map((x, i) => [`f${i}`, k.cell(record[x], x)]));
     return f.map((x, i) => k.add({ id: `${k.pid}__f${i}`, component: 'Row', children: [k.text(`${k.pid}__k${i}`, x, 'caption', 1), k.text(`${k.pid}__v${i}`, { path: `/panels/${k.pid}/record/f${i}` }, undefined, 3)] }));
   },
   account: (o, _p, _d, kit) => { o.values = Object.values(kit.model.record as Record<string, string>).slice(0, 6).join(' · '); },

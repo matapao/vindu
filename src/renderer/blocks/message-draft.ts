@@ -33,11 +33,16 @@ const PRESSED_MS = 15_000;
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const texts = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 const said = (v: unknown) => (typeof v === 'string' ? v : '');
+/** What the window offers in place of Send, as the UI server sent it: Send itself, a host's action, or nothing. */
+function sendingOf(v: unknown): DraftSending {
+  if (v === 'send') return 'send';
+  return isObject(v) && typeof v.action === 'string' ? { action: v.action } : 'none';
+}
 /** The draft the UI server sent, read as untrusted: what is not of its shape is left out. */
 function lookOf(v: unknown): Look | undefined {
   if (!isObject(v) || !isObject(v.fields)) return undefined;
   const f = v.fields, state = ['draft', 'sending', 'sent', 'failed', 'unknown'].includes(said(v.state)) ? said(v.state) as DraftState : 'draft';
-  const sending: DraftSending = v.sending === 'send' ? 'send' : isObject(v.sending) && typeof v.sending.action === 'string' ? { action: v.sending.action } : 'none';
+  const sending = sendingOf(v.sending);
   const files = (Array.isArray(v.files) ? v.files : []).filter(isObject).map(x => ({ path: said(x.path), name: said(x.name), size: Number(x.size) || 0, missing: x.missing === true }));
   const o = isObject(v.original) ? v.original : undefined;
   return {
@@ -133,9 +138,10 @@ export function messageDraft(props: RowBlockProps, element: HTMLElement) {
   const markdown = look.format === 'markdown';
   const source = html`<textarea class="vb-dbody" data-part="body" aria-label=${w.body} .value=${live(sent ? shown.body : local.body)} ?readonly=${locked} aria-invalid=${problems.has('body') ? 'true' : 'false'} maxlength=${DRAFT_LIMITS.body} @input=${typed('body')}></textarea>`;
   const toggle = (editing: boolean) => () => { local.editing = editing; redraw(); };
-  const body = !markdown ? source
-    : local.editing && !locked ? html`${source}<div class="vb-dtools"><button type="button" class="vb-btn" @click=${toggle(false)}>${w.preview}</button></div>`
-    : html`<div class="vb-mdbody vb-dpreview" data-part="body" role="region" aria-label=${w.body}>${markdownOf(local, shown.body)}</div>${locked ? nothing : html`<div class="vb-dtools"><button type="button" class="vb-btn" @click=${toggle(true)}>${w.edit}</button></div>`}`;
+  // the body to edit; a Markdown one drawn, or its source while the person edits it
+  let body = source;
+  if (markdown && local.editing && !locked) body = html`${source}<div class="vb-dtools"><button type="button" class="vb-btn" @click=${toggle(false)}>${w.preview}</button></div>`;
+  else if (markdown) body = html`<div class="vb-mdbody vb-dpreview" data-part="body" role="region" aria-label=${w.body}>${markdownOf(local, shown.body)}</div>${locked ? nothing : html`<div class="vb-dtools"><button type="button" class="vb-btn" @click=${toggle(true)}>${w.edit}</button></div>`}`;
   const chip = (f: File) => html`<span class=${f.missing ? 'vb-chip vb-dfile vb-warn' : 'vb-chip vb-dfile'}>${f.name}<span class="vb-muted"> · ${f.missing ? w.missing : bytesIn(f.size, props.locale)}</span>${locked ? nothing
     : html`<button type="button" class="vb-dremove" aria-label=${`${w.remove} ${f.name}`} @click=${() => { local.attachments = local.attachments.filter(p => p !== f.path); changed(); }}>×</button>`}</span>`;
   const attachments = files.length ? html`<div class=${problems.has('attachments') ? 'vb-dfiles vb-dinvalid' : 'vb-dfiles'}><span class="vb-dlabel">${w.attachments}</span><span class="vb-chips">${files.map(chip)}</span></div>` : nothing;
@@ -143,10 +149,21 @@ export function messageDraft(props: RowBlockProps, element: HTMLElement) {
   const original = o ? html`<div class="vb-dquote"><div class="vb-dlabel">${w.inReplyTo}</div><div class="vb-meta">${o.from ? html`<b>${o.from}</b>` : nothing}${o.time ? html`<span class="vb-when">${whenIn(o.time, props.locale, props.timeZone)}</span>` : nothing}</div>${
     o.subject ? html`<div class="vb-title">${o.subject}</div>` : nothing}${o.body ? html`<blockquote class="vb-body">${plainText(o.body)}</blockquote>` : nothing}</div>` : nothing;
 
-  const status = sending ? w.sending : sent ? `✓ ${w.sent}` : look.state === 'failed' ? `${w.failed}: ${look.reason ?? ''}`
-    : look.state === 'unknown' ? `${w.unknown}${look.reason ? ` (${look.reason})` : ''}` : problems.size ? w.check : '';
-  const action = sent ? nothing : look.sending === 'send' ? html`<button type="button" class="vb-btn vb-primary" data-send ?disabled=${sending || problems.size > 0} @click=${send}>${w.send}</button>`
-    : typeof look.sending === 'object' ? html`<button type="button" class="vb-btn vb-primary" data-host-action @click=${hostAction}>${look.sending.action}</button>` : nothing;
+  const statusOf = (): string => {
+    if (sending) return w.sending;
+    if (sent) return `✓ ${w.sent}`;
+    if (look.state === 'failed') return `${w.failed}: ${look.reason ?? ''}`;
+    if (look.state === 'unknown') return look.reason ? `${w.unknown} (${look.reason})` : w.unknown;
+    return problems.size ? w.check : '';
+  };
+  const status = statusOf();
+  // what the window offers in place of Send: Send itself, the host's own action, or nothing once the mail is sent
+  const actionOf = () => {
+    if (sent) return nothing;
+    if (look.sending === 'send') return html`<button type="button" class="vb-btn vb-primary" data-send ?disabled=${sending || problems.size > 0} @click=${send}>${w.send}</button>`;
+    return typeof look.sending === 'object' ? html`<button type="button" class="vb-btn vb-primary" data-host-action @click=${hostAction}>${look.sending.action}</button>` : nothing;
+  };
+  const action = actionOf();
   return rowContainer(props, 0, sent ? 'vb-draft vb-dsent' : 'vb-draft', html`<div class="vb-dhead">${field('to', sent ? shown.to.join(', ') : local.to)}${field('cc', sent ? shown.cc.join(', ') : local.cc)}${
     field('subject', sent ? shown.subject : local.subject)}</div>${body}${attachments}${original}<div class="vb-dactions"><span class=${look.state === 'failed' || look.state === 'unknown' ? 'vb-dstatus vb-warn' : 'vb-dstatus'} role="status" aria-live="polite">${status}</span><button type="button" class="vb-btn" data-copy @click=${copy}>${local.copied ? w.copied : w.copy}</button>${action}</div>`);
 }

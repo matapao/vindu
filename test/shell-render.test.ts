@@ -158,6 +158,18 @@ test('one view sits in the middle; one page fills its pane; a phone-width window
   assert.equal(d.mode, 'stacked');
   assert.deepEqual(Object.keys(d.panes), ['totals', 'site']);
   assert.ok(Object.values<number[]>(d.panes).every(r => r[0] === 0 && r[2] === 390) && d.panes.site[1] > d.panes.totals[1]);
+  // stacked, every pane is in sight, full width, and none is maximized: the command has nothing to do, a pane has no
+  // Maximize button, a double-click on its title changes nothing, and the UI server takes no maximize from the window
+  assert.equal(await p.evaluate(() => (window as any).app.command({ type: 'maximize', view: 'site' })), false);
+  assert.equal(await p.evaluate(() => (window as any).app.command({ type: 'maximize' })), false);
+  assert.equal(await p.locator('.vindu-pane[data-view="site"] .vindu-pane-tools button[aria-label="Maximize"]').isHidden(), true);
+  await p.dblclick('.vindu-pane[data-view="site"] .vindu-pane-title');
+  await sync2();
+  assert.equal((await rects()).mode, 'stacked');
+  assert.equal(t.event({ type: 'maximize', view: 'totals' }), false);
+  look = await c.json('look', {});
+  assert.equal(look.mode, 'stacked: the window is phone-width, so the panes are one after another, full width');
+  assert.equal(look.person, undefined); // nothing changed
   await p.setViewportSize({ width: 1440, height: 900 });
   await c.mcp.close(); t.close();
   assert.deepEqual(errors, []);

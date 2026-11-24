@@ -5,7 +5,7 @@
 import { countIds, GALLERY_MOST, GUIDE, resultIds, type GalleryItem, type PanelSpec } from '../cards.js';
 import { Refusal, type ViewContext } from '../view-context.js';
 import { findMedia, mediaHad } from '../view-files.js';
-import { rowsAsTheyAre, type CardKind } from './kind.js';
+import { drawnFrom, rowsAsTheyAre, type CardKind } from './kind.js';
 
 /** What an item is, in a word: image or video. */
 const kindOf = (item: GalleryItem) => item.mime.split('/')[0];
@@ -39,7 +39,7 @@ export const GALLERY: CardKind = {
   reads: GUIDE.gallery.fields, typed: false, origin: 'media', noGroup: rowsAsTheyAre,
   own: (p, _view, ctx) => ({ gallery: galleryOf(p, ctx) }),
   draw: (p, d, k) => {
-    const items = d.gallery!;
+    const items = drawnFrom(p, d, 'gallery');
     // each item with where it is of how many, in the view's words; and the words of the overlay that shows one large
     k.model.items = items.map((item, i) => ({ name: item.name, kind: kindOf(item), url: item.url, at: k.words.itemOf(i + 1, items.length) }));
     k.model.words = { previous: k.words.previous, next: k.words.next, close: k.words.close };

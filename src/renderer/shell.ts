@@ -4,12 +4,13 @@
 // the UI server tells the model about, so what the model is told is what is drawn. A split drawn as a stack has a strip
 // of tabs above the view in front: a tab marks a view that changed while behind, or that waits for the person; a click
 // brings it in front, and Spread out shows them side by side again. A pane's Stack button stacks it with its neighbours.
-// The person drags a line (or presses the arrow keys on a focused one; Enter or a double-click evens it), maximizes
-// (double-click a title bar; Esc restores), collapses a pane into the shelf and opens it again (a click opens it where
-// it was; hovering shows it, a peek, without moving anything), drags a pane by its title, or a view from the shelf, to a
-// side of another pane (or a pane onto the shelf, to collapse it), and focuses panes (a click, or F6 and Shift+F6 from
-// pane to pane). Each change is drawn at once and reported through onEvent, with the window's size and each view's
-// content height, for the UI server (ui.event), whose state comes back. After drawing, and again when the panes move, a
+// The person drags a line (or presses the arrow keys on a focused one; Enter or a double-click evens it), maximizes a
+// pane, which has the focus then (double-click a title bar; Esc restores; a phone-width window, its panes stacked,
+// maximizes none), collapses a pane into the shelf and opens it again (a click opens it where it was; hovering shows
+// it, a peek, without moving anything), drags a pane by its title, or a view from the shelf, to a side of another pane
+// (or a pane onto the shelf, to collapse it), and focuses panes (a click, or F6 and Shift+F6 from pane to pane). Each
+// change is drawn at once and reported through onEvent, with the window's size and each view's content height, for
+// the UI server (ui.event), whose state comes back. After drawing, and again when the panes move, a
 // tab is opened or a pane is scrolled, the shell reads back what each view shows, for the UI server to check, and how far
 // the person has read each panel, for the host alone (shell-reading.ts).
 // A host makes it its own: tokens (colours, fonts, corners, for light and dark), labels (every word the shell says),
@@ -241,6 +242,7 @@ export function mountShell(host: HTMLElement, o: ShellOptions = {}): ShellHandle
       p.el.toggleAttribute('data-focus', st.focus === pp.view);
       p.body.toggleAttribute('data-fill', !!m?.fill);
       const isMax = st.maximized === pp.view;
+      p.max.hidden = pl.mode === 'stacked'; // a phone-width window maximizes none
       if (p.maxed !== isMax) { p.maxed = isMax; p.max.innerHTML = isMax ? ICON.restore : ICON.max; p.max.setAttribute('aria-label', isMax ? L.restore : L.maximize); p.max.title = isMax ? L.restoreHint : L.maximizeHint; }
       syncActs(p, pp.view);
       draw(pp.view, pp.compact ? 'compact' : 'wide');
@@ -285,7 +287,13 @@ export function mountShell(host: HTMLElement, o: ShellOptions = {}): ShellHandle
     for (const [n, p] of panes) p.el.toggleAttribute('data-focus', n === name);
     renderBar(); emit({ type: 'focus', view: name });
   };
-  const toggleMax = (name: string) => { const next = st.maximized === name ? null : name; st = { ...st, maximized: next }; layout(); emit({ type: 'maximize', view: next }); };
+  // a pane maximized has the focus; a phone-width window stacks its panes, every one in sight, and maximizes none
+  const toggleMax = (name: string): boolean => {
+    const next = st.maximized === name ? null : name;
+    if (next && isStacked()) return false;
+    st = { ...st, maximized: next, focus: next ?? st.focus }; layout(); emit({ type: 'maximize', view: next });
+    return true;
+  };
   // each move is made here first, with the same layout code the UI server runs, so it is drawn at once
   const collapsePane = (name: string) => {
     st = { ...st, tree: remove(st.tree, name), shelf: { ...st.shelf, [name]: { by: 'person', at: st.rev, slot: slotOf(st.tree, name) } },
@@ -382,7 +390,7 @@ export function mountShell(host: HTMLElement, o: ShellOptions = {}): ShellHandle
   });
   const command = (c: ShellCommand): boolean => {
     switch (c.type) {
-      case 'maximize': { const name = c.view ?? st.focus; if (!isOpen(name)) return false; toggleMax(name); return true; }
+      case 'maximize': { const name = c.view ?? st.focus; return isOpen(name) && toggleMax(name); }
       case 'restore': if (!st.maximized) return false; toggleMax(st.maximized); return true;
       case 'collapse': case 'close': { const name = c.view ?? st.focus; if (!isOpen(name)) return false; collapsePane(name); return true; }
       case 'open': case 'show': {

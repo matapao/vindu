@@ -8,7 +8,8 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { startVindu, memoryResults, type Shown, type ShellState, type ViewPresentation } from '../src/index.js';
-import { chromium, mcpClient } from './helpers.js';
+import type { Page as BrowserPage } from 'playwright';
+import { chromium, mcpClient, shellServer } from './helpers.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
@@ -178,4 +179,41 @@ test('drawn in Chromium: a sheet from a CSV has A1 letters, a marked cell descri
     assert.deepEqual(await sheet.locator('ol.vb-cellnotes li').allTextContents(), ['B3 Pays late every quarter', 'D2 Disputed']);
     assert.deepEqual(errors, []);
   } finally { await browser.close(); app.close(); }
+});
+
+test('drawn in Chromium at phone width, a sheet and a noted table read alike: a code whole on its line, a value with its own line breaks, numbers on the right', async () => {
+  fs.writeFileSync(path.join(work, 'data', 'codes.csv'), 'id,note,amount\nINV-1,"Delivered to the north warehouse on Monday, and signed for by the night shift",31050\nINV-2,"Line one\nline two",007\nINV-3,Paid,35740.5\n');
+  const notes = [{ cell: 'A2', note: 'From the ledger' }];
+  await json('show_view', { name: 'codes', title: 'Codes', panels: [{ id: 'sheet', card: 'sheet', path: 'data/codes.csv', notes }, { id: 'table', card: 'table', path: 'data/codes.csv', notes }] });
+  const shell = await shellServer(import.meta.dirname), browser = await chromium.launch();
+  try {
+    const page: BrowserPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    const errors: string[] = []; page.on('pageerror', (e: Error) => errors.push(e.message));
+    await page.goto(shell.url);
+    await page.evaluate(() => (window as any).app.shell('light'));
+    await page.evaluate((x: Shown) => (window as any).app.view(x), shown.filter(v => v.name === 'codes').at(-1)!);
+    await page.evaluate((s: ShellState) => (window as any).app.state(s), state!);
+    await page.locator('vindu-noted-table td.vb-noted').waitFor();
+    // each cell of a column: its own text (its note's mark aside) and how many lines that takes, its text as shown, how
+    // it is aligned, and whether it overflows its column
+    const column = (tag: string, n: number) => page.evaluate(([t, i]) => [...document.querySelectorAll<HTMLElement>(`${t} tbody tr td:nth-of-type(${i})`)].map(cell => {
+      const tops = new Set<number>(), range = document.createRange(), texts = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+      let own = '';
+      for (let text = texts.nextNode(); text; text = texts.nextNode()) {
+        if (text.parentElement?.closest('.vb-notemark')) continue;
+        own += text.textContent; range.selectNodeContents(text);
+        for (const r of range.getClientRects()) if (r.width > 0) tops.add(Math.round(r.top));
+      }
+      return { own, lines: tops.size, shown: cell.innerText, align: getComputedStyle(cell).textAlign, overflows: cell.scrollWidth > cell.clientWidth };
+    }), [tag, n] as const);
+    for (const tag of ['vindu-sheet', 'vindu-noted-table']) {
+      const ids = await column(tag, 1), said = await column(tag, 2), amounts = await column(tag, 3);
+      assert.deepEqual(ids.map(c => [c.own, c.lines, c.overflows]), [['INV-1', 1, false], ['INV-2', 1, false], ['INV-3', 1, false]], tag);
+      assert.equal(await page.locator(`${tag} tbody tr td.vb-noted .vb-notemark`).textContent(), '1'); // A2, marked
+      assert.equal(said[1].shown, 'Line one\nline two', tag); // the value's own line break
+      assert.ok(said[0].lines > 1, `${tag}: a long text wraps at its spaces`);
+      assert.deepEqual(amounts.map(c => [c.shown, c.align]), [['31,050', 'right'], ['007', 'start'], ['35,740.5', 'right']], tag); // a number on the right; text as written where text goes
+    }
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); shell.close(); }
 });

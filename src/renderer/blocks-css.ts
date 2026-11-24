@@ -72,6 +72,7 @@ export const BLOCKS_CSS = `
 .vindu-theme .vb-legend{display:flex;gap:${rhythm(12)} ${space(12)};flex-wrap:wrap;margin-top:${rhythm(4)};font-size:${captionSize(12)}}.vindu-theme .vb-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:${space(4)}}
 .vindu-theme .vb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:${rhythm(8)} ${space(8)}}
 .vindu-theme .vb-sheet{overflow-x:auto} .vindu-theme .vb-f{color:var(--v-accent)} .vindu-theme .vb-fx{font-style:italic;color:var(--v-accent)}
+.vindu-theme .vb-sheet td{white-space:pre-line} .vindu-theme .vb-nobr{white-space:nowrap}
 .vindu-theme .vb-sheet .vb-letter,.vindu-theme .vb-sheet .vb-rownum{font-family:var(--v-mono);font-weight:400;font-size:${captionSize(10.5)};color:var(--v-muted);text-align:center;background:var(--v-wash)} .vindu-theme .vb-sheet .vb-rownum{width:1%;white-space:nowrap}
 .vindu-theme .vb-sheet .vb-noted{background:rgba(235,104,52,.12);box-shadow:inset 0 0 0 1px rgba(235,104,52,.6)} .vindu-theme .vb-noted:focus-visible{outline:2px solid var(--v-accent);outline-offset:-2px}
 .vindu-theme .vb-notemark{margin-left:${space(3)};font-size:${captionSize(9.5)};font-weight:600;color:#c4511f;line-height:0}

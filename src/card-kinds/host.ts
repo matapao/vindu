@@ -6,7 +6,7 @@ import { pointerStep, type Row } from '../results.js';
 import { VIEW_WORDS, type ViewWords } from '../view-words.js';
 import { notesAccount, notesProblem, placedNotes, type DrawnCells } from './cells.js';
 import { cardFileOf } from '../view-files.js';
-import type { CardKind } from './kind.js';
+import { drawnFrom, type CardKind } from './kind.js';
 
 /** The fields of rows as cells: in the order they first appear, without those the system keeps to itself (__). */
 const cellFields = (rows: Row[]) => rowFields(rows).filter(k => !k.startsWith('__'));
@@ -31,19 +31,23 @@ export function hostKind(def: CardDef): CardKind {
     return JSON.stringify(own) === JSON.stringify(def.words(VIEW_WORDS)) ? {} : { words: own };
   };
   const cells = def.cells ? cellsOf(def.cells) : undefined;
+  // the model's notes: a card of cells places them on its cells, and any other takes none
+  const notesCheck = (p: PanelSpec, d: Resolved) => {
+    if (cells && d.rows) return notesProblem(p, cells(p, d));
+    return p.notes?.length && !def.fields?.notes ? `notes go on the cells of a table or a sheet; a ${p.card} takes none` : null;
+  };
   return {
     reads: [...PANEL_FIELDS, ...Object.keys(def.fields ?? {})], // a host's card may read any shared field, besides its own
     ...(def.one ? { one: true } : {}), ...(def.rows ? { rows: def.rows } : {}), ...(def.source ? { source: def.source } : {}),
     ...(cells ? { cells } : {}),
     ...(how ? { file: (p, e, ctx) => cardFileOf(p, e, ctx, how) } : {}),
-    check: (p, d) => (d.rows && def.check ? def.check(d.rows, p, d.shaped) : null)
-      ?? (cells && d.rows ? notesProblem(p, cells(p, d)) : p.notes?.length && !def.fields?.notes ? `notes go on the cells of a table or a sheet; a ${p.card} takes none` : null),
+    check: (p, d) => (d.rows && def.check ? def.check(d.rows, p, d.shaped) : null) ?? notesCheck(p, d),
     props,
     draw: (p, d, k) => {
-      const drawn = cells?.(p, d), rows = d.rows!.slice(0, drawn?.rows ?? MAX_ROWS);
+      const all = drawnFrom(p, d, 'rows'), drawn = cells?.(p, d), rows = all.slice(0, drawn?.rows ?? MAX_ROWS);
       // cells go as one JSON list of values a row, so that a sheet of 1,000 rows and 200 columns stays within a surface's limits
       k.model.rows = drawn ? rows.map(r => JSON.stringify(drawn.fields.map(f => r[f] ?? null))) : rows;
-      const of = drawn && { fields: drawn.fields, notes: placedNotes(p), rows: d.rows!.length, columns: cellFields(rows).length };
+      const of = drawn && { fields: drawn.fields, notes: placedNotes(p), rows: all.length, columns: cellFields(rows).length };
       // A2UI takes plain values as they are and anything else bound by path: a block's maps and lists go in the data model
       const bound = Object.fromEntries(Object.entries({ ...props(p, d), ...words(k.words), ...(of ? { cells: of } : {}) }).map(([name, v]) => {
         if (v === null || typeof v !== 'object') return [name, v];

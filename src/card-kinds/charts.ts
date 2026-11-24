@@ -3,7 +3,7 @@
 import { GUIDE, MAX_CHART_ROWS, type CardName } from '../cards.js';
 import { chartSvg } from '../chart-svg.js';
 import { asText } from '../format.js';
-import type { CardKind } from './kind.js';
+import { drawnFrom, type CardKind } from './kind.js';
 
 const chart = (name: CardName): CardKind => ({
   reads: GUIDE[name].fields, maxRows: MAX_CHART_ROWS,
@@ -14,8 +14,8 @@ const chart = (name: CardName): CardKind => ({
     p.x = group; p.y = field;
   },
   draw: (p, d, k) => { // narrower when narrow, so its text stays readable
-    const W = k.compact ? 360 : 640, n = Math.min(MAX_CHART_ROWS, d.rows!.length);
-    k.model.chart = chartSvg(p.card, d.rows!.slice(0, MAX_CHART_ROWS), p.x!, [p.y!].flat(), W, k.locale);
+    const rows = drawnFrom(p, d, 'rows'), W = k.compact ? 360 : 640, n = Math.min(MAX_CHART_ROWS, rows.length);
+    k.model.chart = chartSvg(p.card, rows.slice(0, MAX_CHART_ROWS), p.x!, [p.y!].flat(), W, k.locale);
     return [k.add({ id: `${k.pid}__chart`, component: 'VChart', url: { path: `/panels/${k.pid}/chart` }, bands: n, left: 56 / W, right: 24 / W, panel: p.id, ...(p.group ? { opens: true } : {}) })];
   },
   account: (o, p, d) => { o.shows = d.rows!.slice(0, 12).map(r => `${asText(r[p.x!])} ${[p.y!].flat().map(y => r[y]).join('/')}`).join(' · '); },

@@ -191,3 +191,24 @@ test("the person's moves by name, for an app's menus: each is drawn and the mode
   assert.deepEqual(await rects(), boxes(look));
   assert.deepEqual(errors, []);
 });
+
+test('a pane maximized by name has the focus, and the bar marks it: as drawn, and in the state the UI server sends back', async () => {
+  const cmd = (c: unknown) => p.evaluate((x: unknown) => (window as any).app.command(x), c);
+  const marked = () => p.locator('.vindu-bar-views .vindu-bar-view.is-focus').allInnerTexts();
+  assert.equal(await cmd({ type: 'show', view: 'nokkeltal' }), true);
+  await sync();
+  assert.deepEqual(await marked(), ['Nøkkeltal']);
+  assert.equal(await cmd({ type: 'maximize', view: 'veke' }), true);
+  assert.deepEqual(await marked(), ['Meter per veke']);
+  await sync();
+  assert.deepEqual(await marked(), ['Meter per veke']);
+  const look = await json('look', {});
+  assert.equal(look.mode, 'maximized: "veke" fills the window; the other panes are behind it');
+  assert.equal(look.focus, 'veke');
+  assert.equal(await p.locator('.vindu-pane[data-view="veke"]').getAttribute('data-focus'), '');
+  assert.equal(await cmd({ type: 'restore' }), true);
+  await sync();
+  assert.deepEqual(await marked(), ['Meter per veke']); // restored, it keeps the focus
+  assert.equal((await json('look', {})).focus, 'veke');
+  assert.deepEqual(errors, []);
+});

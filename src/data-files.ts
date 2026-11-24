@@ -20,7 +20,9 @@ const BY_EXTENSION: Record<string, DataFormat> = { csv: 'csv', tsv: 'tsv', json:
  *  extension (.csv, .tsv, .json); undefined for any other file. */
 export function dataFormat(name: string, mime = ''): DataFormat | undefined {
   const type = mime.split(';')[0].trim().toLowerCase();
-  return Object.hasOwn(BY_TYPE, type) ? BY_TYPE[type] : Object.hasOwn(BY_EXTENSION, extensionOf(name)) ? BY_EXTENSION[extensionOf(name)] : undefined;
+  if (Object.hasOwn(BY_TYPE, type)) return BY_TYPE[type];
+  const extension = extensionOf(name);
+  return Object.hasOwn(BY_EXTENSION, extension) ? BY_EXTENSION[extension] : undefined;
 }
 /** An attachment a table or a sheet reads as rows: a CSV, TSV or JSON file. */
 const isDataAttachment = (e: Entry | undefined): e is Extract<Entry, { kind: 'attachment' }> =>
@@ -55,8 +57,12 @@ function underHeader(records: unknown[][], toValue: (x: unknown) => unknown, sai
 }
 
 /** What a JSON value is, for a refusal that names it. */
-const whatItHolds = (v: unknown): string =>
-  v === null ? 'null' : Array.isArray(v) ? 'a list of plain values, or of records and other values mixed' : typeof v === 'string' ? 'one string' : typeof v === 'object' ? 'an object' : `one ${typeof v}`;
+function whatItHolds(v: unknown): string {
+  if (v === null) return 'null';
+  if (Array.isArray(v)) return 'a list of plain values, or of records and other values mixed';
+  if (typeof v === 'string') return 'one string';
+  return typeof v === 'object' ? 'an object' : `one ${typeof v}`;
+}
 const isRecord = (v: unknown): v is Row => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /** JSON as rows: a list of records as they are; a list of lists under its first, the header; one object as a row

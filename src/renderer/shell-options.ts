@@ -80,7 +80,7 @@ export type ShellAction = {
 };
 /** The person's moves, by name: for an app's menus, keys and buttons. Each is drawn and reported like the move itself. */
 export type ShellCommand =
-  | { type: 'maximize'; view?: string } // the focused pane, unless one is named; when it is maximized already, restore
+  | { type: 'maximize'; view?: string } // the focused pane, unless one is named, which then has the focus; restore when it is maximized already; false in a phone-width window, its panes stacked
   | { type: 'restore' }
   | { type: 'collapse'; view?: string } | { type: 'close'; view?: string } // the focused pane, unless one is named, into the shelf
   | { type: 'open'; view: string; place?: Place } | { type: 'show'; view: string } // focus it, opening it (where it was, or at place) if it is collapsed

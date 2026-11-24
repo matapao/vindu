@@ -7,7 +7,7 @@ import type { CardDef, CardFileRead, PanelSpec, Resolved, Suggestion, ViewSpec }
 import { plainList } from '../format.js';
 import type { PanelPresentation } from '../presentation.js';
 import type { Entry, Row } from '../results.js';
-import type { ViewContext } from '../view-context.js';
+import { Refusal, type ViewContext } from '../view-context.js';
 import type { ViewWords } from '../view-words.js';
 import type { DrawnCells } from './cells.js';
 
@@ -87,6 +87,28 @@ export type CardKind = {
   /** What the system noticed in its rows that usually means a next step, offered to the person. */
   suggest?: (rows: Row[], p: PanelSpec, where: string) => Omit<Suggestion, 'by'>[];
 };
+
+/** The parts of a panel's resolved data a card is drawn from, each as its own() or the resolving of its rows gives it. */
+const PARTS = {
+  rows: 'its rows, a list of objects',
+  record: 'the one object it shows',
+  media: 'the file it shows or plays, {name, mime, url}',
+  gallery: 'its pictures and videos, a list of {name, mime, url}',
+  page: 'the page in its frame, {url, label, uses, height}',
+  code: 'the file it shows, {path, language, lines}',
+  pdf: 'the PDF it shows, {name, bytes}',
+  app: 'the MCP App in its frame, {server, tool, result, uri, url, height}',
+} as const;
+type DrawnPart = keyof typeof PARTS;
+const LISTS: ReadonlySet<DrawnPart> = new Set(['rows', 'gallery']);
+/** The part of its resolved data a card draws. Data resolved for another card, or by a host in another shape, is
+ *  refused with what the card needs, rather than failing deep in its drawing. */
+export function drawnFrom<K extends DrawnPart>(p: PanelSpec, d: Resolved, part: K): NonNullable<Resolved[K]> {
+  const v: unknown = d[part];
+  const fits = LISTS.has(part) ? Array.isArray(v) : !!v && typeof v === 'object' && !Array.isArray(v);
+  if (!fits) throw new Refusal(`panel ${p.id}: a ${p.card} needs "${part}" in its resolved data: ${PARTS[part]}`);
+  return v as NonNullable<Resolved[K]>;
+}
 
 /** A value that holds lists or objects, which a cell would show as raw text. */
 export const nested = (v: unknown) => v !== null && typeof v === 'object' && !plainList(v);

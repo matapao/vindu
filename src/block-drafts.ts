@@ -20,7 +20,10 @@ export type DraftLook = { token: string; state: DraftState; rev: number; reason?
  *  folder or they are too large together, for a draft the model has just shown. */
 export type DraftContext = (model: ModelDraft) => DraftLook;
 
-const text = (v: unknown): string => (v === undefined || v === null ? '' : typeof v === 'string' ? v : JSON.stringify(v));
+function text(v: unknown): string {
+  if (v === undefined || v === null) return '';
+  return typeof v === 'string' ? v : JSON.stringify(v);
+}
 /** A mailbox as the model gives it: written out ("Kari Nordmann <kari@example.com>"), or an object with its name and
  *  address, written out the same way (a name with a comma in quotes). */
 const mailbox = (x: unknown): string => {
@@ -29,10 +32,15 @@ const mailbox = (x: unknown): string => {
   const address = text(o.email ?? o.address ?? o.mail).trim(), name = text(o.name).replace(/"/g, '').trim();
   return name ? `${/[,;<>@]/.test(name) ? `"${name}"` : name} <${address}>` : address;
 };
-const mailboxes = (v: unknown): string[] =>
-  v === undefined || v === null || v === '' ? [] : typeof v === 'string' ? splitAddresses(v) : (Array.isArray(v) ? v : [v]).map(mailbox).filter(Boolean);
+function mailboxes(v: unknown): string[] {
+  if (v === undefined || v === null || v === '') return [];
+  if (typeof v === 'string') return splitAddresses(v);
+  return [v].flat().map(mailbox).filter(Boolean);
+}
 const FORMATS: Record<string, DraftFormat> = { text: 'text', plain: 'text', markdown: 'markdown', md: 'markdown' };
 const ORIGINAL_MOST = { id: 500, from: DRAFT_LIMITS.address, time: 100, subject: DRAFT_LIMITS.subject, body: DRAFT_LIMITS.body };
+/** The other names a part of the original mail goes by. */
+const ORIGINAL_ALSO: Partial<Record<keyof typeof ORIGINAL_MOST, readonly string[]>> = { time: ['date', 'sent'], id: ['message_id'] };
 
 /** The mail it replies to: its parts as text, each within what a draft holds; or why not. */
 function originalOf(v: unknown, problems: string[]): DraftOriginal | undefined {
@@ -43,7 +51,7 @@ function originalOf(v: unknown, problems: string[]): DraftOriginal | undefined {
   }
   const o = v as Record<string, unknown>, out: DraftOriginal = {};
   for (const part of ['id', 'from', 'time', 'subject', 'body'] as const) {
-    const said = o[part] ?? (part === 'time' ? o.date ?? o.sent : part === 'id' ? o.message_id : undefined);
+    const said = [part, ...(ORIGINAL_ALSO[part] ?? [])].map(name => o[name]).find(x => x !== undefined && x !== null);
     if (said === undefined || said === null || said === '') continue;
     const t = part === 'from' ? mailboxes(said).join(', ') : text(said);
     if (t.length > ORIGINAL_MOST[part]) problems.push(`in_reply_to.${part}: ${t.length.toLocaleString('en-GB')} characters; at most ${ORIGINAL_MOST[part].toLocaleString('en-GB')}`);
@@ -53,7 +61,7 @@ function originalOf(v: unknown, problems: string[]): DraftOriginal | undefined {
 }
 /** The paths of the files it attaches, each once. */
 function pathsOf(v: unknown, problems: string[]): string[] {
-  const list = v === undefined || v === null ? [] : Array.isArray(v) ? v : [v];
+  const list: unknown[] = v === undefined || v === null ? [] : [v].flat();
   const paths = list.map(x => (x && typeof x === 'object' && !Array.isArray(x) ? (x as Record<string, unknown>).path : x));
   if (paths.some(x => typeof x !== 'string' || !x.trim() || x.length > DRAFT_LIMITS.path)) {
     problems.push('attachments: paths of files in the working folder, e.g. ["report.pdf"]');

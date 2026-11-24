@@ -2,7 +2,7 @@
 // column with its formula, the model's notes on cells, and totals for each scenario side by side.
 import { html, nothing } from 'lit';
 import { columnName } from '../../cell-address.js';
-import { dataCell, headCell, noteAt, notesByCell, notesList, type Cells } from './cells.js';
+import { dataCell, headCell, noteAt, notesByCell, notesList, unbroken, type Cells } from './cells.js';
 import { defineBlock, formatCell, type BlockProps, type BlockRow } from './shared.js';
 
 type Sheet = {
@@ -21,6 +21,8 @@ function valuesOf(row: unknown, columns: string[]): unknown[] {
     return [];
   }
 }
+/** A cell of a number is aligned right. */
+const numberClass = (value: unknown) => (typeof value === 'number' ? 'vb-num' : '');
 /** The fields of rows sent as objects, in the order they first appear, without the system's own (__). */
 const fieldsOf = (rows: unknown[]) => [
   ...new Set(rows.flatMap((row) => (row && typeof row === 'object' ? Object.keys(row).filter((k) => !k.startsWith('__')) : []))),
@@ -55,9 +57,9 @@ export const VSheet = defineBlock('VSheet', 'vindu-sheet', { sheet: 'value', cel
   const notes = notesByCell(cells.notes);
   const values = rows.map((row) => valuesOf(row, columns));
   const head = (c: string, i: number) =>
-    headCell(html`${formulas[c] ? html`<span class="vb-fx">ƒ</span> ` : nothing}${c}`, {
+    headCell(html`${formulas[c] ? html`<span class="vb-fx">ƒ</span> ` : nothing}${unbroken(c)}`, {
       note: noteAt(notes, -1, i),
-      className: formulas[c] ? 'vb-num vb-f' : typeof values[0]?.[i] === 'number' ? 'vb-num' : '',
+      className: formulas[c] ? 'vb-num vb-f' : numberClass(values[0]?.[i]),
       title: formulas[c] ? `= ${formulas[c]}, computed by the system` : c,
     });
   return html`<div class="vb-sheet"><table><thead><tr class="vb-letters"><th class="vb-rownum"></th>${columns.map(
@@ -69,7 +71,7 @@ export const VSheet = defineBlock('VSheet', 'vindu-sheet', { sheet: 'value', cel
         (c, i) =>
           dataCell(formatCell(props, row[i], c), {
             note: noteAt(notes, index, i),
-            className: typeof row[i] === 'number' ? 'vb-num' : '',
+            className: numberClass(row[i]),
             title: formulas[c] ? `= ${formulas[c]}` : '',
             field: c,
           }),

@@ -7,7 +7,7 @@ import { refOf, type Row } from '../results.js';
 import { Refusal, type ViewContext } from '../view-context.js';
 import { appOf, codeOf, mediaOf, pageOf, pdfOf } from '../view-files.js';
 import { rowsOf } from '../view-rows.js';
-import { rowsAsTheyAre, type CardKind, type CardProbe } from './kind.js';
+import { drawnFrom, rowsAsTheyAre, type CardKind, type CardProbe } from './kind.js';
 
 /** Marks on a picture (regions as fractions of its size) or a recording (times in seconds), each with a label: from a
  *  result, or typed. Checked here: a region must lie in the picture, a time must run forward. */
@@ -31,7 +31,8 @@ export const MEDIA: CardKind = {
   reads: GUIDE.media.fields, typed: false, origin: 'attachment', noGroup: rowsAsTheyAre,
   own: (p, _view, ctx) => ({ media: mediaOf(p, ctx), ...(p.marks ? { marks: marksOf(p, ctx) } : {}) }),
   draw: (p, d, k) => {
-    k.model.url = d.media!.url; const kind = d.media!.mime.split('/')[0]; const url = { path: `/panels/${k.pid}/url` };
+    const media = drawnFrom(p, d, 'media');
+    k.model.url = media.url; const kind = media.mime.split('/')[0]; const url = { path: `/panels/${k.pid}/url` };
     if (d.marks?.length) { k.model.marks = d.marks; return [k.add({ id: `${k.pid}__marked`, component: 'VMediaMarks', url, kind, marks: { path: `/panels/${k.pid}/marks` }, panel: p.id })]; }
     return [k.add({ id: `${k.pid}__media`, component: kind === 'video' ? 'Video' : kind === 'audio' ? 'AudioPlayer' : 'Image', url, ...(kind === 'image' ? { fit: 'contain' } : {}) })];
   },
@@ -47,8 +48,8 @@ const framed = { typed: false, framed: true, noGroup: rowsAsTheyAre, probes: fra
 export const PAGE: CardKind = { // a web page in a frame of its own origin; a static one in a frame where nothing runs
   ...framed, reads: GUIDE.page.fields,
   own: (p, view, ctx) => ({ page: pageOf(p, view, ctx) }),
-  draw: (p, d, k) => { k.model.url = d.page!.url;
-    return [k.add({ id: `${k.pid}__page`, component: 'Page', url: { path: `/panels/${k.pid}/url` }, height: frameHeight(d.page!.height, k.compact), title: p.title ?? 'page', panel: p.id, ...(d.page!.static ? { static: true } : {}) })]; },
+  draw: (p, d, k) => { const page = drawnFrom(p, d, 'page'); k.model.url = page.url;
+    return [k.add({ id: `${k.pid}__page`, component: 'Page', url: { path: `/panels/${k.pid}/url` }, height: frameHeight(page.height, k.compact), title: p.title ?? 'page', panel: p.id, ...(page.static ? { static: true } : {}) })]; },
   account: (o, _p, d) => {
     o.from = d.page!.label; if (d.page!.uses.length) o.uses = d.page!.uses;
     if (d.page!.static) o.static = 'nothing runs in it: no script, no task API and no data, and it does not reload as its files change; its images, styles, media and fonts load. Its check says only that it loaded, and its size';
@@ -57,8 +58,8 @@ export const PAGE: CardKind = { // a web page in a frame of its own origin; a st
 const file = (name: CardName, shows: string, against = false): CardKind => ({ // a file in Monaco: a page of Vindu's own, on the process's origin
   ...framed, reads: GUIDE[name].fields,
   own: (p, view, ctx) => codeOf(p, view, ctx, against),
-  draw: (p, d, k) => { k.model.url = d.page!.url;
-    return [k.add({ id: `${k.pid}__${p.card}`, component: 'Page', url: { path: `/panels/${k.pid}/url` }, height: frameHeight(d.page!.height, k.compact), title: p.title ?? d.code!.path, panel: p.id })]; },
+  draw: (p, d, k) => { const page = drawnFrom(p, d, 'page'), code = drawnFrom(p, d, 'code'); k.model.url = page.url;
+    return [k.add({ id: `${k.pid}__${p.card}`, component: 'Page', url: { path: `/panels/${k.pid}/url` }, height: frameHeight(page.height, k.compact), title: p.title ?? code.path, panel: p.id })]; },
   account: (o, _p, d) => { o.from = d.page!.label; o.seen = 'the file itself'; Object.assign(o, d.code); o.shows = shows; },
 });
 export const CODE = file('code', 'the file, read-only; it follows the file as it changes');
@@ -66,14 +67,14 @@ export const DIFF = file('diff', 'the file now against the last commit, side by 
 export const PDF: CardKind = { // a PDF in pdf.js: a page of Vindu's own, on the process's origin
   ...framed, reads: GUIDE.pdf.fields,
   own: (p, view, ctx) => pdfOf(p, view, ctx),
-  draw: (p, d, k) => { k.model.url = d.page!.url;
-    return [k.add({ id: `${k.pid}__pdf`, component: 'Page', url: { path: `/panels/${k.pid}/url` }, height: frameHeight(d.page!.height, k.compact), title: p.title ?? d.pdf!.name, panel: p.id })]; },
+  draw: (p, d, k) => { const page = drawnFrom(p, d, 'page'), pdf = drawnFrom(p, d, 'pdf'); k.model.url = page.url;
+    return [k.add({ id: `${k.pid}__pdf`, component: 'Page', url: { path: `/panels/${k.pid}/url` }, height: frameHeight(page.height, k.compact), title: p.title ?? pdf.name, panel: p.id })]; },
   account: (o, _p, d) => { o.from = d.page!.label; o.seen = 'the file itself'; o.file = { name: d.pdf!.name, bytes: d.pdf!.bytes }; o.shows = 'the PDF inline, in its own viewer in the window: the person sees it page by page, as wide as the pane'; },
 };
 export const APP: CardKind = { // an MCP App, in a frame of its own origin, talking to the host over postMessage
   ...framed, reads: GUIDE.app.fields,
   own: (p, _view, ctx) => ({ app: appOf(p, ctx) }),
-  draw: (p, d, k) => { k.model.url = d.app!.url;
-    return [k.add({ id: `${k.pid}__app`, component: 'McpApp', resource: new URL(d.app!.url).hostname, url: { path: `/panels/${k.pid}/url` }, height: frameHeight(d.app!.height, k.compact), title: p.title ?? d.app!.uri, panel: p.id })]; },
+  draw: (p, d, k) => { const app = drawnFrom(p, d, 'app'); k.model.url = app.url;
+    return [k.add({ id: `${k.pid}__app`, component: 'McpApp', resource: new URL(app.url).hostname, url: { path: `/panels/${k.pid}/url` }, height: frameHeight(app.height, k.compact), title: p.title ?? app.uri, panel: p.id })]; },
   account: (o, p, d) => { o.app = d.app!.uri; o.server = d.app!.server; o.seen = 'opaque: the app draws itself; what it is sent is exact (the result, by reference), what it draws is not known'; o.ref = refOf(p.from!); },
 };

@@ -8,6 +8,7 @@ import { BASIC_CATALOG, VINDU_CATALOG, dataModelOf, surfaceOf } from './catalog-
 import { cellIn } from './format.js';
 import { hookWords } from './gates.js';
 import { pointerStep } from './results.js';
+import { Refusal } from './view-context.js';
 import { VIEW_WORDS, type ViewWords } from './view-words.js';
 import type { Probe } from './window-reports.js';
 
@@ -18,7 +19,8 @@ const KPI_ROW = 4; // kpis side by side, at most
 
 /** Each panel is drawn by its card's kind (card-kinds/), below what every panel has: its title, its label, and what
  *  the system says of it (written by the model, not up to date, inputs to change). What the system says is in words,
- *  English unless the view's words are given (view-words.ts). */
+ *  English unless the view's words are given (view-words.ts). A panel without its resolved data, or without the part
+ *  its card draws, is refused, saying what the card needs. */
 export function compile(view: ViewSpec, data: Record<string, Resolved>, { compact, cards, locale = 'en-GB', timeZone = 'UTC', words = VIEW_WORDS }: { compact: boolean; cards?: ReadonlyMap<string, CardDef>; locale?: string; timeZone?: string; words?: ViewWords }): Surface {
   const cell = (v: unknown, field?: string) => cellIn(v, field, locale);
   const sid = view.name;
@@ -34,6 +36,7 @@ export function compile(view: ViewSpec, data: Record<string, Resolved>, { compac
   const card = (p: PanelSpec, weight?: number): string => {
     const pid = add({ id: pidFor(p.id), component: 'Card', child: '', ...(weight ? { weight } : {}) }); // panel ids are unique, so this id is too; child set below
     const d = data[p.id]; const m: Record<string, unknown> = (model.panels[pid] = {}); const kids: string[] = [];
+    if (!d || typeof d !== 'object') throw new Refusal(`panel ${p.id}: a ${p.card} needs its resolved data: there is none under "${p.id}"`);
     if (p.title) kids.push(text(`${pid}__title`, p.title, 'h4'));
     if (d.label) kids.push(text(`${pid}__label`, words.classified(d.label), 'caption'));
     if (d.typed) kids.push(text(`${pid}__made`, words.written, 'caption'));

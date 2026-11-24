@@ -18,10 +18,9 @@ export type PageMessageCheck = { kind: PageAsk | 'report' | 'read'; view: string
 export function pageMessageGuard(): (message: PageMessageCheck) => string | undefined {
   const sentAt = new Map<string, number[]>();
   return ({ kind, view, panel, value, using, now = Date.now() }) => {
-    if (kind === 'report')
-      return !view || !panel ? 'this page is in no view' : jsonLength(value) > REPORT_MAX ? `not a report of at most ${REPORT_MAX} characters as JSON` : undefined;
-    if (kind === 'read')
-      return !view || !panel ? 'this page is in no view' : typeof value === 'number' && value >= 0 && value <= 1 ? undefined : 'a read is a share of the page, from 0 to 1';
+    if ((kind === 'report' || kind === 'read') && (!view || !panel)) return 'this page is in no view';
+    if (kind === 'report') return jsonLength(value) > REPORT_MAX ? `not a report of at most ${REPORT_MAX} characters as JSON` : undefined;
+    if (kind === 'read') return typeof value === 'number' && value >= 0 && value <= 1 ? undefined : 'a read is a share of the page, from 0 to 1';
     const key = `${kind} ${view}`;
     const { recent, why: limited } = checkSend(sentAt.get(key) ?? [], value, now);
     const why = !view || (kind === 'send' && !panel) ? 'this page is in no view'

@@ -259,6 +259,7 @@ export class Shell {
     if (maximize === null && a.maximize === undefined) notes.push(`"${this.maximized}" was maximized; the new layout is shown in its place`);
     const over = maximize === undefined ? this.maximized : maximize;
     if (over && open.some(v => v !== over && inTree.includes(v))) notes.push(`"${over}" is maximized, so what opened is behind it until the layout is restored (maximize: null)`);
+    if (maximize && this.stacks()) notes.push(`the window is phone-width, so its panes are one after another: "${maximize}" fills it once it is wider`);
     const hidden = (a.keep ?? []).filter(v => this.inSight(this.tree, this.maximized, v) && !this.inSight(tree, over, v));
     if (hidden.length) return { refusal: `${quoted(hidden)} must stay in sight while the person is asked: nothing was moved; arrange the other panes around ${hidden.length > 1 ? 'them' : 'it'}`, notes };
     if (this.arranges === 'suggest' && moves) {
@@ -279,7 +280,8 @@ export class Shell {
     }
     this.setTree(tree, 'model');
     if (maximize !== undefined) this.maximized = maximize && inTree.includes(maximize) ? maximize : null;
-    if (a.focus) { this.focus = a.focus; this.used(a.focus); }
+    const focus = a.focus ?? maximize; // a pane maximized has the focus, unless another is named
+    if (focus) { this.focus = focus; this.used(focus); }
     this.measured.clear(); this.emit();
     return { notes };
   }
@@ -364,9 +366,9 @@ export class Shell {
         this.changed('move', `moved "${view}" ${at.side === 'above' || at.side === 'below' ? at.side : `to the ${at.side ?? 'right'} of`} "${at.beside}"`);
         this.measured.clear(); this.emit(); return true;
       }
-      case 'maximize': {
+      case 'maximize': { // a pane maximized has the focus; a phone-width window stacks its panes and maximizes none
         if (x.view === null) { if (!this.maximized) return false; this.changed('maximize', `restored the layout ("${this.maximized}" was maximized)`); this.maximized = null; }
-        else { if (!inTree(view) || this.maximized === view) return false; this.maximized = view; this.changed('maximize', `maximized "${view}"`); }
+        else { if (!inTree(view) || this.maximized === view || this.stacks()) return false; this.maximized = this.focus = view; this.used(view); this.changed('maximize', `maximized "${view}"`); }
         this.laidAt = Date.now(); this.measured.clear(); this.emit(); return true;
       }
       case 'focus': {
@@ -378,6 +380,7 @@ export class Shell {
         const kept = viewsOf(sg.tree).filter(v => !this.meta.has(v)).reduce((t, v) => remove(t, v), sg.tree); // a view gone since it was suggested stays gone
         this.setTree(kept, 'model'); if (sg.maximize !== undefined) this.maximized = sg.maximize; this.suggestion = null;
         if (this.maximized && !this.panes().includes(this.maximized)) this.maximized = null;
+        if (sg.maximize && this.maximized) { this.focus = this.maximized; this.used(this.maximized); } // maximized, it has the focus
         this.changed('take-suggestion', `took the layout you suggested: ${JSON.stringify(shorthand(this.tree))}`); this.measured.clear(); this.emit(); return true;
       }
       case 'stack': case 'spread': case 'front': { // the person stacks a split, spreads it out, or brings a tab in front
@@ -484,6 +487,7 @@ export class Shell {
     if (this.focus && !now.has(this.focus)) this.focus = null;
   }
   private win(): Size { return this.window ?? ASSUMED; }
+  private stacks(): boolean { return this.win().w < this.options.phone; } // phone-width: panes one after another, none maximized
   private panes(): string[] { return viewsOf(this.tree); }
   /** Whether a view is in sight with this layout: in a pane, not behind a tab in its stack or a maximized pane. */
   private inSight(tree: LayoutNode | null, maximized: string | null, view: string) { return this.placed(tree, maximized).panes.some(p => p.view === view && !p.behind); }

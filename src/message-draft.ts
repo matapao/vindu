@@ -102,7 +102,6 @@ const EDIT_WINDOW_MS = 10_000;
  *  draft's. The window holds an edit back until it may go; the UI server refuses one that comes sooner. */
 export function checkDraftEdit(editedAt: readonly number[], fields: unknown, now = Date.now()): { recent: number[]; why?: string } {
   const recent = editedAt.filter(t => now - t < EDIT_WINDOW_MS);
-  const why = recent.length >= EDITS_AT_ONCE ? `too many: ${EDITS_AT_ONCE} edits in ${EDIT_WINDOW_MS / 1000} seconds at most`
-    : fieldsWithin(fields) ? undefined : 'not the fields of a draft, within its limits';
-  return why ? { recent, why } : { recent };
+  if (recent.length >= EDITS_AT_ONCE) return { recent, why: `too many: ${EDITS_AT_ONCE} edits in ${EDIT_WINDOW_MS / 1000} seconds at most` };
+  return fieldsWithin(fields) ? { recent } : { recent, why: 'not the fields of a draft, within its limits' };
 }

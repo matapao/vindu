@@ -6,7 +6,7 @@ import { basePointer, rowPointer } from '../pointing.js';
 import { pointerStep, refOf, type Row } from '../results.js';
 import { isWrapped } from '../view-rows.js';
 import { notesAccount, notesProblem, placedNotes, type DrawnCells } from './cells.js';
-import { rowsAsTheyAre, type AccountKit, type CardKind, type CardProbe, type DrawKit } from './kind.js';
+import { drawnFrom, rowsAsTheyAre, type AccountKit, type CardKind, type CardProbe, type DrawKit } from './kind.js';
 
 /** The account of a card of rows: how many, the fields, empty cells, the first row as drawn, and a reference for each
  *  of its values: under the list's pointer, at its row, then its field; in columns, at its field, then its row; a list
@@ -37,12 +37,12 @@ function rowProbes(p: PanelSpec, d: Resolved, m: Record<string, unknown>, pid: s
 /** The rows as a table: a head that sorts by each column, then a row of cells for each; on a narrow window with more
  *  than three columns, a line per row, the first field above the rest. */
 function drawTable(p: PanelSpec, d: Resolved, k: DrawKit): string[] {
-  const f = shownFields(p, d.rows!); const pid = k.pid;
+  const all = drawnFrom(p, d, 'rows'), f = shownFields(p, all); const pid = k.pid;
   if (k.compact && f.length > 3) {
-    k.model.rows = d.rows!.slice(0, MAX_ROWS).map(r => ({ label: k.cell(r[f[0]], f[0]), meta: f.slice(1).map(x => `${x}: ${k.cell(r[x], x)}`).join(' · ') }));
+    k.model.rows = all.slice(0, MAX_ROWS).map(r => ({ label: k.cell(r[f[0]], f[0]), meta: f.slice(1).map(x => `${x}: ${k.cell(r[x], x)}`).join(' · ') }));
     return [k.list([k.text(`${pid}__label`, { path: 'label' }, 'body'), k.text(`${pid}__meta`, { path: 'meta' }, 'caption')])];
   }
-  const shown = d.rows!.slice(0, MAX_ROWS).map(r => f.map(x => k.cell(r[x], x)));
+  const shown = all.slice(0, MAX_ROWS).map(r => f.map(x => k.cell(r[x], x)));
   k.model.rows = shown.map(r => Object.fromEntries(r.map((c, i) => [`c${i}`, c])));
   // the head and every row are rows of cells with the same weights, so the columns line up; a column's weight
   // follows how long its text is (4 to 28), so a long name gets room and a short number does not
@@ -59,17 +59,19 @@ function drawTable(p: PanelSpec, d: Resolved, k: DrawKit): string[] {
 /** The cells a table draws: its columns, and its first rows. */
 const tableCells = (p: PanelSpec, d: Resolved): DrawnCells => ({ fields: shownFields(p, d.rows!), rows: Math.min(d.rows!.length, MAX_ROWS) });
 /** A table with the model's notes on its cells, drawn by Vindu's own component wide and narrow alike, so that every
- *  cell keeps its A1 address: each noted cell is marked, and the notes are listed below. Its head sorts as a table's. */
+ *  cell keeps its A1 address: each noted cell is marked, and the notes are listed below. Its head sorts as a table's.
+ *  Its cells go as text, with the columns of each row that hold a number, which it aligns right as a sheet does. */
 function drawNotedTable(p: PanelSpec, d: Resolved, k: DrawKit): string[] {
-  const f = shownFields(p, d.rows!);
-  k.model.rows = d.rows!.slice(0, MAX_ROWS).map(r => Object.fromEntries(f.map((x, i) => [`c${i}`, k.cell(r[x], x)])));
-  k.model.cells = { fields: f, notes: placedNotes(p), sort: p.sort ?? '' };
+  const all = drawnFrom(p, d, 'rows'), rows = all.slice(0, MAX_ROWS), f = shownFields(p, all);
+  k.model.rows = rows.map(r => Object.fromEntries(f.map((x, i) => [`c${i}`, k.cell(r[x], x)])));
+  const numbers = rows.map(r => f.flatMap((x, i) => (typeof r[x] === 'number' ? [i] : [])));
+  k.model.cells = { fields: f, notes: placedNotes(p), sort: p.sort ?? '', numbers };
   return [k.add({ id: `${k.pid}__cells`, component: 'VNotedTable', rows: { path: `/panels/${k.pid}/rows` }, cells: { path: `/panels/${k.pid}/cells` }, panel: p.id })];
 }
 
 /** The rows as lines: each its label, and its time above it. */
 function drawLines(p: PanelSpec, d: Resolved, k: DrawKit): string[] {
-  k.model.rows = d.rows!.slice(0, MAX_ROWS).map(r => ({ label: k.cell(r[p.label!], p.label), meta: p.time ? k.cell(r[p.time], p.time) : '' }));
+  k.model.rows = drawnFrom(p, d, 'rows').slice(0, MAX_ROWS).map(r => ({ label: k.cell(r[p.label!], p.label), meta: p.time ? k.cell(r[p.time], p.time) : '' }));
   return [k.list([k.text(`${k.pid}__meta`, { path: 'meta' }, 'caption'), k.text(`${k.pid}__label`, { path: 'label' }, 'body')])];
 }
 

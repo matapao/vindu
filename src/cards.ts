@@ -329,7 +329,14 @@ export const shownFields = (p: PanelSpec, rows: Row[], def?: CardDef): string[] 
 
 /** The card nearest to what a panel sent, for a refusal of a card that does not exist to suggest. */
 function nearestCard(p: Record<string, unknown>): CardName {
-  return p.html || p.path ? 'page' : (p.x && p.y) || p.group ? 'bar-chart' : p.value !== undefined || typeof p.data === 'number' ? 'kpi' : p.text ? 'text' : p.time ? 'timeline' : Array.isArray(p.media) ? 'gallery' : p.media ? 'media' : p.data && !Array.isArray(p.data) ? 'record' : 'table';
+  if (p.html || p.path) return 'page';
+  if ((p.x && p.y) || p.group) return 'bar-chart';
+  if (p.value !== undefined || typeof p.data === 'number') return 'kpi';
+  if (p.text) return 'text';
+  if (p.time) return 'timeline';
+  if (Array.isArray(p.media)) return 'gallery';
+  if (p.media) return 'media';
+  return p.data && !Array.isArray(p.data) ? 'record' : 'table';
 }
 /** Why there is no such card, and what to send instead. */
 export function noCard(card: string, p: Record<string, unknown>, offered: string[]): string {
