@@ -17,6 +17,7 @@ export type {
   TemplateStart,
   UiProcess,
   OpenMore,
+  ReadProgress,
   UiServerOptions,
 } from './server/contracts.js';
 export { NOTE } from './server/instructions.js';

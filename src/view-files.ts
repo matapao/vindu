@@ -1,9 +1,11 @@
 import { createHash } from 'node:crypto';
+import fs from 'node:fs';
 import path from 'node:path';
 import type { CardFile, CardFileRead, GalleryItem, PanelSpec, Resolved, ViewSpec } from './cards.js';
 import { codePage, languageOf, type CodeSpec } from './code.js';
 import { extensionOf, MEDIA_EXTENSIONS, typeOfFile } from './file-types.js';
 import { href, STATIC_QUERY } from './page-workspace.js';
+import { PDF_MAX, pdfPage, type PdfSpec } from './pdf-page.js';
 import type { Entry, Row } from './results.js';
 import { readTextStart, type TextStart } from './text-start.js';
 import { Refusal, listing, type ViewContext } from './view-context.js';
@@ -22,7 +24,7 @@ export function findMedia(want: string, ctx: ViewContext, shows: string): Galler
   const url = (id: string) => `${pages.base}/media/${id}`; // http(s), the only media URLs an A2UI renderer loads
   const e = results.get(want) ?? results.all().find(x => x.kind === 'attachment' && x.name.toLowerCase() === path.basename(want).toLowerCase());
   if (e?.kind === 'attachment') {
-    if (!/^(image|video|audio)\//.test(e.mime)) return { why: `${e.name} is ${e.mime}; ${shows}${e.mime.startsWith('text/') ? ` (show it with a text panel, "from": "${e.id}")` : ''}` };
+    if (!/^(image|video|audio)\//.test(e.mime)) return { why: `${e.name} is ${e.mime}; ${shows}${otherwise(e.mime, e.id)}` };
     return { name: e.name, mime: e.mime, url: url(e.id), from: e.id };
   }
   if (e?.kind === 'result' && e.images.length) return { name: `${e.id} image`, mime: e.images[0].mime, url: url(e.id), from: e.id };
@@ -119,6 +121,38 @@ export function codeOf(p: PanelSpec, view: ViewSpec, ctx: ViewContext, against =
   return { page: { url: pageUrl(`${pages.base}/view/${file}`, '', []), label: `work/${f.rel}`, uses: [], height }, code };
 }
 
+/** A PDF in Vindu's own viewer (pdf-page.ts): an attachment (media, or from) or a file in the working folder (path),
+ *  of at most PDF_MAX bytes, and a PDF by its header: "%PDF-", within its first 1024 bytes, as PDF readers allow. */
+export function pdfOf(p: PanelSpec, view: ViewSpec, ctx: ViewContext): Resolved {
+  const pages = ctx.pages, want = p.media ?? p.from;
+  if (!pages) throw new Refusal(`panel ${p.id}: this host shows no files`);
+  if (want !== undefined && p.path !== undefined) throw new Refusal(`panel ${p.id}: a pdf shows "media" (an attachment) or "path" (a file in the working folder), not both`);
+  let at: { name: string; from: string; file: string; spec: PdfSpec };
+  if (p.path !== undefined) {
+    const rel = splitPath(p.path).file, found = pages.workPath?.(rel);
+    if (!found) throw new Refusal(`panel ${p.id}: no file "${rel}" in the working folder`);
+    const name = path.basename(found.rel);
+    at = { name, from: `work/${found.rel}`, file: found.file, spec: { url: `/work/${href(found.rel)}`, name, path: found.rel } };
+  } else if (want !== undefined) {
+    const e = ctx.results.get(String(want)) ?? ctx.results.all().find(x => x.kind === 'attachment' && x.name.toLowerCase() === path.basename(String(want)).toLowerCase());
+    if (e?.kind !== 'attachment') {
+      const had = ctx.results.all().filter(x => x.kind === 'attachment').map(x => `${x.id} (${x.name})`).join(', ') || 'none';
+      throw new Refusal(`panel ${p.id}: "${want}" is no attachment; a pdf shows a PDF attachment, or a file in the working folder (path). Attachments: ${had}`);
+    }
+    if (e.mime !== 'application/pdf' && extensionOf(e.name) !== 'pdf') throw new Refusal(`panel ${p.id}: ${e.id} is ${e.name} (${e.mime}); a pdf panel shows PDFs${otherwise(e.mime, e.id)}`);
+    at = { name: e.name, from: e.id, file: e.file, spec: { url: `/media/${e.id}`, name: e.name } };
+  } else throw new Refusal(`panel ${p.id}: a pdf panel needs "media" (a PDF attachment, e.g. "a1") or "path" (a PDF in the working folder, e.g. "docs/report.pdf")`);
+  let size: number, head: Buffer;
+  try {
+    const fd = fs.openSync(at.file, 'r');
+    try { size = fs.fstatSync(fd).size; head = Buffer.alloc(Math.min(size, 1024)); fs.readSync(fd, head, 0, head.length, 0); } finally { fs.closeSync(fd); }
+  } catch { throw new Refusal(`panel ${p.id}: ${at.name} could not be read`); }
+  if (size > PDF_MAX) throw new Refusal(`panel ${p.id}: ${at.name} is ${(size / 1e6).toFixed(1)} MB; a pdf panel shows PDFs up to ${PDF_MAX / 1e6} MB`);
+  if (!head.includes('%PDF-')) throw new Refusal(`panel ${p.id}: ${at.name} is not a PDF: it does not begin with "%PDF-"`);
+  const file = pages.writeView(pageName(view.name, p.id), pdfPage(at.spec));
+  return { page: { url: pageUrl(`${pages.base}/view/${file}`, '', []), label: at.from, uses: [], height: heightOf(p) }, pdf: { name: at.name, bytes: size } };
+}
+
 /** An MCP App's own UI for a result: only for a connection the host turned MCP Apps on for, and only for a tool that
  *  links a ui:// resource. What it draws is its own (the account says so); what it is sent is exact. */
 export function appOf(p: PanelSpec, ctx: ViewContext): NonNullable<Resolved['app']> {
@@ -132,9 +166,11 @@ export function appOf(p: PanelSpec, ctx: ViewContext): NonNullable<Resolved['app
   return { server: e.server, tool: e.tool, result: e.id, uri, url: apps.frame(e.server, uri, e.id), height: heightOf(p, 420) };
 }
 
-/** What else an attachment can be shown with, for a refusal: media for a picture or a recording, text for other text. */
+/** What else an attachment can be shown with, for a refusal: media for a picture or a recording, pdf for a PDF, text for
+ *  other text. */
 function otherwise(mime: string, attachment: string): string {
   if (/^(image|video|audio)\//.test(mime)) return `; show it with a media panel ("media": "${attachment}")`;
+  if (mime === 'application/pdf') return `; show it with a pdf panel ("media": "${attachment}")`;
   return mime.startsWith('text/') ? `; show it with a text panel ("from": "${attachment}")` : '';
 }
 /** A file a card shows as it is (CardFile), read by the system: the attachment from names, or path, a file in the

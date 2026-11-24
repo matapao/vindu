@@ -11,8 +11,8 @@ type PageMessage = { vindu: string; n?: unknown; value?: unknown; items?: unknow
 
 /** The frames in a shell's panes: the pages the model wrote, and MCP Apps. Their messages reach the window in the
  *  shell's own document, whose window may not be the one this script runs in. locale: the window's language, for MCP
- *  Apps. */
-export function connectShellFrames(root: HTMLElement, emit: (event: ShellEvent) => void, options: { locale?: string } = {}) {
+ *  Apps. read: how far the person has read a page, as its frame says (shell-reading.ts). */
+export function connectShellFrames(root: HTMLElement, emit: (event: ShellEvent) => void, options: { locale?: string; read?: (frame: HTMLIFrameElement, share: number) => void } = {}) {
   const doc = root.ownerDocument, win = doc.defaultView ?? window;
   const apps = connectAppFrames(root, emit, options);
 
@@ -41,11 +41,18 @@ export function connectShellFrames(root: HTMLElement, emit: (event: ShellEvent) 
     const view = viewOf(frame) ?? '', panel = frame.dataset.pagePanel ?? '';
     if (!guard({ kind: 'report', view, panel, value: said.report, using: true })) emit({ type: 'report', view, panel, report: said.report });
   };
+  // How far the person has read a page, as its own script says (page-runtime.ts): a share, kept by the window, which
+  // takes it while the frame is in view, and tells the UI server for the host alone.
+  const readOf = (frame: HTMLIFrameElement, said: PageMessage) => {
+    const view = viewOf(frame) ?? '', panel = frame.dataset.pagePanel ?? '';
+    if (!guard({ kind: 'read', view, panel, value: said.value, using: true })) options.read?.(frame, said.value as number);
+  };
   const onMessage = (ev: MessageEvent) => {
     const said = ev.data as PageMessage | null;
     const kind = typeof said?.vindu === 'string' ? said.vindu : undefined;
-    const page = kind && (kind === 'report' || PAGE_ASKS.has(kind)) ? pageFrameFor(root, ev) : undefined;
+    const page = kind && (kind === 'report' || kind === 'read' || PAGE_ASKS.has(kind)) ? pageFrameFor(root, ev) : undefined;
     if (page && kind === 'report') reportOf(page, said!);
+    else if (page && kind === 'read') readOf(page, said!);
     else if (page) fromPage(page, ev, said!);
     else apps.receive(ev);
   };

@@ -171,6 +171,32 @@ export function boot(data: Record<string, unknown>, live: boolean, at: { v: numb
     });
   };
 
+  // How far the person has read the page, for the window and the host alone: the furthest share of the document they
+  // have had in view (0 to 1, from 0.985 on 1), or of a box that scrolls in it and is at least half its height, told as
+  // it grows, four times a second at most. A page that fits its frame, with no such box, is read once it has been in
+  // view 2.5 s. A page that knows better (pdf.js's viewer, whose pages come as they load; Monaco, which scrolls itself)
+  // says it itself with task.read, and from then on only that is told.
+  let readSaid = 0, readOwn = false, readTimer: ReturnType<typeof setTimeout> | undefined, fitTimer: ReturnType<typeof setTimeout> | undefined;
+  const readTell = (share: number) => {
+    const value = share >= 0.985 ? 1 : Math.round(share * 1000) / 1000;
+    if (!(value > readSaid) || parent === window) return;
+    readSaid = value;
+    readTimer ??= setTimeout(() => { readTimer = undefined; tellParent({ vindu: 'read', value: readSaid }); }, 250);
+  };
+  const tall = () => (document.scrollingElement ?? document.documentElement).scrollHeight;
+  const box = (el: unknown): el is Element => el instanceof Element && el.clientHeight >= innerHeight / 2 && el.scrollHeight > el.clientHeight + 1;
+  const boxes = () => { const all = document.body?.getElementsByTagName('*') ?? []; for (let i = 0; i < all.length && i < 5000; i++) if (box(all[i]) && /auto|scroll/.test(getComputedStyle(all[i]).overflowY)) return true; return false; };
+  const scrolled = (e?: Event) => {
+    if (readOwn || document.visibilityState !== 'visible') return;
+    const inner = e?.target;
+    if (box(inner)) { readTell((inner.scrollTop + inner.clientHeight) / inner.scrollHeight); return; }
+    if (tall() > innerHeight + 1) { readTell((scrollY + innerHeight) / tall()); return; }
+    fitTimer ??= setTimeout(() => { fitTimer = undefined; if (!readOwn && tall() <= innerHeight + 1 && document.visibilityState === 'visible' && !boxes()) readTell(1); else if (tall() > innerHeight + 1) scrolled(); }, 2500);
+  };
+  addEventListener('scroll', scrolled, { passive: true, capture: true }); addEventListener('resize', () => scrolled()); addEventListener('load', () => scrolled());
+  document.addEventListener('visibilitychange', () => scrolled());
+  try { new ResizeObserver(() => scrolled()).observe(document.documentElement); } catch { /* an old browser: scrolls and resizes still tell */ }
+
   // the data the page uses, exact, and arithmetic done the way views do it (values computed here are not "typed")
   (window as any).task = Object.freeze({
     data: Object.freeze(data),
@@ -200,6 +226,8 @@ export function boot(data: Record<string, unknown>, live: boolean, at: { v: numb
       const set = hear[what] as Set<(x: any) => void>; set.add(f); listenSoon(); return () => { set.delete(f); };
     },
     send,
+    /** How far the person has read the page (0 to 1), from a page that knows it better than its scroll does. */
+    read(share: number) { readOwn = true; if (typeof share === 'number' && Number.isFinite(share)) readTell(Math.min(1, Math.max(0, share))); },
   });
   // What the window that shows the page is told of it, as it runs there (page-report.ts keeps its shape): the page
   // itself, never what is in it. Of an error, its kind and the place in the page's own code it came from, not its

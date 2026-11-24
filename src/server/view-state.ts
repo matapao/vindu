@@ -1,6 +1,6 @@
 // What the session keeps of each view besides what it shows, and when it goes: the changes made inside it (for undo),
-// what the system offered on its pane, the person's yes to each of its hooks' jobs, and, once a view leaves the window
-// for good, everything it was shown with.
+// what the system offered on its pane, the person's yes to each of its hooks' jobs, how far the person has read it, and,
+// once a view leaves the window for good, everything it was shown with.
 import type { Hook } from '../cards.js';
 import { stableJson } from './records.js';
 import type { Session } from './state.js';
@@ -20,11 +20,13 @@ const forHooks = (session: Session, view: string) => {
 };
 
 /** The model showed a view anew under a name: what was made inside the old one, offered on it, and the person's yes to
- *  its hooks' jobs go with it, so nothing the person allowed carries over to what the model wrote in its place. */
+ *  its hooks' jobs go with it, so nothing the person allowed carries over to what the model wrote in its place; and so
+ *  does how far they have read it, as what they read was the old. */
 export const shownAnew = (session: Session, view: string) => {
   forget(session, view);
   forHooks(session, view);
   session.cues.delete(view);
+  session.read.delete(view);
 };
 
 /** A hook as the person saw it when they turned its job on: all of it (when, what it does, its job's prompt, connectors

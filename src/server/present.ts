@@ -75,8 +75,10 @@ export const present = async (
           },
           (args as { place?: Place }).place,
         );
-  // what it draws says what it is: a page of its own, or a file in Monaco (a page of Vindu's own, which no check reads)
-  const pages = panels.filter((p) => v.data[p.id].page && !v.data[p.id].code);
+  // what it draws says what it is: a page of its own, or a file in Monaco or pdf.js (a page of Vindu's own, which no
+  // check reads)
+  const own = (p: PanelSpec) => !!(v.data[p.id].code || v.data[p.id].pdf);
+  const pages = panels.filter((p) => v.data[p.id].page && !own(p));
   const ids = pages.map((p) => p.id);
   session.views.set(v.spec.name, ids);
   if (!redraw)
@@ -86,7 +88,7 @@ export const present = async (
     } // a page shown anew is told of anew
   for (const p of panels) {
     const d = v.data[p.id];
-    if (d.page && d.code) setPage(session, v.spec.name, p.id, { url: d.page.url, label: d.page.label, uses: [] }); // check_page reads them like pages
+    if (d.page && own(p)) setPage(session, v.spec.name, p.id, { url: d.page.url, label: d.page.label, uses: [] }); // check_page reads them like pages
   }
   if (anew) shownAnew(session, v.spec.name);
   committed?.();

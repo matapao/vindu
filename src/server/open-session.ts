@@ -28,6 +28,7 @@ import { closeFiles } from './record-files.js';
 import { log, readLines } from './records.js';
 import { armRem, askRem, drawRem, REM_PANE, REM_VIEW, remCount, setRem } from './reminders.js';
 import type { Endpoints, ServerRuntime } from './runtime.js';
+import { readProgressOf } from './read-progress.js';
 import { stopWaiting } from './render-reports.js';
 import { consumeWindowChanges, contextFor, resolved, setPicked } from './selection.js';
 import type { Session } from './state.js';
@@ -85,6 +86,7 @@ export function openSession(
     specs: new Map(),
     drawn: new Map(),
     shown: new Map(),
+    read: new Map(),
     inputs: new Map(),
     data: new Map(),
     picked: [],
@@ -261,6 +263,8 @@ export function openSession(
     setViewWords: (words?: PartialViewWords) => setViewWords(session, words),
     /** What the person's yeses let go, and how each went. */
     receipts: () => session.receipts.map((r) => ({ ...r })),
+    /** How far the person has read each panel of the views shown, now: for the host alone, never the model. */
+    readProgress: () => readProgressOf(session),
     /** The view as it is now, for a new process (or a fresh run of this one) to start from. */
     checkpoint: (): ViewCheckpoint => checkpoint(session),
     /** A new task restored from a checkpoint the host kept: refused, with why, if it is not one. */

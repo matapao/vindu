@@ -1,6 +1,6 @@
 // Node provider for a web backend or Electron main process. The window entry is @matapao/vindu/renderer.
 export { startVindu, type Vindu, type VinduSession, type VinduOptions, type VinduProcess, type VinduSessionOptions, type UiEndpoint } from './provider.js';
-export { NOTE, type HeadText, type TemplateStart, type Shown, type OpenMore, type ViewCheckpoint, type ViewSnapshot } from './server.js';
+export { NOTE, type HeadText, type TemplateStart, type Shown, type OpenMore, type ReadProgress, type ViewCheckpoint, type ViewSnapshot } from './server.js';
 export { type ViewPresentation, type PanelPresentation } from './presentation.js';
 export { applyAction, ACTIONS, type ViewAction } from './actions.js';
 export { rowKey } from './row-keys.js';

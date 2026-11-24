@@ -38,6 +38,9 @@ export type ViewSnapshot = {
   changes: string[];
   picked: PointItem[];
 };
+/** How far the person has read one panel of a view: the furthest share of it they have had in view, from 0 to 1, as the
+ *  window measures it (renderer/shell-reading.ts). For the host alone: the model is never told. */
+export type ReadProgress = { view: string; panel: string; read: number };
 /** Passive UI state for reopening a task against its original result record. */
 export type ViewCheckpoint = {
   views: ViewSnapshot['views'];
@@ -51,6 +54,8 @@ export type ViewCheckpoint = {
   gates: [string, Gate][];
   tickets: number;
   mode?: { template: Template; inputs: Record<string, unknown>; fills: [string, Fill][] };
+  /** How far each panel of each view has been read: by view, each panel's share. */
+  read?: [string, [string, number][]][];
 };
 export type { HeadText }; // a file of the working folder as the last commit has it, or why not
 /** One process, as Vindu sees it: its results, a folder of its own (logs, written pages), and its working folder if it
@@ -74,6 +79,10 @@ export type OpenMore = {
   onApp?: (view: string, panel: string, msg: Record<string, unknown>) => void;
   /** A renderer-independent projection of each resolved card view, including updates from the person and from tools. */
   onPresentation?: (view: ViewPresentation) => void;
+  /** How far the person has read a panel grew: by 0.05 at least since the last call for it, or to 1 (read). For the host
+   *  alone, the model is never told; ui.readProgress() gives every panel's now. A host that draws views itself sends
+   *  { type: 'read', view, seq, read: { [panel]: share } } through ui.event. */
+  onReadProgress?: (r: ReadProgress) => void;
   onAppMessage?: (text: string) => Promise<void> | void;
   onOpenLink?: (url: string) => Promise<void> | void;
   onAskGone?: (view: string, action: 'accept' | 'decline' | 'cancel') => void; // an ask has left: answered, declined, or no longer waited on

@@ -6,6 +6,11 @@ strictDepBuilds: true
 allowBuilds:
   esbuild: false
 
+# pdf.js renders PDFs in the window, never in Node: its optional native canvas for Node is not installed, so no native
+# binary or install script comes with it.
+ignoredOptionalDependencies:
+  - '@napi-rs/canvas'
+
 # A2UI uses the Zod 3 schema API. Keep the bounds check on its locked copy.
 patchedDependencies:
   zod@3.25.76: patches/zod@3.25.76.patch

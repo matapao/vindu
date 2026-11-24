@@ -56,6 +56,7 @@ export type ShellEvent =
   | { type: 'app'; view: string; panel: string; resource: string; mount: string; msg: unknown }
   | { type: 'send'; view: string; panel: string; value: unknown }
   | { type: 'report'; view: string; panel: string; report: unknown } // how a page runs in the window: the page itself (page-report.ts)
+  | { type: 'read'; view: string; seq?: number; read: Record<string, number> } // how far each panel is read, by pid: for the host, never the model
   | { type: 'operation'; name: string }
   | { type: 'reminders' }                              // the bar's chip: show the Reminders pane
   // what the person points at (pointing.ts): marked things, a pane in the chat, a bar opened, a page's bridge

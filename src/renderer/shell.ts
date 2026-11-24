@@ -10,7 +10,8 @@
 // side of another pane (or a pane onto the shelf, to collapse it), and focuses panes (a click, or F6 and Shift+F6 from
 // pane to pane). Each change is drawn at once and reported through onEvent, with the window's size and each view's
 // content height, for the UI server (ui.event), whose state comes back. After drawing, and again when the panes move, a
-// tab is opened or a pane is scrolled, the shell reads back what each view shows, for the UI server to check.
+// tab is opened or a pane is scrolled, the shell reads back what each view shows, for the UI server to check, and how far
+// the person has read each panel, for the host alone (shell-reading.ts).
 // A host makes it its own: tokens (colours, fonts, corners, for light and dark), labels (every word the shell says),
 // actions (its own buttons, on panes and in the shelf) and command (the person's moves by name, for menus and keys).
 // None of these reach the model: what it is told about the panes stays the same.
@@ -28,6 +29,7 @@ import { appFontVariables, setMetrics, type ViewMetrics } from './metrics.js';
 import { SHELL_LABELS, skinCss, type ShellLabels, type ShellOptions, type ShellHandle, type ShellSkin, type ShellCommand, type ShellAction, type ShownView } from './shell-options.js';
 import { connectShellFrames, isLeaving } from './shell-frames.js';
 import { measurePanes } from './shell-measurements.js';
+import { trackReading } from './shell-reading.js';
 import { releaseSurface, rendered } from './surface-runtime.js';
 import { drawPaneSurface, fitPage, fitPages, placeHost, showLoading, tabTitle, type PaneEl } from './shell-pane.js';
 import { mountDocking } from './shell-docking.js';
@@ -91,8 +93,10 @@ export function mountShell(host: HTMLElement, o: ShellOptions = {}): ShellHandle
   let lastWindow = '';
   let winTimer: ReturnType<typeof setTimeout> | undefined;
   const emit = (e: ShellEvent) => o.onEvent?.(e);
-  const measurements = measurePanes(panes, surfaces, () => placed, emit);
-  const { verify, recheck, recheckAll, scheduleMeasure } = measurements;
+  const measurements = measurePanes(panes, surfaces, () => placed, emit), reading = trackReading(root, panes, emit);
+  const { verify, recheck, recheckAll } = measurements;
+  // what is in sight, and so how far each panel has been read, changes with what changes the pane's measures
+  const scheduleMeasure = (view?: string) => { measurements.scheduleMeasure(view); reading.soon(view); };
   // each view by name, and the views open in the layout: worked out once for each views and tree the state gives
   let byName = new Map<string, ShownMeta>(), namedFrom: ShownMeta[] | undefined;
   let openViews = new Set<string>(), openIn: ShellState['tree'] | undefined;
@@ -406,7 +410,7 @@ export function mountShell(host: HTMLElement, o: ShellOptions = {}): ShellHandle
   watch.observe(desk);
   root.addEventListener('scroll', placeHosts, { capture: true, passive: true }); // a stacked window scrolls: native views follow
 
-  const frames = connectShellFrames(root, emit, { locale: o.locale });
+  const frames = connectShellFrames(root, emit, { locale: o.locale, read: reading.frame });
 
   const handle: ShellHandle = {
     view(v) {
@@ -444,7 +448,7 @@ export function mountShell(host: HTMLElement, o: ShellOptions = {}): ShellHandle
     placement: () => placed,
     app: frames.send,
     destroy() {
-      destroyed = true; pointer.destroy(); docking.destroy(); measurements.destroy();
+      destroyed = true; pointer.destroy(); docking.destroy(); measurements.destroy(); reading.destroy();
       watch.disconnect(); clearTimeout(winTimer); clearTimeout(peekTimer); clearTimeout(unpeekTimer); (doc.defaultView ?? window).cancelAnimationFrame(laying); laying = 0;
       for (const p of panes.values()) { p.seen?.disconnect(); releaseSurface(p.body); p.host?.pane?.destroy?.(); }
       panes.clear(); surfaces.clear(); // what still waits on a pane (a read back, a tab) finds none

@@ -2,7 +2,7 @@
 // resolved data must pass before it is shown.
 import { rowFields, shownFields, type CardDef, type CardName, type PanelSpec, type Resolved } from '../cards.js';
 import { BAR_CHART, LINE_CHART } from './charts.js';
-import { APP, CODE, DIFF, MEDIA, PAGE } from './frames.js';
+import { APP, CODE, DIFF, MEDIA, PAGE, PDF } from './frames.js';
 import { GALLERY } from './gallery.js';
 import { hostKind } from './host.js';
 import { nested, type CardKind } from './kind.js';
@@ -11,7 +11,7 @@ import { KPI, RECORD, TEXT } from './values.js';
 
 const BUILT_IN: Record<CardName, CardKind> = {
   kpi: KPI, table: TABLE, list: LIST, record: RECORD, timeline: TIMELINE, 'bar-chart': BAR_CHART, 'line-chart': LINE_CHART,
-  media: MEDIA, gallery: GALLERY, text: TEXT, page: PAGE, code: CODE, diff: DIFF, app: APP,
+  media: MEDIA, gallery: GALLERY, text: TEXT, page: PAGE, code: CODE, diff: DIFF, pdf: PDF, app: APP,
 };
 const hosts = new WeakMap<CardDef, CardKind>();
 /** A card's kind: a built-in card's own, or the kind of a card a host added; none for a card there is not. */

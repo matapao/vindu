@@ -11,6 +11,8 @@ function pkgDir(name: string, from = require): string | undefined {
 
 /** Pinned libraries a page imports by name; the import map resolves them here, and nothing comes from the web. Monaco
  *  (the VS Code editor) loads with its own script loader instead: <script src="/lib/monaco-editor/vs/loader.js">.
+ *  pdf.js, for pdf panels, is imported by its path, and of its package only the files a viewer needs are served
+ *  (only): its module build and worker, the character maps and standard fonts text needs, and its image decoders.
  *  Each is found when first asked for, not when Vindu loads: one that is not installed is refused alone (its /lib
  *  paths are not found, its name is not in the import map), and everything else works. @kurkle/color is Chart.js's
  *  own, found beside it. */
@@ -20,7 +22,9 @@ const PINNED = [
   { name: 'chart.js', license: 'MIT', imports: ['chart.js', 'chart.js/auto', 'chart.js/helpers'], dirs: [['chart.js', 'dist']],
     map: { 'chart.js': '/lib/_vindu/chart.js', 'chart.js/auto': '/lib/_vindu/chart.js', 'chart.js/helpers': '/lib/chart.js/helpers.js', '@kurkle/color': '/lib/@kurkle/color/color.esm.js' } },
   { name: 'monaco-editor', license: 'MIT', imports: ['/lib/monaco-editor/vs/loader.js, then require([\'vs/editor/editor.main\'])'], dirs: [['monaco-editor', 'min']], map: {} },
-] as const satisfies readonly { name: string; license: string; imports: readonly string[]; dirs: readonly (readonly [string, string])[]; map: Record<string, string> }[];
+  { name: 'pdfjs-dist', license: 'Apache-2.0', imports: ['/lib/pdfjs-dist/build/pdf.min.mjs, with its worker /lib/pdfjs-dist/build/pdf.worker.min.mjs'], dirs: [['pdfjs-dist', '.']], map: {},
+    only: /^(?:build\/pdf(?:\.worker)?\.min\.mjs|cmaps\/[\w-]+\.bcmap|standard_fonts\/[\w-]+\.(?:pfb|ttf)|wasm\/(?:openjpeg|jbig2|qcms_bg)\.wasm|iccs\/[\w-]+\.icc)$/ },
+] as const satisfies readonly { name: string; license: string; imports: readonly string[]; dirs: readonly (readonly [string, string])[]; map: Record<string, string>; only?: RegExp }[];
 type PinnedName = (typeof PINNED)[number]['name'];
 
 const found = new Map<string, { dir: string; version: string } | null>();
@@ -44,11 +48,13 @@ export const LIBRARIES = PINNED.map(({ name, license, imports }) => ({
   get version(): string { return installed(name)?.version ?? 'not installed'; },
 }));
 const real = (dir: string) => { try { return fs.realpathSync(dir); } catch { return undefined; } };
-/** Each pinned library's prefix under /lib/, and its folder's real path once found (found once: it never moves). */
-const LIB_DIRS: [string, () => string | undefined][] = [...PINNED.flatMap((l): readonly (readonly [string, string])[] => l.dirs), ['@kurkle/color', 'dist'] as const].map(([prefix, sub]) => {
-  const name = PINNED.find(l => l.dirs.some(([p]) => p === prefix))?.name ?? '@kurkle/color';
+/** Each pinned library's prefix under /lib/, its folder's real path once found (found once: it never moves), and which
+ *  of the files under it are served, where not all of them are. */
+const LIB_DIRS: { prefix: string; dir: () => string | undefined; only?: RegExp }[] = [...PINNED.flatMap((l): readonly (readonly [string, string])[] => l.dirs), ['@kurkle/color', 'dist'] as const].map(([prefix, sub]) => {
+  const lib = PINNED.find(l => l.dirs.some(([p]) => p === prefix)), name = lib?.name ?? '@kurkle/color';
   let dir: string | null | undefined;
-  return [prefix, () => { if (dir === undefined) { const at = installed(name); dir = (at && real(path.join(at.dir, sub))) ?? null; } return dir ?? undefined; }];
+  return { prefix, dir: () => { if (dir === undefined) { const at = installed(name); dir = (at && real(path.join(at.dir, sub))) ?? null; } return dir ?? undefined; },
+    ...(lib && 'only' in lib ? { only: lib.only } : {}) };
 });
 /** Every pinned name a page imports, installed or not (what inject maps by default). */
 export const IMPORT_MAP: Record<string, string> = Object.assign({}, ...PINNED.map(l => l.map));
@@ -58,21 +64,22 @@ export const IMPORT_MAP: Record<string, string> = Object.assign({}, ...PINNED.ma
 export type Library = { name: string; version: string; license: string; dir: string; imports: Record<string, string> };
 
 export function libraryTable(extra: Library[]) {
-  const taken = new Set(['_vindu', ...LIB_DIRS.map(([p]) => p.split('/')[0])]); const specs = new Set(Object.keys(IMPORT_MAP));
+  const taken = new Set(['_vindu', ...LIB_DIRS.map(({ prefix }) => prefix.split('/')[0])]); const specs = new Set(Object.keys(IMPORT_MAP));
   for (const l of extra) {
     if (!/^[a-z0-9][a-z0-9._-]*$/i.test(l.name) || taken.has(l.name)) throw new Error(`library name "${l.name}" is not a plain name, or is taken`);
     for (const spec of Object.keys(l.imports)) { if (specs.has(spec)) throw new Error(`"${spec}" is already pinned`); specs.add(spec); }
     taken.add(l.name);
   }
   // a host's folder is found once if it is there at the start; if not, again on each request (insideAsync)
-  const dirs = [...LIB_DIRS.map(([prefix, dir]) => ({ prefix, dir, root: dir })),
+  const dirs: { prefix: string; dir: () => string | undefined; root: () => string | undefined; only?: RegExp }[] = [...LIB_DIRS.map(d => ({ ...d, root: d.dir })),
     ...extra.map(l => { const root = real(l.dir); return { prefix: l.name, dir: () => l.dir, root: () => root }; })].sort((a, b) => b.prefix.length - a.prefix.length);
   let pinned: string[] | undefined, importMap: Record<string, string> | undefined;
   return {
     /** The library whose prefix under /lib/ starts rel (the longest), its folder, and that folder's real path when
-     *  known. A pinned library that is not installed has none. */
+     *  known. A pinned library that is not installed has none, and nor has a file of one that serves only some. */
     dirOf(rel: string): [string, string, string | undefined] | undefined {
       const hit = dirs.find(({ prefix }) => rel === prefix || rel.startsWith(`${prefix}/`)), dir = hit?.dir();
+      if (hit?.only && !hit.only.test(rel.slice(hit.prefix.length + 1))) return undefined;
       return hit && dir ? [hit.prefix, dir, hit.root()] : undefined;
     },
     /** What each page's import map holds: the pinned libraries installed here, and the host's. */

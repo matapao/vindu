@@ -5,7 +5,8 @@
   "project": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.{mjs,ts}", "examples/**/*.{ts,js}"],
   "ignoreDependencies": [
     // The page host serves these to generated pages by package name (page-libraries.ts); nothing imports them.
-    "axe-core", "chart.js", "echarts", "monaco-editor", "three",
+    // pdfjs-dist is served the same way, to Vindu's own viewer for pdf panels (pdf-page.ts).
+    "axe-core", "chart.js", "echarts", "monaco-editor", "pdfjs-dist", "three",
     // scripts/check-package.mjs runs them on the packed tarball, through pnpm exec.
     "publint", "@arethetypeswrong/cli"
   ]

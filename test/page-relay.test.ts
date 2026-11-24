@@ -31,6 +31,14 @@ test("a page's report: from a view's page panel, small, and never counted", () =
   assert.equal(guard({ kind: 'report', view: 'v', panel: 'p', value: 'x'.repeat(REPORT_MAX), using: true }), `not a report of at most ${REPORT_MAX} characters as JSON`);
 });
 
+test("how far a page is read: from a view's page panel, a share from 0 to 1, and never counted", () => {
+  const guard = pageMessageGuard();
+  for (let n = 0; n <= 30; n++) assert.equal(guard({ kind: 'read', view: 'v', panel: 'p', value: n / 30, using: false }), undefined);
+  assert.equal(guard({ kind: 'read', view: 'v', panel: '', value: 0.5, using: true }), 'this page is in no view');
+  for (const value of [-0.1, 1.01, Number.NaN, '0.5', null, { share: 1 }])
+    assert.equal(guard({ kind: 'read', view: 'v', panel: 'p', value, using: true }), 'a read is a share of the page, from 0 to 1', JSON.stringify(value));
+});
+
 test.skipIf(process.platform === 'win32')("a host's result pictures are its own: written readable by this user only, in any folder", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vindu-pictures-'));
   try {

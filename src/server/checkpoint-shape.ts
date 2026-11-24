@@ -61,6 +61,10 @@ const Checkpoint = z.object({
       fills: z.array(z.tuple([z.string(), Fill])),
     })
     .optional(),
+  read: z
+    .array(z.tuple([Name, z.array(z.tuple([z.string().max(80), z.number().min(0).max(1)])).max(200)]))
+    .max(200)
+    .optional(),
 });
 
 /** The checkpoint, as a checkpoint, or why it is not one: what is wrong, in a few words for the host's log. */

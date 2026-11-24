@@ -1,11 +1,11 @@
 // Cards that draw something other than rows: media (a picture, a video or a recording, with marks on it), and the
 // framed ones, each in a frame of its own: a page (a file in the working folder, or one the model wrote; a static one
-// runs nothing), code and a diff (a file in Monaco, a page of Vindu's own) and an MCP App. What each shows is read
-// before any result. A gallery of many pictures is gallery.ts.
+// runs nothing), code and a diff (a file in Monaco, a page of Vindu's own), a PDF (in pdf.js, a page of Vindu's own
+// too) and an MCP App. What each shows is read before any result. A gallery of many pictures is gallery.ts.
 import { GUIDE, type CardName, type PanelSpec } from '../cards.js';
 import { refOf, type Row } from '../results.js';
 import { Refusal, type ViewContext } from '../view-context.js';
-import { appOf, codeOf, mediaOf, pageOf } from '../view-files.js';
+import { appOf, codeOf, mediaOf, pageOf, pdfOf } from '../view-files.js';
 import { rowsOf } from '../view-rows.js';
 import { rowsAsTheyAre, type CardKind, type CardProbe } from './kind.js';
 
@@ -63,6 +63,13 @@ const file = (name: CardName, shows: string, against = false): CardKind => ({ //
 });
 export const CODE = file('code', 'the file, read-only; it follows the file as it changes');
 export const DIFF = file('diff', 'the file now against the last commit, side by side, read-only; it follows the file as it changes', true);
+export const PDF: CardKind = { // a PDF in pdf.js: a page of Vindu's own, on the process's origin
+  ...framed, reads: GUIDE.pdf.fields,
+  own: (p, view, ctx) => pdfOf(p, view, ctx),
+  draw: (p, d, k) => { k.model.url = d.page!.url;
+    return [k.add({ id: `${k.pid}__pdf`, component: 'Page', url: { path: `/panels/${k.pid}/url` }, height: frameHeight(d.page!.height, k.compact), title: p.title ?? d.pdf!.name, panel: p.id })]; },
+  account: (o, _p, d) => { o.from = d.page!.label; o.seen = 'the file itself'; o.file = { name: d.pdf!.name, bytes: d.pdf!.bytes }; o.shows = 'the PDF inline, in its own viewer in the window: the person sees it page by page, as wide as the pane'; },
+};
 export const APP: CardKind = { // an MCP App, in a frame of its own origin, talking to the host over postMessage
   ...framed, reads: GUIDE.app.fields,
   own: (p, _view, ctx) => ({ app: appOf(p, ctx) }),

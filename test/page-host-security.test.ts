@@ -1,7 +1,7 @@
 // The page host's edges, over plain HTTP: names it writes, origins it answers to (128-bit keys, its own port only),
 // who may frame it, what an attachment is served as, what a working folder never gives out (dot names, secrets, a link
 // out), prototype names that are no file, apps' declared domains, waits that end with their request, where the boot
-// script goes in a page, and libraries found only when asked for.
+// script goes in a page, libraries found only when asked for, and the pdf viewer with the files of pdf.js it needs.
 import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -9,9 +9,10 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { appCsp, inject, memoryResults, pageNavigationAllowed, startPageHost, watchFolder } from '../src/index.js';
+import { appCsp, CSP, inject, memoryResults, pageNavigationAllowed, startPageHost, watchFolder } from '../src/index.js';
 import { secretName } from '../src/page-workspace.js';
-import { get, sleep } from './helpers.js';
+import { pdfPage } from '../src/pdf-page.js';
+import { get, sleep, tinyPdf } from './helpers.js';
 
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const write = (root: string, files: Record<string, string>) => { for (const [f, s] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(root, f)), { recursive: true }); fs.writeFileSync(path.join(root, f), s); } };
@@ -172,4 +173,28 @@ test('a library that is not installed is refused alone; the others, and the host
   assert.equal(table.dirOf('dee/d.js')?.[0], 'dee');
   assert.equal(m.wrapperFor('three.js'), undefined);
   assert.match(String(host.pinned.join('\n')), /three, three\/addons\/…: three \d/); // installed here: pinned
+});
+
+test('the pdf viewer is a page of the process\'s origin with its headers, and of pdf.js only what a viewer needs is served', async () => {
+  const paper = results.attach('paper.pdf', 'application/pdf', path.join(dir, 'paper.pdf'));
+  fs.writeFileSync(paper.file, tinyPdf(1));
+  const kept = { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' };
+  const view = await get(`${base}/view/${host.writeView(key, 'p_paper__doc', pdfPage({ url: `/media/${paper.id}`, name: 'paper.pdf' }))}`);
+  assert.deepEqual([view.status, view.headers['content-type'], view.headers['content-security-policy']], [200, 'text/html; charset=utf-8', CSP]); // its requests stay on its origin
+  for (const [k, v] of Object.entries(kept)) assert.equal(view.headers[k], v, k);
+  assert.match(view.body, /^<!doctype html><script type="importmap">.*?<\/script><script src="\/__vindu\/boot\.js"><\/script>/); // the boot script first, as in every page
+  assert.match(view.body, /from '\/lib\/pdfjs-dist\/build\/pdf\.min\.mjs';\nconst spec = \{"url":"\/media\/a\d+","name":"paper\.pdf"\};/);
+  const pdf = await get(`${base}/media/${paper.id}`); // what the viewer reads: the PDF as what it is, and never run as a page
+  assert.deepEqual([pdf.headers['content-type'], pdf.headers['x-content-type-options']], ['application/pdf', 'nosniff']);
+  assert.match(String(pdf.headers['content-security-policy']), /^default-src 'none'; .*; sandbox$/);
+  for (const [file, type] of [['build/pdf.min.mjs', 'text/javascript'], ['build/pdf.worker.min.mjs', 'text/javascript'], ['cmaps/UniJIS-UTF16-H.bcmap', 'application/octet-stream'],
+    ['standard_fonts/LiberationSans-Regular.ttf', 'font/ttf'], ['standard_fonts/FoxitSerif.pfb', 'application/octet-stream'], ['wasm/openjpeg.wasm', 'application/wasm'], ['iccs/CGATS001Compat-v2-micro.icc', 'application/octet-stream']]) {
+    const r = await get(`${base}/lib/pdfjs-dist/${file}`);
+    assert.deepEqual([r.status, r.headers['content-type'], r.headers['content-security-policy']], [200, type, CSP], file);
+    for (const [k, v] of Object.entries(kept)) assert.equal(r.headers[k], v, `${file} ${k}`);
+  }
+  for (const file of ['', 'package.json', 'LICENSE', 'README.md', 'build/pdf.mjs', 'build/pdf.min.mjs.map', 'build/pdf.worker.mjs', 'build/pdf.worker.mjs.map', 'build/pdf.sandbox.min.mjs',
+    'build/pdf.renderer.min.mjs', 'legacy/build/pdf.min.mjs', 'web/pdf_viewer.mjs', 'image_decoders/pdf.image_decoders.min.mjs', 'wasm/quickjs-eval.wasm', 'wasm/quickjs-eval.js',
+    'wasm/openjpeg_nowasm_fallback.js', 'cmaps/LICENSE', 'types/src/pdf.d.ts', 'build/../package.json', 'cmaps/..%2Fpackage.json'])
+    assert.equal((await get(`${base}/lib/pdfjs-dist/${file}`)).status, 404, file);
 });

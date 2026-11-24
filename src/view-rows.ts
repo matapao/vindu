@@ -21,7 +21,7 @@ export function rowsOf(e: Entry, p: PanelSpec, notes: string[], whole = false): 
   if (e.kind === 'attachment') {
     const format = dataFormat(e.name, e.mime);
     if (format) throw new Refusal(`panel ${p.id}: ${e.id} is a ${format.toUpperCase()} file (${e.name}); a table or a sheet shows its rows, read by the system`);
-    throw new Refusal(`panel ${p.id}: ${e.id} is an attachment (${e.mime}); show it with a media panel, or point at the result where you read it`);
+    throw new Refusal(`panel ${p.id}: ${e.id} is an attachment (${e.mime}); show it with a ${e.mime === 'application/pdf' ? 'pdf' : 'media'} panel, or point at the result where you read it`);
   }
   let v: unknown = e.kind === 'answer' ? dataOf(e) : e.value ?? (e.rows?.length ? e.rows : undefined);
   if (v === undefined && e.kind === 'result' && e.images.length) throw new Refusal(`panel ${p.id}: ${e.id} is an image, not data; show it with a media panel ("media": "${e.id}"), or type the rows you read from it`);
@@ -131,7 +131,7 @@ export function textOf(e: Entry, p: PanelSpec): string {
     if (typeof v === 'string') return v.slice(0, 4000);
     throw new Refusal(`panel ${p.id}: ${e.id} holds the person's answer, not text; show it with a record card, or pick its text field`);
   }
-  if (e.kind === 'attachment') { if (e.mime.startsWith('text/')) return headOf(e.file, 4000); throw new Refusal(`panel ${p.id}: ${e.name} is ${e.mime}; show it with a media panel`); }
+  if (e.kind === 'attachment') { if (e.mime.startsWith('text/')) return headOf(e.file, 4000); throw new Refusal(`panel ${p.id}: ${e.name} is ${e.mime}; show it with a ${e.mime === 'application/pdf' ? 'pdf' : 'media'} panel`); }
   if (e.value !== undefined || e.rows?.length) throw new Refusal(`panel ${p.id}: ${e.id} holds data, not plain text; show it with a table, list or record card`);
   return e.text.slice(0, 4000);
 }

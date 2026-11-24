@@ -1,7 +1,8 @@
 // Code and diff panels: a file in the process's working folder, in Monaco (the VS Code editor), read-only, on a page of
 // Vindu's own that the page host serves like any page (offline: Monaco is pinned there, /lib/monaco-editor/). The page
 // reads the file as it is now (/work/<path>?raw=1), and again whenever it changes; a diff page also gets the file as the
-// last commit has it, written into the page.
+// last commit has it, written into the page. How far the person has read the file is Monaco's scroll, which the page
+// tells the window (task.read), as its document does not scroll.
 import { escapeText, scriptJson } from './escape.js';
 
 const LANGUAGES: Record<string, string> = {
@@ -26,6 +27,7 @@ export function codePage(spec: CodeSpec): string {
 <style>html,body{margin:0;height:100%;background:Canvas;color:CanvasText}#code{position:absolute;inset:0}</style></head>
 <body><div id="code"></div><script src="/lib/monaco-editor/vs/loader.js"></script><script>
 const spec = ${data};
+task.read(0); // this page says how far it is read itself, from Monaco's scroll
 require.config({ paths: { vs: '/lib/monaco-editor/vs' } });
 require(['vs/editor/editor.main'], async () => {
   const read = async () => { const r = await fetch('/work/' + spec.path.split('/').map(encodeURIComponent).join('/') + '?raw=1', { cache: 'no-store' }); if (!r.ok) throw new Error('the file is gone: ' + spec.path); return r.text(); };
@@ -41,6 +43,15 @@ require(['vs/editor/editor.main'], async () => {
     if (spec.line) { editor.revealLineInCenter(spec.line); editor.setSelection(new monaco.Range(spec.line, 1, spec.line, 1)); }
   }
   theme(); dark.addEventListener('change', theme);
+  // how far down the file the person has had in view; a file that fits once it has been in view 2.5 s
+  const reader = editor.getModifiedEditor?.() ?? editor;
+  let fits;
+  const reached = () => {
+    const h = reader.getLayoutInfo().height, all = reader.getScrollHeight();
+    if (all > h + 1) { task.read((reader.getScrollTop() + h) / all); return; }
+    fits ??= setTimeout(() => { fits = undefined; if (reader.getScrollHeight() <= reader.getLayoutInfo().height + 1) task.read(1); else reached(); }, 2500);
+  };
+  reader.onDidScrollChange(reached); reader.onDidLayoutChange(reached); reached();
   // the file changed: read it again, where the person was in it
   task.on('change', async paths => {
     if (!paths.includes('*') && !paths.includes(spec.path)) return;

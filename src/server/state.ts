@@ -121,6 +121,7 @@ export type Session = {
   closed?: boolean;
   pointedBy?: { name: string; window: string }; // who pointed, as the host says (not verified)
   shown: Map<string, ViewSpec>; // each view as last shown, with its panels' ids
+  read: Map<string, Map<string, { read: number; told: number }>>; // by view and panel: how far the person has read it, and what the host was told of it
   inputs: Map<string, { set: Record<string, number>; defaults: Record<string, number> }>; // view/panel: the person's what-ifs
   mode?: StaticMode; // a static view: the template, its inputs, and what filled each slot
   data: Map<string, Record<string, Resolved>>; // each view's panels as last resolved: what pointing refers into

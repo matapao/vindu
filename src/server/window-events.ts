@@ -5,6 +5,7 @@ import { answered } from './asks.js';
 import { readNow } from './live-panels.js';
 import { personRuns } from './operations.js';
 import { pageSaid, sent } from './page-messages.js';
+import { readFromWindow } from './read-progress.js';
 import { log, unawaited, whoOf } from './records.js';
 import { askRem, doRem, drawRem, isRemindersPane } from './reminders.js';
 import { compare, reported } from './render-reports.js';
@@ -46,6 +47,7 @@ export function dispatchEvent(session: Session, e: unknown, replyToWindow = sess
   if (x.type === 'rendered') return compare(session, x);
   if (x.type === 'send') return sent(session, x);
   if (x.type === 'report') return reported(session, x);
+  if (x.type === 'read') return readFromWindow(session, x); // for the host alone: never told the model, nor logged as the person's
 
   if (x.type === 'app') return routeAppMessage(session, x, replyToWindow);
   if (x.type === 'reminders') {

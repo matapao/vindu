@@ -3,6 +3,7 @@ import path from 'node:path';
 import { FROM_ALIASES, fieldRoles, resultIds } from '../cards.js';
 import type { AnswerEntry } from '../results.js';
 import type { ViewCheckpoint, ViewSnapshot } from './contracts.js';
+import { readForCheckpoint, restoreRead } from './read-progress.js';
 import { keep, log } from './records.js';
 import { setPicked } from './selection.js';
 import type { Session } from './state.js';
@@ -137,6 +138,7 @@ export const checkpoint = (session: Session): ViewCheckpoint => {
     fresh: [...session.fresh],
     tickets: session.tickets,
     ...(session.mode ? { mode: { ...session.mode, fills: [...session.mode.fills] } } : {}),
+    read: readForCheckpoint(session), // how far the person has read each panel, like their what-ifs: their own state of the view
   };
 };
 export const restore = async (session: Session, saved: ViewCheckpoint) => {
@@ -173,6 +175,7 @@ export const restore = async (session: Session, saved: ViewCheckpoint) => {
   }
   session.shell.restoreLayout(saved.layout, saved.arrangement);
   session.attached = new Set(saved.attached.filter((name) => session.shown.has(name)));
+  restoreRead(session, saved.read);
   setPicked(session, saved.picked);
   return refused;
 };
