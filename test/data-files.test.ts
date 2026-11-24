@@ -21,7 +21,7 @@ results.attach('shot.png', 'image/png', png); // a1
 // each file as written, where it is put, and the rows the system must read from it
 const FILES = {
   csv: { name: 'invoices.csv', mime: 'text/csv',
-    text: '﻿id,customer,note,amount\r\nINV-1,"Vik Data, AS","Line one\nline two",31050\r\nINV-2,Strand Bygg,"He said ""pay""",35740.5\r\nINV-3,Nordlys,,007\r\n',
+    text: '\uFEFFid,customer,note,amount\r\nINV-1,"Vik Data, AS","Line one\nline two",31050\r\nINV-2,Strand Bygg,"He said ""pay""",35740.5\r\nINV-3,Nordlys,,007\r\n',
     rows: [{ id: 'INV-1', customer: 'Vik Data, AS', note: 'Line one\nline two', amount: 31050 }, { id: 'INV-2', customer: 'Strand Bygg', note: 'He said "pay"', amount: 35740.5 }, { id: 'INV-3', customer: 'Nordlys', note: '', amount: '007' }] },
   tsv: { name: 'stock.tsv', mime: 'text/tab-separated-values',
     text: 'name\tqty\tprice\nBolts, M8\t100\t2.5\nNuts\t250\t0.80\n',
