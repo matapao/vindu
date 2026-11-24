@@ -61,12 +61,34 @@ function step(element: GalleryElement, by: number, count: number) {
   element.requestUpdate();
 }
 
-/** Back in the gallery: nothing shown large, and focus on the tile of the item that was. */
-function closed(element: GalleryElement) {
+/** A dialog shut by the gallery: the item it showed, and where the browser put focus as it closed. */
+const shutting = new WeakMap<HTMLDialogElement, { at: number | undefined; focus: Element | null }>();
+const focusTile = (element: GalleryElement, at: number) => element.querySelector<HTMLElement>(`.vb-tile[data-row="${at}"]`)?.focus();
+
+/** Close a dialog: nothing is shown large from now on, before its close is heard, so an item opened in between stays. */
+function shut(element: GalleryElement, dialog: HTMLDialogElement) {
   const at = shownAt.get(element);
   shownAt.delete(element);
+  dialog.close();
+  shutting.set(dialog, { at, focus: dialog.ownerDocument.activeElement });
   element.requestUpdate();
-  if (at !== undefined) element.querySelector<HTMLElement>(`.vb-tile[data-row="${at}"]`)?.focus();
+}
+
+/** Its close heard, a moment after: focus on the tile of the item that was shown, unless the person has moved focus on
+ *  since, or opened another item already. A dialog closed another way is let go here as it is closed. */
+function closed(element: GalleryElement, dialog: HTMLDialogElement) {
+  const was = shutting.get(dialog);
+  shutting.delete(dialog);
+  if (!was) {
+    const at = shownAt.get(element);
+    shownAt.delete(element);
+    element.requestUpdate();
+    if (at !== undefined) focusTile(element, at);
+    return;
+  }
+  const doc = element.ownerDocument;
+  const stayed = doc.activeElement === was.focus || doc.activeElement === doc.body;
+  if (!shownAt.has(element) && was.at !== undefined && stayed) focusTile(element, was.at);
 }
 
 /** Keys in the dialog: Escape goes back, the arrows step (but in a video, whose own they are), and Tab goes round its
@@ -76,7 +98,7 @@ function onKey(element: GalleryElement, e: KeyboardEvent, count: number) {
   if (e.key === 'Escape') {
     e.preventDefault();
     e.stopPropagation();
-    dialog.close();
+    shut(element, dialog);
     return;
   }
   if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !(e.target as Element).closest('video')) {
@@ -108,7 +130,10 @@ const thumbOf = (item: Item) =>
 /** The item shown large: where it is of how many, its name and the way back; it, marked as its tile is; and the steps. */
 function viewer(element: GalleryElement, item: Item, at: number, count: number, words: Words, panel: string) {
   const src = sourceOf(item), name = nameOf(item);
-  const close = (e: Event) => (e.currentTarget as HTMLElement).closest('dialog')?.close();
+  const close = (e: Event) => {
+    const dialog = (e.currentTarget as HTMLElement).closest('dialog');
+    if (dialog) shut(element, dialog);
+  };
   const media = item.kind === 'video' ? html`<video src=${src} controls playsinline></video>` : html`<img src=${src} alt=${name}>`;
   return html`<div class="vb-viewerbar"><span class="vb-viewerat" aria-live="polite">${
     typeof item.at === 'string' ? item.at : VIEW_WORDS.itemOf(at + 1, count)
@@ -136,8 +161,8 @@ export const VGallery = defineComponent({
         if (!e.altKey) void open(host, i); // Alt and a click marks it, as any row: pointing's, not an opening
       }}>${thumbOf(item)}<span class="vb-tilename">${nameOf(item)}</span></button></li>`;
     return html`<ul class="vb-gallery">${items.map(tile)}</ul><dialog class="vb-viewer" aria-label=${index === undefined ? nothing : nameOf(items[index])}
-      @keydown=${(e: KeyboardEvent) => onKey(host, e, items.length)} @close=${() => closed(host)}
-      @click=${(e: MouseEvent) => { if (e.target === e.currentTarget) (e.currentTarget as HTMLDialogElement).close(); }}>${
+      @keydown=${(e: KeyboardEvent) => onKey(host, e, items.length)} @close=${(e: Event) => closed(host, e.currentTarget as HTMLDialogElement)}
+      @click=${(e: MouseEvent) => { if (e.target === e.currentTarget) shut(host, e.currentTarget as HTMLDialogElement); }}>${
         index === undefined ? nothing : viewer(host, items[index], index, items.length, words, panel)
       }</dialog>`;
   },
