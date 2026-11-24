@@ -36,7 +36,9 @@ export function memoryResults(dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vindu
       const images = (x.images ?? []).map((im, i) => {
         const subtype = /^[a-z\d.+-]+\/([a-z\d.+-]{1,64})(?:\s*;|$)/i.exec(im.mime)?.[1] ?? 'bin';
         const file = path.join(dir, `${id}-${i + 1}.${subtype}`);
-        fs.writeFileSync(file, im.data);
+        // a host's results are its own: readable by this user only, wherever the folder is (and kept so if it was there)
+        fs.writeFileSync(file, im.data, { mode: 0o600 });
+        fs.chmodSync(file, 0o600);
         return { file, mime: im.mime };
       });
       return keep({ id, kind: 'result', tool: x.tool, server: x.server, input: x.input, text: x.text ?? '', value: rows ? undefined : x.value, rows, images });

@@ -8,6 +8,8 @@ export type { PanelPresentation, ViewPresentation } from '../presentation.js';
 export type { PointItem } from '../pointing.js';
 export { useTheme, THEME_CSS } from './theme.js';
 export { guardA2uiArrays } from './a2ui-limits.js'; // for a host that checks with A2UI's schemas before the window starts
+export { pageMessageGuard, REPORT_MAX, type PageAsk, type PageMessageCheck } from '../page-message-guard.js'; // for a host that relays a page's messages itself
+export { checkSend, SEND_MAX } from '../page-send.js';
 export { html, css, nothing } from 'lit'; // the Lit a host's components render with: vindu's own, so there is one
 export { place, insert, remove, resize, readLayout, shorthand, where, openView, restore, slotOf, LAYOUT, type LayoutNode, type Placement, type LayoutOptions, type Box, type Size, type Place, type Side, type Slot } from '../layout.js';
 export { Shell, type ShellState, type ShellEvent, type Shelved, type ShownMeta, type ViewRole, type ViewOwner } from '../shell.js';
