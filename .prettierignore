@@ -1,0 +1,8 @@
+dist/
+out/
+node_modules/
+pnpm-lock.yaml
+scripts/fixtures/pnpm-lock.yaml
+patches/
+research_notes/
+reports/

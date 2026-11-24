@@ -1,0 +1,8 @@
+# Known advisories accepted here, each with why it cannot reach Vindu's users and when to look again. A new one fails CI.
+# OSV-Scanner without --config (as Scorecard runs it) reads the file next to each lockfile: scripts/fixtures has its own
+# copy of what applies to the consumer's lockfile there.
+
+[[IgnoredVulns]]
+id = "GHSA-mrhx-c7xc-m3w5"
+ignoreUntil = 2027-05-31T00:00:00Z
+reason = "zod 3 is A2UI's own (@a2ui/web_core, which has no zod 4 release). Vindu bounds every surface before A2UI parses it (withinSurfaceLimits), patches zod 3's array and set checks in its own install (patches/), and installs the same guard at runtime in every host that mounts its renderer (guardA2uiArrays). Look again when A2UI leaves zod 3."

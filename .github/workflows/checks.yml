@@ -1,0 +1,85 @@
+name: Checks
+on: [push, pull_request, workflow_dispatch, workflow_call]
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_call' }}
+
+jobs:
+  sdk:
+    name: SDK tests on ${{ matrix.toolchain }} / runtime ${{ matrix.runtime }}
+    runs-on: macos-15
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # pnpm and Vitest need a later Node 22 patch than consumers of the SDK.
+          - toolchain: '22.23.5'
+            runtime: '22.0.0'
+          - toolchain: '24.22.3'
+            runtime: '24.22.3'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.toolchain }}
+      - run: corepack enable pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm exec playwright install chromium
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm test:package
+      - run: pnpm check:package
+      - name: Switch to the minimum supported runtime
+        if: matrix.runtime != matrix.toolchain
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.runtime }}
+      - run: node --test scripts/test-runtime.mjs
+
+  # Linux: terminals (node-pty), shells and file watching differ there. Not yet required: it tells, and turns required
+  # once it has passed.
+  sdk-linux:
+    name: SDK tests on Linux (not yet required)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.22.3'
+      - run: sudo apt-get update && sudo apt-get install -y zsh
+      - run: corepack enable pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm test:package
+      - run: node --test scripts/test-runtime.mjs
+
+  # The owner's style (Prettier at 120 columns, no nested ternaries, no explicit any) reports here until the code is
+  # changed to it; then it moves into pnpm lint.
+  style:
+    name: Style (reports only)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.22.3'
+      - run: corepack enable pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint:style

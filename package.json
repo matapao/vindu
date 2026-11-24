@@ -1,0 +1,114 @@
+{
+  "name": "@matapao/vindu",
+  "version": "0.1.2",
+  "license": "MIT",
+  "type": "module",
+  "description": "UI SDK for browser and Electron. Render task data and expose views, inputs and interactions to an app-owned MCP client.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/matapao/vindu.git"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/renderer/index.d.ts",
+      "default": "./dist/renderer/index.js"
+    },
+    "./renderer": {
+      "types": "./dist/renderer/index.d.ts",
+      "default": "./dist/renderer/index.js"
+    },
+    "./server": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./app-submission": {
+      "types": "./dist/app-submission.d.ts",
+      "default": "./dist/app-submission.js"
+    },
+    "./renderer/terminal": {
+      "types": "./dist/renderer/terminal.d.ts",
+      "default": "./dist/renderer/terminal.js"
+    },
+    "./renderer/browser": {
+      "types": "./dist/renderer/browser.d.ts",
+      "default": "./dist/renderer/browser.js"
+    },
+    "./playwright": {
+      "types": "./dist/drivers/playwright.d.ts",
+      "default": "./dist/drivers/playwright.js"
+    }
+  },
+  "files": [
+    "dist",
+    "types",
+    "LICENSE",
+    "README.md",
+    "patches"
+  ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "lint": "pnpm run build && eslint . --max-warnings 0 && oxlint --type-aware --deny-warnings src test scripts examples && knip && node scripts/check-lines.mjs",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p .",
+    "prepack": "pnpm run build",
+    "build:test": "pnpm run build && node -e \"require('node:fs').rmSync('out', { recursive: true, force: true })\" && tsc -p tsconfig.test.json && esbuild out/test/fixtures/app.js --bundle --format=esm --log-level=warning --outfile=out/test/fixtures/app.bundle.js",
+    "typecheck": "pnpm run build && tsc -p tsconfig.test.json --noEmit",
+    "test": "pnpm run build:test && vitest run",
+    "test:package": "node scripts/test-package.mjs",
+    "lint:style": "oxlint -D no-nested-ternary -D typescript/no-explicit-any src test scripts examples && prettier --check .",
+    "format": "prettier --write .",
+    "check:package": "node scripts/check-package.mjs",
+    "check:security": "node scripts/check-security.mjs"
+  },
+  "peerDependencies": {
+    "playwright": ">=1.40"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@eslint/js": "10.0.1",
+    "@modelcontextprotocol/client": "2.4.0",
+    "@modelcontextprotocol/core": "2.4.0",
+    "@modelcontextprotocol/ext-apps": "2.0.4",
+    "@types/node": "^24.19.2",
+    "esbuild": "0.28.2",
+    "eslint": "10.15.0",
+    "fast-check": "4.10.2",
+    "globals": "17.14.0",
+    "knip": "6.45.1",
+    "oxlint": "1.93.0",
+    "oxlint-tsgolint": "7.0.2007",
+    "playwright": "^1.65.0",
+    "prettier": "3.10.1",
+    "publint": "0.3.25",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "@a2ui/lit": "0.15.0",
+    "@a2ui/web_core": "0.15.0",
+    "@lydell/node-pty": "1.1.0",
+    "@modelcontextprotocol/node": "^2.1.2",
+    "@modelcontextprotocol/server": "^2.4.0",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/addon-serialize": "0.14.0",
+    "@xterm/headless": "6.0.0",
+    "@xterm/xterm": "6.0.0",
+    "axe-core": "4.14.0",
+    "chart.js": "4.6.1",
+    "echarts": "6.1.0",
+    "lit": "^3.3.3",
+    "monaco-editor": "0.58.0-dev-20261109",
+    "three": "0.187.0",
+    "zod": "^4.6.7"
+  },
+  "peerDependenciesMeta": {
+    "playwright": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@11.28.9+sha512.35421cea2720eca3f5ad722b67e8ef18f4d3cd4745ed2fcfeb0dc288d4e9437fad3870d91ee6e83f268f0f6f7e0f62723317b19617bb45ee4333172ef51159f8"
+}

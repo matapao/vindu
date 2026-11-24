@@ -1,0 +1,13 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>app</title>
+  <!-- the app's own page: views come from vindu, pages and media from each task's page origin -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: http://*.localhost:*; media-src http://*.localhost:*; frame-src http://*.localhost:*; style-src 'self' 'unsafe-inline'">
+</head>
+<body>
+  <div id="view" style="width: 900px"></div>
+  <script type="module" src="/app.bundle.js"></script>
+</body>
+</html>

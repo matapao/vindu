@@ -1,0 +1,7 @@
+# The consumer's lockfile here (test:package installs the packed SDK with it): the same acceptance as
+# ../../osv-scanner.toml. OSV-Scanner without --config, as Scorecard runs it, reads only the file next to each lockfile.
+
+[[IgnoredVulns]]
+id = "GHSA-mrhx-c7xc-m3w5"
+ignoreUntil = 2027-05-31T00:00:00Z
+reason = "zod 3 is A2UI's own (@a2ui/web_core, which has no zod 4 release). A consumer gets it with @matapao/vindu's renderer, which bounds every surface before A2UI parses it (withinSurfaceLimits) and installs a guard for zod 3's array and set checks at runtime in every host that mounts it (guardA2uiArrays). Look again when A2UI leaves zod 3."

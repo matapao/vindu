@@ -1,0 +1,11 @@
+minimumReleaseAge: 10080
+trustPolicy: no-downgrade
+trustPolicyIgnoreAfter: 43200
+blockExoticSubdeps: true
+strictDepBuilds: true
+allowBuilds:
+  esbuild: false
+
+# A2UI uses the Zod 3 schema API. Keep the bounds check on its locked copy.
+patchedDependencies:
+  zod@3.25.76: patches/zod@3.25.76.patch

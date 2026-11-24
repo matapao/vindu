@@ -1,0 +1,36 @@
+// Values at the edges of what is drawn: two panels whose ids differ only in punctuation, an input's name with a slash
+// in it, a chart of one very large value, a size that is not there, and a sort over numbers with blanks among them.
+// Each comes out as it should, or is refused, never drawn wrong. All synthetic; no window.
+import { test } from 'vitest';
+import assert from 'node:assert/strict';
+import { bytesIn, compile, type ViewSpec } from '../src/index.js';
+import type { PanelSpec, Resolved } from '../src/cards.js';
+import { niceScale } from '../src/chart-svg.js';
+import { shape } from '../src/view-rows.js';
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+const componentsOf = (surface: Record<string, unknown>[]) => (surface.find((m: any) => m.updateComponents) as any).updateComponents.components as any[];
+
+test("each panel has a place of its own in the window: ids that would share one are refused; an input's name is one step of its path", () => {
+  const two: ViewSpec = { name: 'v', title: 'V', panels: [{ id: 'a-b', card: 'text' }, { id: 'a_b', card: 'text' }] as PanelSpec[] };
+  const data: Record<string, Resolved> = { 'a-b': { text: 'one' }, a_b: { text: 'two' } };
+  assert.throws(() => compile(two, data, { compact: false }), /panels "a-b" and "a_b" go by the same id in the window \(p_a_b\)/);
+  const view: ViewSpec = { name: 'v', title: 'V', panels: [{ id: 'k', card: 'text', inputs: { 'a/b': 2 } }] as PanelSpec[] };
+  const field = componentsOf(compile(view, { k: { text: 'what if', inputs: { 'a/b': 2 } } }, { compact: false })).find(c => c.id === 'p_k__in0');
+  assert.equal(field.value.path, '/panels/p_k/inputs/a~1b');
+});
+
+test('a chart of one value, at any size, has an axis around it; a size that is not there is not 0 B', () => {
+  for (const [lo, hi] of [[1e16, 1e16], [0, 0], [-5, -5], [Infinity, 3]]) {
+    const s = niceScale(lo, hi);
+    assert.ok(Number.isFinite(s.lo) && Number.isFinite(s.hi) && s.hi > s.lo && s.ticks.length > 1, `${lo}..${hi}`);
+  }
+  assert.deepEqual([bytesIn(null), bytesIn(undefined), bytesIn(''), bytesIn(0), bytesIn(2048)], ['', '', '', '0 B', '2 KB']);
+});
+
+test('a sort by numbers puts blanks below every number, never as 0, and keeps two blanks even', () => {
+  const rows = [{ n: 2 }, { n: '' }, { n: -1 }, { n: null }, { n: 10 }, {}];
+  const by = (sort: string) => shape(rows, { id: 't', card: 'table', sort }, []).map(r => (r as { n?: unknown }).n);
+  assert.deepEqual(by('n asc'), ['', null, undefined, -1, 2, 10]);
+  assert.deepEqual(by('n desc'), [10, 2, -1, '', null, undefined]);
+});

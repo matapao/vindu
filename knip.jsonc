@@ -1,0 +1,12 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // The package's exports (package.json) are entries already; these are the rest.
+  "entry": ["test/**/*.test.ts", "test/fixtures/app.ts", "scripts/*.mjs", "examples/*.ts", "examples/lib/*.js"],
+  "project": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.{mjs,ts}", "examples/**/*.{ts,js}"],
+  "ignoreDependencies": [
+    // The page host serves these to generated pages by package name (page-libraries.ts); nothing imports them.
+    "axe-core", "chart.js", "echarts", "monaco-editor", "three",
+    // scripts/check-package.mjs runs them on the packed tarball, through pnpm exec.
+    "publint", "@arethetypeswrong/cli"
+  ]
+}
