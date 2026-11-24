@@ -31,5 +31,6 @@ Run these checks from the repository root and report the results.
   licences, OSV-Scanner, secrets, Semgrep, zizmor and actionlint. CI runs it with `--strict`, and pnpm audit too.
 - `pnpm lint:style` reports the owner's style (Prettier, no nested ternaries, no explicit any) until the code follows it.
 
-CI also runs CodeQL and OpenSSF Scorecard on public repositories. Dependabot proposes updates a week after release.
+GitHub's CodeQL default setup scans the code, and CI runs OpenSSF Scorecard on public repositories. Dependabot
+proposes updates a week after release.
 Tests run without model calls. Leave pushes and merges to the person.
