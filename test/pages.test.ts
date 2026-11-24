@@ -372,7 +372,9 @@ for (let i = 0; i < 3; i++) { const m = new THREE.Mesh(new THREE.BoxGeometry(), 
 const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.2 })), flat = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 renderer.setAnimationLoop(() => { renderer.clear(); renderer.render(scene, camera); renderer.render(quad, flat); });
 </script></body></html>`;
-  const s = (await json('check_page', { html })).three[0];
+  // a slow machine draws fewer frames in a page's first moments: the page then runs a while longer before it is read
+  let s = (await json('check_page', { html })).three[0];
+  for (let n = 0; s.frames <= 3 && n < 5; n++) s = (await json('check_page', { html, steps: [{ wait: 1500 }] })).three[0];
   assert.deepEqual(s.objects, { Mesh: 3 }, JSON.stringify(s)); assert.deepEqual(s.named, ['node 0', 'node 1', 'node 2']); assert.equal(s.camera, 'PerspectiveCamera');
   assert.equal(s.renders_per_frame, 2); assert.equal(s.scenes, 2); assert.match(s.note, /post-processing/);
   assert.equal(s.draw_calls, 4); assert.equal(s.triangles, 3 * 12 + 2); // the boxes and the quad, in one frame

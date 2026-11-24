@@ -246,7 +246,7 @@ function fit(sections: MarkdownSection[], most: number): { sections: MarkdownSec
  *  heading is then a heading inside its section), cut where the window would be given more than `values` values. */
 export function parseMarkdown(source: string, o: { sections?: number; values?: number } = {}): MarkdownDocument {
   const most = o.sections ?? 100;
-  const text = source.replace(/^﻿/, '').replace(/\r\n?/g, '\n').replace(/\0/g, '�');
+  const text = source.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').replace(/\0/g, '�');
   const lines = text.split('\n');
   const front: MarkdownBlock[] = [];
   if (lines[0] === '---' && /^[A-Za-z_][\w-]*[ \t]*:/.test(lines[1] ?? '')) { // front matter, as a static site generator reads it: shown as the YAML it is
