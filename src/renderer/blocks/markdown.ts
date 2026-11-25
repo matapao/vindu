@@ -5,6 +5,7 @@
 // opens as the host opens links (a new window, which the browser, or an Electron host's window-open handler, decides
 // on). A document of more than two headings has a table of contents beside it, where its pane is wide enough.
 import { html, nothing } from 'lit';
+import { BLOCK_WORDS, wordsGiven, type DocumentWords } from '../../block-words.js';
 import { linkAddress } from '../../markdown-inline.js';
 import { type BlockRow, type RowBlockProps, fieldValue, rowContainer } from './shared.js';
 
@@ -76,19 +77,20 @@ const goTo = (anchor: string) => (e: Event) => {
   target?.scrollIntoView({ block: 'start', behavior: 'smooth' });
 };
 /** The table of contents: each section's heading, indented by its level below the document's top one. */
-function contents(props: RowBlockProps, titled: BlockRow[]) {
+function contents(props: RowBlockProps, titled: BlockRow[], words: DocumentWords) {
   const levels = titled.map(r => Number(fieldValue(props, r, 'level')) || 1), top = Math.min(...levels);
-  return html`<nav class="vb-toc" aria-label="Contents"><div class="vb-tochead">Contents</div><ol>${titled.map((r, i) => {
+  return html`<nav class="vb-toc" aria-label=${words.contents}><div class="vb-tochead">${words.contents}</div><ol>${titled.map((r, i) => {
     const anchor = fieldValue(props, r, 'anchor');
     return html`<li class=${`vb-toc${Math.min(3, levels[i] - top + 1)}`}><button type="button" @click=${typeof anchor === 'string' ? goTo(anchor) : nothing}>${said(fieldValue(props, r, 'heading'))}</button></li>`;
   })}</ol></nav>`;
 }
 
-/** A document of Markdown sections, with what it is drawn from: the file's name, and whether only its start is shown. */
+/** A document of Markdown sections, with what it is drawn from: the file's name, and whether only its start is shown,
+ *  in the view's words. */
 export function markdownDocument(props: RowBlockProps) {
-  const file = isObject(props.file) ? props.file : {};
+  const file = isObject(props.file) ? props.file : {}, words = wordsGiven(props.words, BLOCK_WORDS.document);
   const titled = props.rows.filter(r => fieldValue(props, r, 'heading') !== undefined);
-  const toc = titled.length > 2 ? contents(props, titled) : nothing;
+  const toc = titled.length > 2 ? contents(props, titled, words) : nothing;
   const sections = props.rows.map((row, index) => {
     const title = fieldValue(props, row, 'heading');
     const head = title === undefined ? nothing : heading(Array.isArray(row.__heading) ? inlines(row.__heading) : said(title), fieldValue(props, row, 'level'), fieldValue(props, row, 'anchor'));
@@ -96,5 +98,5 @@ export function markdownDocument(props: RowBlockProps) {
   });
   return html`<div class="vb-md"><div class=${toc === nothing ? 'vb-mdgrid' : 'vb-mdgrid vb-withtoc'}>${toc}<article class="vb-mdbody">${
     typeof file.name === 'string' ? html`<div class="vb-mdfile">${file.name}</div>` : nothing}${sections}${
-    file.cut === true ? html`<p class="vb-mdcut">Only its start is shown.</p>` : nothing}</article></div></div>`;
+    file.cut === true ? html`<p class="vb-mdcut">${words.cut}</p>` : nothing}</article></div></div>`;
 }

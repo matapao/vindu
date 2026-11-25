@@ -2,7 +2,8 @@
 // a table's rows and what they add up to (the totals the panel declares, else its amounts: a column it computes before
 // one it was given, and never a rate or a price per unit), a record's name or number, a mail's To and subject, a calendar's
 // next event and how many there are, a list of tasks' open ones and the next due, an invoice's total due, a chart's
-// last value and its direction, a forecast's next day, the most severe of some warnings, a PDF's pages once known.
+// last value and its direction, a forecast's next day, the most severe of some warnings, a PDF's pages once known, a
+// map's place (or how many, and their labels), a document's first heading.
 // Written in the view's words and its locale, as its cards are drawn; worked out by the system from what the panel shows.
 import { wordWith } from './block-words.js';
 import type { PanelSpec, Resolved } from './cards.js';
@@ -168,6 +169,17 @@ const LINES: Record<string, Line> = {
     return [wordWith(kit.words.batch.ok, { count: n('ok') }), wordWith(kit.words.batch.failed, { count: n('failed') })].join(' · ');
   },
   notice: (_p, d, kit) => warningLine(d.rows ?? [], kit) ?? firstLine(asText(d.rows?.[0]?.[roleOf(d, 'text') ?? ''] ?? '')),
+  map: (_p, d, kit) => {
+    const rows = d.rows ?? [], label = roleOf(d, 'label'), w = kit.words.summary;
+    const labels = label ? rows.map(r => asText(r[label] ?? '').trim()).filter(Boolean) : [];
+    if (rows.length === 1) return ellipsis(labels[0] ?? '', 100);
+    return [counted(kit, rows.length, w.places, w.place), ellipsis(labels.join(', '), 80)].filter(Boolean).join(' · ');
+  },
+  document: (_p, d) => {
+    const heading = roleOf(d, 'heading') ?? 'heading';
+    const first = (d.rows ?? []).map(r => r[heading]).find(h => typeof h === 'string' && h.trim() !== '');
+    return typeof first === 'string' ? firstLine(first) : '';
+  },
 };
 
 /** The picture a panel's card shows: a media panel's own, or a gallery's first picture. */

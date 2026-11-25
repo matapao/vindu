@@ -59,7 +59,7 @@ export function wordDiff(a: string, b: string): { op: '=' | '+' | '-'; t: string
 const DOC: Roles = { anchor: /^(anchor|id|section|clause|ref|no|number|paragraph)$/i, heading: /^(heading|title|caption|name)$/i, text: /^(text|body|content|paragraph_?text|value)$/i, level: /^(level|depth)$/i, page: /^(page|p)$/i, sources: /^(sources?|cites?|citations?|refs)$/i };
 export const DOCUMENT = block({
   name: 'document', component: 'VDocument', about: 'a document as sections or paragraphs, each with an anchor to cite (§ 4.2, page 3); with before: an earlier version\'s result id, what changed is shown as tracked changes. Or a Markdown file as it is, read and drawn by the system (headings, lists, code, tables, links), up to 512,000 bytes; or a Word document (.docx), its headings, paragraphs, lists, tables and links read and drawn by the system, each picture as [picture]: from an attachment (a1), or path: a .md or .docx file in the working folder',
-  roles: DOC, file: DOCUMENT_FILE,
+  roles: DOC, file: DOCUMENT_FILE, words: w => ({ ...w.document }),
   fields: { before: resultRef(z.string().optional().describe('document: an earlier version (a result id with the same sections): what changed is computed word by word and shown as tracked changes')) },
   check: (rows, _p, m) => (rows.some(isMarkdownSection) ? null : needOne(m, ['text'], 'a document', rows)), derived: ['__changes', '__new', '__gone', '__heading', '__blocks'],
   rows: (rows, p, m, read) => {

@@ -54,7 +54,12 @@ export type SheetWords = {
   false: string;  // "FALSE"
   sheets: string; // "Sheets": what the tabs of a workbook's sheets are called, for assistive technology
 };
-export type BlockWords = { money: MoneyWords; events: EventWords; notice: NoticeWords; batch: BatchWords; map: MapWords; tasks: TaskWords; pdf: PdfWords; sheet: SheetWords };
+/** A document read from a file: what its table of contents is headed, and that only its start is shown. */
+export type DocumentWords = {
+  contents: string; // "Contents"
+  cut: string;      // "Only its start is shown.": a file longer than a document draws
+};
+export type BlockWords = { money: MoneyWords; events: EventWords; notice: NoticeWords; batch: BatchWords; map: MapWords; tasks: TaskWords; pdf: PdfWords; sheet: SheetWords; document: DocumentWords };
 
 export const BLOCK_WORDS: BlockWords = {
   money: {
@@ -72,6 +77,7 @@ export const BLOCK_WORDS: BlockWords = {
   tasks: { due: 'due {date}' },
   pdf: { page: 'page {at} of {of}', loading: 'Loading the PDF…', locked: 'This PDF is protected by a password, so it is not shown.', unreadable: 'This PDF could not be read: {why}' },
   sheet: { true: 'TRUE', false: 'FALSE', sheets: 'Sheets' },
+  document: { contents: 'Contents', cut: 'Only its start is shown.' },
 };
 
 /** A word with its slots filled: "{count} ok" with count "4" is "4 ok". A slot with no value is left as it is. */

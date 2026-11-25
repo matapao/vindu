@@ -95,7 +95,7 @@ export const VMessages = defineBlock('VMessages', 'vindu-messages', { draft: 'va
 export const VDocument = defineBlock(
   'VDocument',
   'vindu-document',
-  { file: 'value' },
+  { file: 'value', words: 'value' },
   (props) =>
     props.rows.some((row) => Array.isArray(row.__blocks)) ? markdownDocument(props) : html`<div class="vb-doc">${props.rows.map((row, index) => {
       const level = Number(fieldValue(props, row, 'level') ?? 1);

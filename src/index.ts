@@ -13,7 +13,7 @@ export { addDates, addTime, dayOf, parseDateExpr, today, type DateExpr } from '.
 export { whenOf, instantOf, localOf, sayTime, remindersSurface, REMINDER_WORDS, DEFAULT_TIME, type Reminder, type ReminderWords } from './reminders.js';
 export { FieldSchema, formBinding, readAnswer, fieldsOf, checkValue, checkDigits, FORMATS, CHECKS, permissionDetails, lineDiff, confirms, HINTS, WORDS, type Format, type Check, type Operation, type Effect, type Field, type Form, type Detail, type Ask, type Binding, type Words } from './operations.js';
 export { VIEW_WORDS, type ViewWords, type HookWords, type MessageWords, type PartialViewWords } from './view-words.js';
-export { BLOCK_WORDS, wordWith, type BlockWords, type MoneyWords, type EventWords, type NoticeWords, type BatchWords, type MapWords, type TaskWords, type PdfWords, type SheetWords } from './block-words.js';
+export { BLOCK_WORDS, wordWith, type BlockWords, type MoneyWords, type EventWords, type NoticeWords, type BatchWords, type MapWords, type TaskWords, type PdfWords, type SheetWords, type DocumentWords } from './block-words.js';
 export { SUMMARY_WORDS, type SummaryWords } from './summary-words.js';
 export { readableName } from './field-names.js';
 export { VIEW_WORDS_NB, VIEW_WORDS_NN } from './view-words-norwegian.js';

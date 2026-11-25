@@ -1,7 +1,8 @@
 // What each view's card says of what it holds, in one line, in the window's words and locale (English and Bokmål):
 // for a host that draws views itself (onPresentation) and in the shell's state (each view's summary); who changed each
 // view last, the model or the person; which views wait for the person; and how big each is. A week arriving as four
-// views (a calendar, a forecast, warnings and a list of tasks) says something useful on every card. All synthetic.
+// views (a calendar, a forecast, warnings and a list of tasks) says something useful on every card. A map says its
+// place, and a document its first heading, or nothing: never "1 row". All synthetic.
 import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -52,6 +53,7 @@ async function shownIn(locale: 'en-GB' | 'nb-NO') {
   ] } }).id;
   const brief = results.attach('brief.pdf', 'application/pdf', file('brief.pdf', tinyPdf(3))).id;
   const photo = results.attach('dent.png', 'image/png', file('dent.png', PNG)).id;
+  const plan = results.attach('plan.md', 'text/markdown', file('plan.md', Buffer.from('Notes before any heading.\n\n# Ferry plan\n\nThe crossing.\n\n## Fares\n\n450 an adult.\n'))).id;
   const presented = new Map<string, ViewPresentation>();
   const st: { s?: ShellState } = {};
   const ui = vindu.open({ results, dir }, { locale, timeZone: ZONE, ...(locale === 'nb-NO' ? { viewWords: VIEW_WORDS_NB } : {}),
@@ -72,6 +74,12 @@ async function shownIn(locale: 'en-GB' | 'nb-NO') {
   await show('trend', [{ card: 'line-chart', rows: [{ month: 'Jan', sales: 10 }, { month: 'Feb', sales: 12.5 }], x: 'month', y: 'sales' }]);
   await show('brief', [{ card: 'pdf', media: brief }]);
   await show('photos', [{ card: 'gallery', media: [photo] }]);
+  await show('site', [{ card: 'map', rows: [{ name: 'Lager Sandviken', lat: 60.41, lon: 5.32 }] }]);
+  await show('pin', [{ card: 'map', rows: [{ lat: 60.41, lon: 5.32 }] }]);
+  await show('route', [{ card: 'map', rows: [{ stop: 'Lager', lat: 60.41, lon: 5.32 }, { stop: 'Kaia', lat: 60.39, lon: 5.31 }, { stop: 'Byggeplass', lat: 60.36, lon: 5.35 }] }]);
+  await show('contract', [{ card: 'document', rows: [{ anchor: '§ 1', heading: 'Avtale om takarbeid', text: 'Partene er enige.' }, { anchor: '§ 2', heading: 'Pris', text: '125 700 kr.' }] }]);
+  await show('memo', [{ card: 'document', rows: [{ anchor: '1', text: 'Ring Kari i morgen.' }] }]);
+  await show('plan', [{ card: 'document', from: plan }]);
   await show('pending', [{ card: 'table', awaits: { server: 'work', tool: 'profile' } }]);
   const failed = results.add({ server: 'work', tool: 'profile', text: 'The profile could not be loaded' });
   failed.error = true;
@@ -101,6 +109,12 @@ test('each card says what it holds in one line, in English and in Bokmål, numbe
       trend: ['last 12.5 · up', 'sist 12,5 · opp'],
       brief: ['3 pages', '3 sider'],
       photos: ['1 item', '1 element'],
+      site: ['Lager Sandviken', 'Lager Sandviken'],
+      pin: ['', ''],
+      route: ['3 places · Lager, Kaia, Byggeplass', '3 steder · Lager, Kaia, Byggeplass'],
+      contract: ['Avtale om takarbeid', 'Avtale om takarbeid'],
+      memo: ['', ''],
+      plan: ['Ferry plan', 'Ferry plan'],
       pending: ['failed: work.profile failed (r8): The profile could not be loaded', 'feilet: work.profile failed (r8): The profile could not be loaded'],
     };
     for (const [view, [english, bokmal]] of Object.entries(expected)) {

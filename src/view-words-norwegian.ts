@@ -23,6 +23,7 @@ const BLOCK_WORDS_NB: BlockWords = {
   tasks: { due: 'frist {date}' },
   pdf: { page: 'side {at} av {of}', loading: 'Laster inn PDF-en…', locked: 'Denne PDF-en er beskyttet med passord, så den vises ikke.', unreadable: 'Denne PDF-en kunne ikke leses: {why}' },
   sheet: { true: 'SANN', false: 'USANN', sheets: 'Ark' },
+  document: { contents: 'Innhold', cut: 'Bare begynnelsen vises.' },
 };
 const BLOCK_WORDS_NN: BlockWords = {
   money: {
@@ -40,6 +41,7 @@ const BLOCK_WORDS_NN: BlockWords = {
   tasks: { due: 'frist {date}' },
   pdf: { page: 'side {at} av {of}', loading: 'Lastar inn PDF-en…', locked: 'Denne PDF-en er verna med passord og blir difor ikkje vist.', unreadable: 'Denne PDF-en kunne ikkje lesast: {why}' },
   sheet: { true: 'SANN', false: 'USANN', sheets: 'Ark' },
+  document: { contents: 'Innhald', cut: 'Berre byrjinga blir vist.' },
 };
 
 export const VIEW_WORDS_NB: ViewWords = {

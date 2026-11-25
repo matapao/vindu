@@ -20,6 +20,7 @@ export type SummaryWords = {
   allDone: string;                    // every task done
   nextDue: string;                    // "next due {date}: {what}"
   items: string; item: string;        // a gallery's pictures and videos
+  places: string; place: string;      // a map's places, with their labels after them
   pages: string; page: string;        // a PDF's pages, once known
   span: string;                       // "{min} to {max}": a forecast's temperatures
   from: string;                       // "from {when}": when a warning begins
@@ -45,6 +46,7 @@ export const SUMMARY_WORDS: SummaryWords = {
   allDone: 'all done',
   nextDue: 'next due {date}: {what}',
   items: '{count} items', item: '1 item',
+  places: '{count} places', place: '1 place',
   pages: '{count} pages', page: '1 page',
   span: '{min} to {max}',
   from: 'from {when}',
@@ -70,6 +72,7 @@ export const SUMMARY_WORDS_NB: SummaryWords = {
   allDone: 'alt er gjort',
   nextDue: 'neste frist {date}: {what}',
   items: '{count} elementer', item: '1 element',
+  places: '{count} steder', place: '1 sted',
   pages: '{count} sider', page: '1 side',
   span: '{min} til {max}',
   from: 'fra {when}',
@@ -95,6 +98,7 @@ export const SUMMARY_WORDS_NN: SummaryWords = {
   allDone: 'alt er gjort',
   nextDue: 'neste frist {date}: {what}',
   items: '{count} element', item: '1 element',
+  places: '{count} stader', place: '1 stad',
   pages: '{count} sider', page: '1 side',
   span: '{min} til {max}',
   from: 'frå {when}',

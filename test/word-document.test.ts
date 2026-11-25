@@ -70,8 +70,9 @@ test('a Word document is read by the system into a document\'s sections, and its
     assert.match(o.shows, /^the Word document as a document, read and drawn by the system: headings by its Heading 1 to 6 styles/);
     assert.equal(o.marked, undefined);
   }
-  const rows = presented.filter(x => x.name === 'plan').at(-1)!.panels[0].rows!;
+  const plan = presented.filter(x => x.name === 'plan').at(-1)!.panels[0], rows = plan.rows!;
   assert.deepEqual(rows.map(r => [r.heading, r.level, r.anchor]), [['Prosjektplan for Ålesund', 1, 'prosjektplan-for-ålesund'], ['Steg', 2, 'steg'], ['Vedlegg', 2, 'vedlegg']]);
+  assert.equal(plan.summary.line, 'Prosjektplan for Ålesund'); // its card says its first heading
   const [intro, steps] = rows.map(r => r.__blocks as any[]);
   assert.deepEqual(intro[0], { paragraph: ['Vanlig tekst med ', { strong: ['fet'] }, ', ', { em: ['kursiv'] }, ' og ', { strong: [{ em: ['begge'] }] }, ' og ', { strong: ['sterk'] }, '.'] });
   assert.deepEqual(intro[1], { paragraph: ['Les ', { link: 'https://example.com/plan?a=1&b=2', text: ['planen'] }, ', ', { link: 'mailto:post@example.com', text: ['skriv til oss'] }, ' eller ikke dette.'] });
