@@ -7,6 +7,7 @@ import { draftEvent } from './message-drafts.js';
 import { personRuns } from './operations.js';
 import { pageSaid, sent } from './page-messages.js';
 import { readFromWindow } from './read-progress.js';
+import { tryAgain } from './refetch-waiting.js';
 import { log, unawaited, whoOf } from './records.js';
 import { askRem, doRem, drawRem, isRemindersPane } from './reminders.js';
 import { compare, reported } from './render-reports.js';
@@ -103,6 +104,11 @@ import { hookDigest, hookIsOn } from './view-state.js';
 function updateView(session: Session, x: Record<string, unknown>): boolean | undefined {
   const more = session.more;
   if (x.type === 'action' && x.name === 'set_inputs') return setInputs(session, x); // what-ifs, from a view's own pane
+  if (x.type === 'action' && x.name === 'try_again') {
+    // a panel waiting for its result read again: the person has the host read it again now
+    const panel = (x.context as { panel?: unknown } | undefined)?.panel;
+    return typeof panel === 'string' && tryAgain(session, asText(x.view ?? ''), panel, whoOf(x));
+  }
   if (x.type === 'action' && x.name === 'view_action' && typeof x.view === 'string')
     return personAct(session, x.view, viewAction((x.context ?? {}) as Record<string, unknown>), whoOf(x)); // a column's head, say
   if (x.type === 'view' && typeof x.view === 'string') {

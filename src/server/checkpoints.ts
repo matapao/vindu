@@ -5,7 +5,8 @@ import type { ViewCheckpoint, ViewSnapshot } from './contracts.js';
 import { readForCheckpoint, restoreRead } from './read-progress.js';
 import { restoreDrafts, savedDrafts } from './message-drafts.js';
 import { keep, log } from './records.js';
-import { NOT_KEPT, pointersFor, refetchAll, restoredView, type Restoring } from './refetch.js';
+import { pointersFor, refetchAll, restoredView, type Restoring, waitsSaid } from './refetch.js';
+import { gateRestored, keptGates, keptPointers } from './refetch-waiting.js';
 import { restoreRem } from './reminders.js';
 import { setPicked } from './selection.js';
 import type { Fill, Gate, Session } from './state.js';
@@ -92,7 +93,7 @@ const gatesOf = (session: Session, views: ReadonlySet<string>): [string, Gate][]
 export const checkpoint = (session: Session): ViewCheckpoint => {
   const { views, layout, picked } = snapshotOf(session);
   const { focus, maximized, shelf, recent } = session.shell.state();
-  const gates = gatesOf(session, new Set(views.map((v) => v.name)));
+  const gates = keptGates(session, gatesOf(session, new Set(views.map((v) => v.name))));
   const reminders = session.runtime.options.reminders ? session.reminders.map((r) => ({ ...r })) : [];
   const refs = refsOf(session), ids = new Set<string>();
   for (const v of views) idsIn(v.args, refs, ids);
@@ -120,11 +121,15 @@ export const checkpoint = (session: Session): ViewCheckpoint => {
     ...(reminders.length ? { reminders } : {}),
   };
 };
-/** A gate as restored: on what was read again, or waiting for what comes after the restore (since), saying why. */
-const restoredGate = (g: Gate, since: number, sinceOwn: number, got: string | undefined, why: string | undefined): Gate => {
+/** A gate as restored: on what was read again, or waiting for what comes after the restore (since), saying why, with
+ *  the pointer it may be read again from (gateRestored). */
+const restoredGate = (g: Gate, since: number, sinceOwn: number, r: ReturnType<typeof gateRestored>): Gate => {
   const gate: Gate = { want: g.want, since, sinceOwn };
-  if (got) gate.got = got;
-  else if (why) gate.why = why;
+  if (r.got) gate.got = r.got;
+  else if (r.why) {
+    gate.why = r.why;
+    if (r.pointer) gate.pointer = r.pointer;
+  }
   return gate;
 };
 /** A template's fill, on the id read again; without one where it was not. */
@@ -139,17 +144,20 @@ export const restore = async (session: Session, saved: ViewCheckpoint) => {
   if (session.specs.size || session.own.length || session.asks.size)
     throw new Error('Restore into a newly opened task.');
   const answered = restoreAnswers(session, saved.answers);
-  const read = await refetchAll(session, saved.pointers ?? []);
+  const read = await refetchAll(session, saved.pointers ?? [], keptPointers(saved.gates));
   const map = { ...read.map, ...answered.map };
   const now = (id?: string) => (id !== undefined && Object.hasOwn(map, id) ? map[id] : undefined); // never what objects inherit
   const since = session.results.all().length; // what waits, waits for what comes after the restore
+  const pointers = new Map((saved.pointers ?? []).map((p) => [p.id, p]));
+  const waits: string[] = [];
   session.tickets = saved.tickets;
   session.inputs = new Map(saved.inputs);
   session.steps = new Map(saved.steps);
   session.gates = new Map(
     saved.gates.map(([k, g]) => {
-      const why = g.got ? (read.missing.get(g.got) ?? NOT_KEPT) : g.why;
-      return [k, restoredGate(g, since, answered.sinceOwn(g.sinceOwn), now(g.got), why)];
+      const r = gateRestored(k, g, read, now, pointers);
+      if (r.told) waits.push(r.told);
+      return [k, restoredGate(g, since, answered.sinceOwn(g.sinceOwn), r)];
     }),
   );
   session.fresh = new Map(saved.fresh.flatMap(([was, newest]): [string, string][] => {
@@ -161,13 +169,7 @@ export const restore = async (session: Session, saved: ViewCheckpoint) => {
   restoreDrafts(session, saved.drafts);
   const refs = refsOf(session);
   restoreRem(session, saved.reminders?.map((r) => (r.about ? { ...r, about: swapIds(r.about, refs, map) as string } : r)));
-  const restoring: Restoring = {
-    refs,
-    map,
-    missing: read.missing,
-    pointers: new Map((saved.pointers ?? []).map((p) => [p.id, p])),
-    waits: [],
-  };
+  const restoring: Restoring = { refs, map, missing: read.missing, again: read.again, pointers, waits };
   const refused: string[] = [];
   for (const v of saved.views) {
     try {
@@ -181,10 +183,9 @@ export const restore = async (session: Session, saved: ViewCheckpoint) => {
   session.attached = new Set(saved.attached.filter((name) => session.shown.has(name)));
   restoreRead(session, saved.read);
   setPicked(session, saved.picked);
-  const { waits } = restoring;
   if (waits.length)
     session.shell.say(
-      `this task was opened again where the person left it, its views drawn from their results read again; ${waits.length === 1 ? 'one panel waits for its result' : `${waits.length} panels wait for their results`}: ${waits.slice(0, 12).join('; ')}${waits.length > 12 ? '; …' : ''}`,
+      `this task was opened again where the person left it, its views drawn from their results read again; ${waitsSaid(waits)}`,
     );
   log(session, { restore: { read: Object.keys(read.map), missing: [...read.missing.keys()], waits: waits.length, refused } });
   return refused;

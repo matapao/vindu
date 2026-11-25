@@ -31,7 +31,20 @@ const Shelved = z.object({
   slot: z.unknown().optional(),
   updated: z.boolean().optional(),
 });
-const Gate = z.object({ want: z.string(), since: Count, sinceOwn: Count, got: z.string().optional(), why: z.string().max(1000).optional() });
+const Text = (most: number) => z.string().max(most);
+const ResultPointer = z.object({ id: z.string().regex(/^r\d+$/), kind: z.literal('result'), server: Text(200), tool: Text(200), input: z.unknown().optional(), ref: Text(1000).optional() });
+const Pointer = z.discriminatedUnion('kind', [
+  ResultPointer,
+  z.object({ id: z.string().regex(/^a\d+$/), kind: z.literal('attachment'), name: Text(1000), mime: Text(200), file: Text(4096) }),
+]);
+const Gate = z.object({
+  want: z.string(),
+  since: Count,
+  sinceOwn: Count,
+  got: z.string().optional(),
+  why: z.string().max(1000).optional(),
+  pointer: ResultPointer.optional(), // a restored panel's result the host could not read, to read again
+});
 const Fill = z.object({
   by: z.enum(['source', 'model', 'person']),
   id: z.string().optional(),
@@ -75,11 +88,6 @@ const byDigest = (drafts: z.infer<typeof Drafts>, kept: 'task checkpoint' | 'vie
     if (!mail) throw new Error(`Not a ${kept}: the draft in "${d.view}" names no mail`);
     return { ...d, of: mail };
   });
-const Text = (most: number) => z.string().max(most);
-const Pointer = z.discriminatedUnion('kind', [
-  z.object({ id: z.string().regex(/^r\d+$/), kind: z.literal('result'), server: Text(200), tool: Text(200), input: z.unknown().optional(), ref: Text(1000).optional() }),
-  z.object({ id: z.string().regex(/^a\d+$/), kind: z.literal('attachment'), name: Text(1000), mime: Text(200), file: Text(4096) }),
-]);
 const Answer = z.object({
   id: z.string().regex(/^p\d+$/),
   to: Text(2000),

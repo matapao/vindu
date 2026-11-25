@@ -30,6 +30,9 @@ export type PanelPresentation = {
   /** A page's or an app's frame; a static page runs nothing, and its frame is drawn with sandbox="". */
   frame?: { kind: 'page' | 'app'; url: string; height: number; static?: true };
   props?: Record<string, unknown>;
+  /** A waiting panel's result the host could not read again: the person's Try again, as Vindu's own panel sends it
+   *  through the window's events, { type: 'action', view: name, name: again.event, context: again.context }. */
+  again?: { event: 'try_again'; context: { panel: string } };
 };
 
 export type ViewPresentation = {
@@ -54,7 +57,10 @@ function panelOf(p: PanelSpec, d: Resolved, cards: ReadonlyMap<string, CardDef>)
   const def = cards.get(p.card); const kind = kindOf(p.card, cards);
   const base = { id: p.id, card: d.waiting?.card ?? p.card, ...(p.title === undefined ? {} : { title: p.title }) };
   if (d.failed !== undefined) return { ...base, state: 'error', message: d.failed };
-  if (d.waiting) return { ...base, state: 'waiting', message: d.waiting.for };
+  if (d.waiting) {
+    const again = d.waiting.again ? { again: { event: 'try_again' as const, context: { panel: p.id } } } : {}; // as a2ui.ts draws it
+    return { ...base, state: 'waiting', message: d.waiting.for, ...again };
+  }
 
   const result: PanelPresentation = { ...base, state: 'ready' };
   const props = kind?.props?.(p, d);

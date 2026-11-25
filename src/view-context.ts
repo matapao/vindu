@@ -30,8 +30,9 @@ export type ViewContext = {
    *  while nothing has changed. Undefined for anything else. */
   newest?: (id: string) => string | undefined;
   /** A panel that waits (awaits a result, or after something): the result that came (from), or what it still waits
-   *  for (wait), said for the person; failed: that result is a failed call (the server's own answer). */
-  gate?: (view: string, p: PanelSpec, spec: ViewSpec) => { from?: string; wait?: string; failed?: string };
+   *  for (wait), said for the person; failed: that result is a failed call (the server's own answer); again: what it
+   *  waits for is a result the host could not read again, which the person may have it try again now. */
+  gate?: (view: string, p: PanelSpec, spec: ViewSpec) => { from?: string; wait?: string; failed?: string; again?: boolean };
   /** A view with steps: how many of its panels are shown now (1 to start). */
   step?: (view: string) => number;
   /** A view's hook, as the person sees it: a job they turned on or not (or jobs are off here), or the system's own. */

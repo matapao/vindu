@@ -1,14 +1,21 @@
-import { type After, panelsOf, type PanelSpec, type ViewSpec } from '../cards.js';
+import { type After, type Await, panelsOf, type PanelSpec, type ViewSpec } from '../cards.js';
 import { awaitName, firstAfter, panelRef } from '../gates.js';
 import { log } from './records.js';
 import type { Gate, Session } from './state.js';
+
+/** The call a gate waits for, the first that came after it began: what fills its panel, which then needs no pointer
+ *  to read its result again. */
+const cameFor = (session: Session, gate: Gate, awaited: Await) => {
+  gate.got = firstAfter(session.results.all(), gate.since, awaited)?.id;
+  if (gate.got) delete gate.pointer;
+};
 
 export const gateOf = (
   session: Session,
   view: string,
   p: PanelSpec,
   spec: ViewSpec,
-): { from?: string; wait?: string; failed?: string } => {
+): { from?: string; wait?: string; failed?: string; again?: boolean } => {
   const key = `${view}/${p.id}`,
     want = JSON.stringify({ awaits: p.awaits ?? null, after: p.after ?? null });
   let gate = session.gates.get(key);
@@ -20,9 +27,12 @@ export const gateOf = (
   }
   if (!p.awaits) return {};
   const awaited = p.awaits;
-  if (!gate.got) gate.got = firstAfter(session.results.all(), gate.since, awaited)?.id;
+  if (!gate.got) cameFor(session, gate, awaited);
   if (!gate.got)
-    return { wait: `${gate.why ? `${gate.why} ` : ''}Waiting for ${awaitName(awaited)}: it fills in here when it comes.` };
+    return {
+      wait: `${gate.why ? `${gate.why} ` : ''}Waiting for ${awaitName(awaited)}: it fills in here when it comes.`,
+      ...(gate.pointer && session.more.refetch ? { again: true } : {}), // the person may have it read again now
+    };
   const came = session.results.get(gate.got);
   return came?.kind === 'result' && came.error
     ? { from: gate.got, failed: `${awaitName(awaited)} failed (${gate.got}): ${came.text.slice(0, 600)}` }
@@ -57,8 +67,7 @@ export const notYet = (
   if (after.filled) {
     const { inView, panel, found } = panelAt(after.filled);
     const filled = session.gates.get(`${inView}/${panel}`);
-    if (found?.awaits && filled && !filled.got)
-      filled.got = firstAfter(session.results.all(), filled.since, found.awaits)?.id; // in any order: worked out here
+    if (found?.awaits && filled && !filled.got) cameFor(session, filled, found.awaits); // in any order: worked out here
     if (!filled?.got) return `After ${found?.title ?? after.filled} is filled.`;
   }
   return undefined;

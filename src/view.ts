@@ -33,7 +33,7 @@ export function showView(input: Record<string, unknown>, ctx: ViewContext): Show
       if (g?.from && !g.failed) p.from = g.from;
       if (g?.wait || g?.failed) {
         const card = p.card; p.card = 'text'; p.text = g.failed ?? g.wait; delete p.from;
-        data[p.id] = { text: p.text, waiting: { card, for: g.failed ?? g.wait! }, ...(g.failed ? { failed: g.failed } : {}) };
+        data[p.id] = { text: p.text, waiting: { card, for: g.failed ?? g.wait!, ...(g.again && !g.failed ? { again: true as const } : {}) }, ...(g.failed ? { failed: g.failed } : {}) };
         continue;
       }
       // a read the app keeps fresh: a panel that follows it shows the newest read; one that does not is marked if it changed

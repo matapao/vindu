@@ -52,6 +52,8 @@ export function compile(view: ViewSpec, data: Record<string, Resolved>, { compac
       kids.push(add({ id: `${pid}__inputs`, component: 'Row', children: [...fields, again] }));
     }
     kids.push(...kindOf(p.card, cards)!.draw(p, d, { pid, model: m, add, text, list: (cells, item) => list(pid, cells, item), cell, compact, locale, timeZone, words }));
+    if (d.waiting?.again) // a result the host could not read again: the person has it read again now
+      kids.push(add({ id: `${pid}__again`, component: 'Button', child: text(`${pid}__again_label`, words.tryAgain), action: { event: { name: 'try_again', context: { panel: p.id } } } }));
     const body = add({ id: `${pid}__body`, component: 'Column', children: kids });
     comps.find(c => c.id === pid)!.child = body;
     return pid;

@@ -303,7 +303,7 @@ export type Resolved = {
   newer?: string;                    // the read it shows has changed since: the newest read of the same source (marked so)
   picked?: { of: string; key: string; label: string; by: string; value: string }; // a linked panel: the row picked in the panel it follows, the field they share and its value
   follows?: string;                  // it follows its source: the read it was given, now shown at the newest
-  waiting?: { card: string; for: string }; // it waits (awaits a result, or after something): its own card, and what it waits for
+  waiting?: { card: string; for: string; again?: true }; // it waits (awaits a result, or after something): its own card, what it waits for, and whether the person may try reading it again
   failed?: string;                   // the call it waited for failed: the server's own answer
   shaped?: Omit<Shaped, 'rows'>;     // what the card's own shaping worked out besides its rows
 };

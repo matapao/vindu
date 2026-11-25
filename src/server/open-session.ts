@@ -30,6 +30,7 @@ import { log, readLines } from './records.js';
 import { armRem, askRem, drawRem, REM_PANE, REM_VIEW, remCount, setRem } from './reminders.js';
 import type { Endpoints, ServerRuntime } from './runtime.js';
 import { readProgressOf } from './read-progress.js';
+import { refetchWaiting } from './refetch-waiting.js';
 import { stopWaiting } from './render-reports.js';
 import { consumeWindowChanges, contextFor, resolved, setPicked } from './selection.js';
 import { holdResults, letGoResults, sessionFolder } from './session-folder.js';
@@ -117,6 +118,7 @@ export function openSession(
     files: new Map(),
     drafts: new Map(),
     savedDrafts: new Map(),
+    rereading: new Map(),
   };
   const layoutToken = randomBytes(16).toString('hex');
   endpoints.set(token, () => serverFor(session));
@@ -290,6 +292,12 @@ export function openSession(
      *  same task again (after a restart, say): its results read again, and the person's own state of its views, their
      *  drafts among it (a sent one sent and read-only, under its id; one being sent as unknown). */
     restore: (saved: ViewCheckpoint) => restore(session, checkedCheckpoint(session, saved)),
+    /** Every panel that waits because the host could not read its result again (on restore, or since), read again now
+     *  through refetch, by the same rules as restore (the computer back online, say): those that fill are drawn in
+     *  place, and the model is told once; the rest wait, saying why now. How many filled, and how many still wait.
+     *  Without refetch, nothing is read. A call while one runs shares it. The person's Try again on such a panel does
+     *  the same for that panel alone. */
+    refetchWaiting: () => refetchWaiting(session),
     snapshot: (): ViewSnapshot => snapshotOf(session),
     /** Start this window from another process's view: the host carried its results and attachments into this process's
      *  record (carried: their ids there → here); the person's answers are kept again here; every id in the views is

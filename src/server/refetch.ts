@@ -1,7 +1,8 @@
 // A checkpoint keeps where each result came from, never what it held: on restore, the host reads each one again
 // (refetch), and the restored views are drawn from what came. A panel whose result was not read again waits for it,
 // saying why: for the same call again where it showed a result, or in words where it showed something else; the rest
-// of its view is drawn as it was.
+// of its view is drawn as it was. One that waits for the same call keeps the pointer, to be read again later
+// (refetch-waiting.ts).
 import { panelIdsOf } from '../cards.js';
 import type { Row } from '../results.js';
 import type { ResultPointer } from './contracts.js';
@@ -44,57 +45,90 @@ const oneLine = (e: unknown) =>
     .trim()
     .slice(0, 200);
 
-/** One pointer, read again by the host: the new entry's id, or why there is none, as a sentence. */
-async function readAgain(session: Session, p: ResultPointer): Promise<{ id: string } | { why: string }> {
+/** What came of reading a pointer again: the new entry's id; or why there is none, as a sentence, and whether it may be
+ *  read again later (again): what the host could not read now it may later, but never a tool that changes things. */
+export type ReadAgain = { id: string } | { why: string; again: boolean };
+/** One pointer, read again by the host. */
+async function readAgain(session: Session, p: ResultPointer): Promise<ReadAgain> {
   const refetch = session.more.refetch;
-  if (!refetch) return { why: 'Not read again: this host reads nothing again for a task restored.' };
+  if (!refetch) return { why: 'Not read again: this host reads nothing again for a task restored.', again: true };
   if (p.kind === 'result' && p.ref === undefined && session.more.isRead?.(p.server, p.tool) === false)
-    return { why: `Not called again: ${nameOf(p)} changes things, as its server says.` };
+    return { why: `Not called again: ${nameOf(p)} changes things, as its server says.`, again: false };
   let id: unknown;
   try {
     id = await refetch(structuredClone(p));
   } catch (e) {
-    return { why: `Not read again: the host could not (${oneLine(e)}).` };
+    return { why: `Not read again: the host could not (${oneLine(e)}).`, again: true };
   }
-  if (typeof id !== 'string' || !id) return { why: 'Not read again: the host could not.' };
+  if (typeof id !== 'string' || !id) return { why: 'Not read again: the host could not.', again: true };
   const e = session.results.get(id);
   if (e?.kind !== p.kind)
     return {
       why: `Not read again: the host gave ${id.slice(0, 40)}, which is not ${p.kind === 'result' ? 'a result' : 'an attachment'} of this task.`,
+      again: true,
     };
-  if (e.kind === 'result' && e.error) return { why: `Read again, ${nameOf(p)} failed (${id}).` };
+  if (e.kind === 'result' && e.error) return { why: `Read again, ${nameOf(p)} failed (${id}).`, again: true };
   return { id };
 }
 
-/** Every pointer, read again by the host, each call once and all at once: the new id of each one read (map), and why
- *  each other one was not (missing). */
-export async function refetchAll(session: Session, pointers: readonly ResultPointer[]) {
-  const map: Record<string, string> = {};
-  const missing = new Map<string, string>();
-  const calls = new Map<string, ResultPointer[]>();
-  for (const p of pointers) calls.set(callOf(p), [...(calls.get(callOf(p)) ?? []), p]);
+/** Each pointer, by its key, read again by the host: each call once, and all at once. What came of each, by its key. */
+export async function readEachAgain(
+  session: Session,
+  pointers: ReadonlyMap<string, ResultPointer>,
+): Promise<Map<string, ReadAgain>> {
+  const calls = new Map<string, string[]>();
+  for (const [key, p] of pointers) calls.set(callOf(p), [...(calls.get(callOf(p)) ?? []), key]);
+  const out = new Map<string, ReadAgain>();
   await Promise.all(
-    [...calls.values()].map(async (same) => {
-      const got = await readAgain(session, same[0]);
-      for (const p of same)
-        if ('id' in got) map[p.id] = got.id;
-        else missing.set(p.id, got.why);
+    [...calls.values()].map(async (keys) => {
+      const got = await readAgain(session, pointers.get(keys[0])!);
+      for (const key of keys) out.set(key, got);
     }),
   );
-  return { map, missing };
+  return out;
 }
 
-/** What restoring a view knows: the ids read again (map), why the others were not (missing), each pointer by its id,
- *  and where the view's panels that wait are told (waits). */
+/** Every pointer a checkpoint names, and each one a panel was kept waiting for (kept, by its view/panel), read again by
+ *  the host, each call once and all at once: the new id of each one named that was read (map), why each other was not
+ *  (missing) and which of those may be read again later (again); and what came of each kept one (waiting). */
+export async function refetchAll(
+  session: Session,
+  pointers: readonly ResultPointer[],
+  kept: ReadonlyMap<string, ResultPointer> = new Map(),
+) {
+  const keyed = new Map(kept); // a view/panel has a "/", which no id has
+  for (const p of pointers) keyed.set(p.id, p);
+  const map: Record<string, string> = {};
+  const missing = new Map<string, string>();
+  const again = new Set<string>();
+  const waiting = new Map<string, ReadAgain>();
+  for (const [key, got] of await readEachAgain(session, keyed)) {
+    if (kept.has(key)) waiting.set(key, got);
+    else if ('id' in got) map[key] = got.id;
+    else {
+      missing.set(key, got.why);
+      if (got.again) again.add(key);
+    }
+  }
+  return { map, missing, again, waiting };
+}
+export type Reread = Awaited<ReturnType<typeof refetchAll>>;
+
+/** What restoring a view knows: the ids read again (map), why the others were not (missing) and which of those may be
+ *  read again later (again), each pointer by its id, and where the view's panels that wait are told (waits). */
 export type Restoring = {
   refs: Set<string>;
   map: Record<string, string>;
   missing: Map<string, string>;
+  again: ReadonlySet<string>;
   pointers: Map<string, ResultPointer>;
   waits: string[];
 };
 const isRecord = (x: unknown): x is Row => !!x && typeof x === 'object' && !Array.isArray(x);
 export const NOT_KEPT = 'Not shown again: what it showed is not kept once its task has closed.';
+/** What the model is told of the panels that wait for their results, each "view (panel): why", as restore says it. */
+export const waitsSaid = (waits: readonly string[]): string =>
+  `${waits.length === 1 ? 'one panel waits for its result' : `${waits.length} panels wait for their results`}: ${waits.slice(0, 12).join('; ')}${waits.length > 12 ? '; …' : ''}`;
 /** What a panel showed, where the checkpoint says. */
 const showed = (p: ResultPointer | undefined): string => {
   if (!p) return '';
@@ -118,7 +152,8 @@ function restoredPanel(session: Session, view: string, id: string, panel: Row, r
     };
     const since = session.results.all().length;
     const want = JSON.stringify({ awaits, after: rest.after ?? null });
-    session.gates.set(`${view}/${id}`, { want, since, sinceOwn: session.own.length, why });
+    const kept = r.again.has(gone[0]) ? { pointer: p } : {}; // read again later, on the next restore or a try again
+    session.gates.set(`${view}/${id}`, { want, since, sinceOwn: session.own.length, why, ...kept });
     return { ...rest, id, awaits };
   }
   return {

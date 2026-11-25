@@ -52,6 +52,7 @@ export type ViewWords = {
   written: string;                                       // "Written by the model"
   notUpToDate: (shows: string, newer: string) => string; // "Not up to date: this shows r1, and its source has changed since (r2)"
   recompute: string;                                     // a panel's values computed again with the inputs the person set
+  tryAgain: string;                                      // "Try again": a waiting panel's result the host could not read, read again now
   back: string;                                          // "‹ Back", after a drill and on a step after the first
   pathSeparator: string;                                 // between the steps of a drill's way in
   step: (at: number, of: number) => string;              // "Step 2 of 3"
@@ -84,6 +85,7 @@ export const VIEW_WORDS: ViewWords = {
   written: 'Written by the model',
   notUpToDate: (shows, newer) => `Not up to date: this shows ${shows}, and its source has changed since (${newer})`,
   recompute: 'Recompute',
+  tryAgain: 'Try again',
   back: '‹ Back',
   pathSeparator: ' › ',
   step: (at, of) => `Step ${at} of ${of}`,

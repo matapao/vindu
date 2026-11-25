@@ -149,7 +149,9 @@ export type OpenMore = {
    *  input, or looks up its own ref, or attaches the person's file again; keeps what came as a new entry; and says its
    *  id. undefined, or a throw, when it cannot: the panels that showed it wait, saying why. Called once for each pointer
    *  the checkpoint keeps, as restore begins; never for a tool its server says changes things (isRead false) unless the
-   *  result carries the host's own ref. Without it, every panel that shows a result restores waiting. */
+   *  result carries the host's own ref. Without it, every panel that shows a result restores waiting. A panel waiting
+   *  for the same call keeps the pointer in every checkpoint until a result fills it, and is read again with it on each
+   *  restore after, on ui.refetchWaiting, and on the person's Try again on that panel. */
   refetch?: (p: ResultPointer) => Promise<string | undefined>;
   /** Whether a tool only reads, as its server says (MCP's readOnlyHint): only reads may be a template's sources. */
   isRead?: (server: string, tool: string) => boolean | undefined;
