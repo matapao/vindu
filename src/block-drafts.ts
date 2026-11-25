@@ -38,11 +38,12 @@ function mailboxes(v: unknown): string[] {
   return [v].flat().map(mailbox).filter(Boolean);
 }
 const FORMATS: Record<string, DraftFormat> = { text: 'text', plain: 'text', markdown: 'markdown', md: 'markdown' };
-const ORIGINAL_MOST = { id: 500, from: DRAFT_LIMITS.address, time: 100, subject: DRAFT_LIMITS.subject, body: DRAFT_LIMITS.body };
+const ORIGINAL_MOST = { id: 500, ref: 500, from: DRAFT_LIMITS.address, time: 100, subject: DRAFT_LIMITS.subject, body: DRAFT_LIMITS.body };
 /** The other names a part of the original mail goes by. */
 const ORIGINAL_ALSO: Partial<Record<keyof typeof ORIGINAL_MOST, readonly string[]>> = { time: ['date', 'sent'], id: ['message_id'] };
 
-/** The mail it replies to: its parts as text, each within what a draft holds; or why not. */
+/** The mail it replies to: its parts as text, each within what a draft holds; or why not. Its ref is the host's, a
+ *  string kept exactly as given. */
 function originalOf(v: unknown, problems: string[]): DraftOriginal | undefined {
   if (v === undefined || v === null) return undefined;
   if (typeof v !== 'object' || Array.isArray(v)) {
@@ -50,9 +51,13 @@ function originalOf(v: unknown, problems: string[]): DraftOriginal | undefined {
     return undefined;
   }
   const o = v as Record<string, unknown>, out: DraftOriginal = {};
-  for (const part of ['id', 'from', 'time', 'subject', 'body'] as const) {
+  for (const part of ['id', 'ref', 'from', 'time', 'subject', 'body'] as const) {
     const said = [part, ...(ORIGINAL_ALSO[part] ?? [])].map(name => o[name]).find(x => x !== undefined && x !== null);
     if (said === undefined || said === null || said === '') continue;
+    if (part === 'ref' && typeof said !== 'string') {
+      problems.push('in_reply_to.ref: the host\'s reference to the original mail, as a string, exactly as a result gave it');
+      continue;
+    }
     const t = part === 'from' ? mailboxes(said).join(', ') : text(said);
     if (t.length > ORIGINAL_MOST[part]) problems.push(`in_reply_to.${part}: ${t.length.toLocaleString('en-GB')} characters; at most ${ORIGINAL_MOST[part].toLocaleString('en-GB')}`);
     else out[part] = t;
@@ -97,23 +102,33 @@ const SENDING_SAYS = {
   send: 'the person reads it, may change any of it, and sends it from the window: their click on Send is their yes, and the host sends it. You never press Send; you are told once how it went, with the fields as they were sent',
   none: 'this window sends no mail: the person may copy it',
 };
+/** The model's row without the host's ref to the mail it replies to (in its in_reply_to field): what the window draws
+ *  and what is told of it never hold the ref. */
+function withoutRef(row: Row, field: string | undefined): Row {
+  const v = field ? row[field] : undefined;
+  if (!field || !v || typeof v !== 'object' || Array.isArray(v) || !Object.hasOwn(v, 'ref')) return row;
+  const { ref: _ref, ...rest } = v as Record<string, unknown>;
+  return { ...row, [field]: rest };
+}
+
 /** A draft's rows, the props its component draws it with, and what its account says: the draft as the model wrote it,
- *  never what the person changed. Without a window that keeps the person's draft (look), it is drawn as written, with
- *  Copy alone, and attaches no file. */
+ *  never what the person changed, nor the host's ref to the mail it replies to. Without a window that keeps the
+ *  person's draft (look), it is drawn as written, with Copy alone, and attaches no file. */
 export function draftShaped(rows: Row[], map: Record<string, string>, look?: DraftContext): Shaped {
   const model = readDraft(rows[0], map);
   if (!look && model.fields.attachments.length) throw new Error('attachments: this host reads no files from a working folder');
   const seen: DraftLook = look ? look(model) : { token: '', state: 'draft', rev: 0, files: [], sending: 'none' };
+  const { ref: _ref, ...shownOriginal } = model.original ?? {};
   const draft = {
     token: seen.token, state: seen.state, rev: seen.rev, ...(seen.reason ? { reason: seen.reason } : {}),
-    fields: seen.fields ?? model.fields, format: model.format, ...(model.original ? { original: model.original } : {}),
+    fields: seen.fields ?? model.fields, format: model.format, ...(Object.keys(shownOriginal).length ? { original: shownOriginal } : {}),
     files: seen.files, sending: seen.sending,
   };
   const { to, cc, subject, body, attachments } = model.fields;
   const files = attachments.map(path => { const f = (seen.modelFiles ?? seen.files).find(x => x.path === path); return f && !f.missing ? { path, name: f.name, size: f.size } : { path }; });
   const original = model.original && { ...(model.original.from ? { from: model.original.from } : {}), ...(model.original.time ? { time: model.original.time } : {}), ...(model.original.subject ? { subject: model.original.subject } : {}) };
   return {
-    rows,
+    rows: rows.map(row => withoutRef(row, map.in_reply_to)),
     props: { draft },
     account: {
       draft: { to, ...(cc.length ? { cc } : {}), subject, body: `${body.length.toLocaleString('en-GB')} characters of ${model.format === 'markdown' ? 'Markdown' : 'plain text'}`,

@@ -7,15 +7,24 @@
 export const DRAFT_LIMITS = { addresses: 50, address: 320, subject: 500, body: 100_000, attachments: 20, bytes: 25 * 1024 * 1024, path: 1000 };
 /** How the body is written: plain text, or Markdown, which the window draws as elements. */
 export type DraftFormat = 'text' | 'markdown';
-/** The mail a draft replies to, as the model gives it: each part as text, and its id where the mail has one. */
-export type DraftOriginal = { id?: string; from?: string; time?: string; subject?: string; body?: string };
+/** The mail a draft replies to, as the model gives it: each part as text, its id where the mail has one, and ref, the
+ *  host's own reference to it (at most 500 characters), which the model passes through as a result gave it: kept with
+ *  the draft and handed back to the host with the mail sent (MessageDraft), so it can thread the reply, and never shown
+ *  to the person or told to the model. */
+export type DraftOriginal = { id?: string; ref?: string; from?: string; time?: string; subject?: string; body?: string };
 /** A draft's fields as the person sees them: each address as written ("Kari Nordmann <kari@example.com>"), and the
  *  attachments by their paths in the working folder. */
 export type DraftFields = { to: string[]; cc: string[]; subject: string; body: string; attachments: string[] };
 /** A file a draft attaches, as the system read it: its path in the working folder, its name and its size in bytes. */
 export type DraftFile = { path: string; name: string; size: number };
-/** How a send went, as the host says: sent; failed, and why; or unknown, when it may not have arrived. */
-export type SendResult = { outcome: 'sent' } | { outcome: 'failed'; reason: string } | { outcome: 'unknown'; reason?: string };
+/** How a send went, as the host says: sent; failed, and why; or unknown, when it may not have arrived. reason is the
+ *  person's: the window shows it, and the model never hears it. forModel is the only text of the host's the model hears
+ *  of it (at most 500 characters of plain text, trimmed, its control characters taken out); without it, the model hears
+ *  Vindu's own words alone: sent, could not send, or cannot say whether it went. */
+export type SendResult =
+  | { outcome: 'sent'; forModel?: string }
+  | { outcome: 'failed'; reason: string; forModel?: string }
+  | { outcome: 'unknown'; reason?: string; forModel?: string };
 /** Where a draft is: as drafted, being sent, sent (and then read-only), or after a send that failed or may not have
  *  arrived, when the person may change it and send it again. */
 export type DraftState = 'draft' | 'sending' | 'sent' | 'failed' | 'unknown';

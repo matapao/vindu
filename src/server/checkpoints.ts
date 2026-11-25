@@ -24,6 +24,7 @@ export const snapshotOf = (session: Session): ViewSnapshot => {
     }));
   const ids = new Set<string>(); const refs = refsOf(session);
   for (const v of views) idsIn(v.args, refs, ids);
+  const drafts = savedDrafts(session).filter((d) => views.some((v) => v.name === d.view)); // the person's, in these views
   return {
     at: new Date().toISOString(),
     views,
@@ -39,6 +40,7 @@ export const snapshotOf = (session: Session): ViewSnapshot => {
       ),
     ),
     picked: session.picked.filter((it) => views.some((v) => v.name === it.view)),
+    ...(drafts.length ? { drafts } : {}),
   };
 };
 export const startFrom = async (session: Session, snap: ViewSnapshot, carried: Record<string, string>) => {
@@ -53,6 +55,7 @@ export const startFrom = async (session: Session, snap: ViewSnapshot, carried: R
     });
     map[a.id] = e.id;
   }
+  restoreDrafts(session, snap.drafts); // as restore brings them back: each the person's again where its view draws the same mail
   const shown: string[] = [];
   const refused: Record<string, string> = {}; const refs = refsOf(session);
   for (const v of snap.views) {

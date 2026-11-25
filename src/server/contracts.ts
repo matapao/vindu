@@ -30,7 +30,8 @@ export type Shown = {
 };
 /** A process's view as it is, for another process (or a fresh run) to start from: each view of cards as shown, with the
  *  person's changes inside it and its mark; the layout; what the person points at; what was done; the results and
- *  attachments the views point at (ids, for the host to carry); and the person's answers they point at. */
+ *  attachments the views point at (ids, for the host to carry); the person's answers they point at; and their drafts
+ *  in those views, as a checkpoint keeps them (a sent one stays sent, under its id; one being sent is kept as unknown). */
 export type ViewSnapshot = {
   at: string;
   views: { name: string; title: string; args: Record<string, unknown>; mark?: ViewMark }[];
@@ -39,6 +40,7 @@ export type ViewSnapshot = {
   answers: AnswerEntry[];
   changes: string[];
   picked: PointItem[];
+  drafts?: SavedDraft[];
 };
 /** How far the person has read one panel of a view: the furthest share of it they have had in view, from 0 to 1, as the
  *  window measures it (renderer/shell-reading.ts). For the host alone: the model is never told. */
@@ -71,7 +73,7 @@ export type ViewCheckpoint = {
   mode?: { template: Template; inputs: Record<string, unknown>; fills: [string, Fill][] };
   /** How far each panel of each view has been read: by view, each panel's share. */
   read?: [string, [string, number][]][];
-  drafts?: SavedDraft[]; // the person's drafts of the mails drafted for them, as they changed them, and how each send went
+  drafts?: SavedDraft[]; // the person's drafts of the mails drafted for them, as they changed them, and how each send went (a ViewSnapshot's the same)
   pointers?: ResultPointer[];
   answers?: KeptAnswer[];
   reminders?: Reminder[]; // the process's reminders, as the Reminders pane has them
@@ -96,9 +98,11 @@ export type UiProcess = {
 }; // the copy brought up to date with the folder there, before a show or a check reads it
 
 /** A mail the person sends from the window (a message block's draft, its Send pressed): a stable id for this draft
- *  (the same through the person's changes and every try, for the host to key its own record on), the view and panel it
- *  is in, its fields exactly as the person sees them, the files it attaches (each its path in the working folder, its
- *  name and size, read by the system as Send was pressed), and who pressed Send, as the window says. */
+ *  (the same through the person's changes and every try, and in the task opened again, for the host to key its own
+ *  record on), the view and panel it is in, its fields exactly as the person sees them, the mail it replies to (with
+ *  in_reply_to.ref, the host's own reference to it, where the model passed one through, for threading the reply), the
+ *  files it attaches (each its path in the working folder, its name and size, read by the system as Send was pressed),
+ *  and who pressed Send, as the window says. */
 export type MessageDraft = {
   id: string;
   view: string;
@@ -180,7 +184,9 @@ export type OpenMore = {
   /** The person pressed Send on a mail drafted for them (a message block's draft): the host sends it as it decides, and
    *  says how it went; unknown when it may not have arrived. Their click is their yes: there is no ask after it, and
    *  only that click calls this, never the model. Until it answers the draft says "Sending…"; once sent it is
-   *  read-only; after failed or unknown the person may change it and send it again. A throw counts as unknown. */
+   *  read-only; after failed or unknown the person may change it and send it again. A throw counts as unknown. The
+   *  result's reason is shown to the person; the model hears Vindu's own words, and the result's forModel alone of
+   *  the host's. An unknown one the host may settle later with the opened window's settleDraft. */
   onSendMessage?: (draft: MessageDraft) => Promise<SendResult>;
   /** Whether this window can send mail now: true, or the host's own action in place of Send, with its label (a window
    *  with no mail connection yet, say), which onMessageAction then runs. Read each time a draft is drawn; call the opened

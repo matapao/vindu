@@ -1,8 +1,9 @@
 // A mail drafted for the person to send, drawn in Chromium through the fixtures' shell, with the window's events carried
 // to the UI server as a host carries them: the person changes the subject, the body and the files, and presses Send;
 // the host gets the mail as they see it, the draft says "Sending…", then "Sent", and locks. A send that failed says why
-// and may go again; one that may not have arrived says so. A host that cannot send yet offers its own action in place
-// of Send, and Copy puts the whole mail on the clipboard. Drawn in Bokmål and Nynorsk too. All synthetic.
+// and may go again; one that may not have arrived says so, until the host settles it. A host that cannot send yet
+// offers its own action in place of Send, and Copy puts the whole mail on the clipboard. The host's ref to the mail
+// replied to is never drawn. Drawn in Bokmål and Nynorsk too. All synthetic.
 import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -21,7 +22,7 @@ fs.writeFileSync(path.join(work, 'map.png'), Buffer.alloc(2_048, 2));
 const REPLY = {
   to: ['Kari Nordmann <kari@fjord.example>'], cc: 'ola@fjord.example', subject: 'Re: Ferry plan', format: 'markdown',
   body: 'Hi Kari,\n\nThe **plan** is attached.',
-  in_reply_to: { from: { name: 'Kari Nordmann', email: 'kari@fjord.example' }, time: '2026-11-20T09:12:00Z', subject: 'Ferry plan', body: 'Could you send me the plan?\n\nKari' },
+  in_reply_to: { from: { name: 'Kari Nordmann', email: 'kari@fjord.example' }, time: '2026-11-20T09:12:00Z', subject: 'Ferry plan', body: 'Could you send me the plan?\n\nKari', ref: 'host-thread-window-91' },
   attachments: ['plan.pdf', 'map.png'],
 };
 const person = { name: 'Ola', window: 'main' };
@@ -81,6 +82,7 @@ test('the person edits the subject, the body and the files, and presses Send: th
   assert.deepEqual(await d.locator('.vb-dfile').allInnerTexts(), [`plan.pdf · ${bytesIn(12_345)}×`, `map.png · ${bytesIn(2_048)}×`]);
   assert.equal(await d.locator('.vb-dquote blockquote').innerText(), 'Could you send me the plan?\n\nKari');
   assert.match(await page.locator('.vindu-pane[data-view="reply"] .vindu-pane-body').innerText(), /Written by the model/);
+  assert.ok(!(await page.content()).includes('host-thread-window-91')); // the host's, never drawn
   await d.locator('input[data-part="subject"]').fill('Re: Ferry plan, as agreed');
   await d.locator('button', { hasText: 'Edit' }).click();
   assert.equal(await d.locator('textarea[data-part="body"]').inputValue(), REPLY.body);
@@ -101,6 +103,7 @@ test('the person edits the subject, the body and the files, and presses Send: th
   const sent = sends[0];
   assert.match(sent.id, /^[0-9a-f-]{36}$/);
   assert.deepEqual([sent.to, sent.cc, sent.subject, sent.body, sent.format, sent.attachments, sent.by], [['Kari Nordmann <kari@fjord.example>'], ['ola@fjord.example'], 'Re: Ferry plan, as agreed', 'Hi Kari,\n\nHere it is, **as agreed**.', 'markdown', [{ path: 'plan.pdf', name: 'plan.pdf', size: 12_345 }], person]);
+  assert.equal(sent.in_reply_to?.ref, 'host-thread-window-91'); // handed back, for the host to thread the reply
   resolve({ outcome: 'sent' });
   await settle(async () => (await status('reply')) === '✓ Sent', 'Sent');
   assert.deepEqual(await d.locator('.vb-dhead input').evaluateAll((xs: HTMLInputElement[]) => xs.map(x => [x.readOnly, x.value])), [[true, 'Kari Nordmann <kari@fjord.example>'], [true, 'ola@fjord.example'], [true, 'Re: Ferry plan, as agreed']]);
@@ -132,7 +135,32 @@ test('a send that failed says why, and may go again after a change; one that may
   await settle(async () => (await status('again')) === 'It may not have arrived. Check before you send it again.', 'unknown');
   assert.equal(sends.at(-1)!.body, 'Here it is, again.');
   assert.equal(sends.at(-1)!.id, sends.at(-2)!.id); // the same draft, sent again
-  assert.match(ui.delta(5000), /could not send it \(mailbox full\).*the host cannot say whether it went: it may not have arrived/);
+  const told = ui.delta(5000);
+  assert.match(told, /could not send it: it did not go.*the host cannot say whether it went: it may not have arrived/);
+  assert.ok(!told.includes('mailbox full')); // the person's reason, never the model's
+  assert.deepEqual(errors, []);
+});
+
+test('a send that may not have arrived, settled by the host as the person learned it: failed says why and Send is there again; sent locks every field', async () => {
+  answer = async () => ({ outcome: 'unknown' });
+  const unknown = 'It may not have arrived. Check before you send it again.';
+  const d = await shownAlone('settled', { to: 'kari@fjord.example', subject: 'Settle', body: 'Did it go?' });
+  await d.locator('button[data-send]').click();
+  await settle(async () => (await status('settled')) === unknown, 'unknown');
+  assert.equal(ui.settleDraft(drafted('settled').id, 'failed', 'it bounced'), true);
+  await settle(async () => (await status('settled')) === 'Failed: it bounced', 'settled as failed');
+  assert.equal(await d.locator('input[data-part="subject"]').evaluate((x: HTMLInputElement) => x.readOnly), false);
+  assert.equal(await d.locator('button[data-send]').isDisabled(), false);
+  await d.locator('input[data-part="subject"]').fill('Settle, again');
+  await d.locator('button[data-send]').click();
+  await settle(async () => sends.at(-1)!.subject === 'Settle, again' && (await status('settled')) === unknown, 'unknown again');
+  assert.equal(ui.settleDraft(drafted('settled').id, 'sent'), true);
+  await settle(async () => (await status('settled')) === '\u2713 Sent', 'settled as sent');
+  assert.deepEqual(await d.locator('.vb-dhead input').evaluateAll((xs: HTMLInputElement[]) => xs.map(x => [x.readOnly, x.value])), [[true, 'kari@fjord.example'], [true, ''], [true, 'Settle, again']]);
+  assert.equal(await d.locator('button[data-send], .vb-dremove, .vb-dtools button').count(), 0);
+  assert.equal(ui.settleDraft(drafted('settled').id, 'failed', 'too late'), false); // sent: settled
+  assert.match(ui.delta(5000), /of which the host could not say whether it went: the host now says it did not go.*of which the host could not say whether it went: the host now says it went/);
+  answer = async () => ({ outcome: 'sent' });
   assert.deepEqual(errors, []);
 });
 

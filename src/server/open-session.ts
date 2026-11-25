@@ -14,14 +14,14 @@ import { appControls } from './app-events.js';
 import { arrived } from './arrivals.js';
 import { provideFiles } from './ask-events.js';
 import { closeAsks } from './asks.js';
-import { checkedCheckpoint } from './checkpoint-shape.js';
+import { checkedCheckpoint, checkedDrafts } from './checkpoint-shape.js';
 import { branchNote, checkpoint, restore, snapshotOf, startFrom } from './checkpoints.js';
 import type { OpenMore, Shown, UiProcess, ViewCheckpoint, ViewSnapshot } from './contracts.js';
 import { wake } from './gates.js';
 import { fire } from './hooks.js';
 import { hostRequests } from './host-requests.js';
 import { hasOf, NOTE, noteViews } from './instructions.js';
-import { messagesChanged } from './message-drafts.js';
+import { messagesChanged, settleDraft } from './message-drafts.js';
 import { unheard } from './page-messages.js';
 import { present } from './present.js';
 import { settle } from './receipts.js';
@@ -274,21 +274,31 @@ export function openSession(
     /** The host's messageSending says something else now (a mail connection made, or gone): every mail drafted for the
      *  person is drawn again, with Send, or the host's own action in its place. */
     messagesChanged: () => messagesChanged(session),
+    /** A send that ended unknown, settled as the person learned on their side (it arrived, or it did not): sent locks
+     *  the draft; failed shows the reason (the person's, never the model's) and lets them send it again. The draft is
+     *  drawn again, and the model told once, in Vindu's words and forModel alone (plain text, at most 500 characters).
+     *  Only for a draft drawn in this window whose last send ended unknown: anything else is refused (false). */
+    settleDraft: (id: string, outcome: 'sent' | 'failed', reason?: string, forModel?: string): boolean =>
+      settleDraft(session, id, outcome, reason, forModel),
     /** What the person's yeses let go, and how each went. */
     receipts: () => session.receipts.map((r) => ({ ...r })),
     /** How far the person has read each panel of the views shown, now: for the host alone, never the model. */
     readProgress: () => readProgressOf(session),
     /** The view as it is now, for a new process (or a fresh run of this one) to start from. */
     checkpoint: (): ViewCheckpoint => checkpoint(session),
-    /** A new task restored from a checkpoint the host kept: refused, with why, if it is not one. */
+    /** A new task restored from a checkpoint the host kept: refused, with why, if it is not one. The way to open the
+     *  same task again (after a restart, say): its results read again, and the person's own state of its views, their
+     *  drafts among it (a sent one sent and read-only, under its id; one being sent as unknown). */
     restore: (saved: ViewCheckpoint) => restore(session, checkedCheckpoint(session, saved)),
     snapshot: (): ViewSnapshot => snapshotOf(session),
     /** Start this window from another process's view: the host carried its results and attachments into this process's
      *  record (carried: their ids there → here); the person's answers are kept again here; every id in the views is
      *  replaced by this process's; the views are shown as they were, in their layout, with their marks; and the first
      *  prompt's note says where they came from and what was done in them. A view whose entries were not carried
-     *  is left out, and says why. */
-    startFrom: (snap: ViewSnapshot, carried: Record<string, string>) => startFrom(session, snap, carried),
+     *  is left out, and says why. The person's drafts in them come as restore brings them back (a sent one sent and
+     *  read-only, under its id; one being sent as unknown); drafts that are not a snapshot's are refused, with why. */
+    startFrom: (snap: ViewSnapshot, carried: Record<string, string>) =>
+      startFrom(session, { ...snap, drafts: checkedDrafts(snap.drafts) }, carried),
     /** The process's reminders, as they are now. */
     reminders: () => session.reminders.map((r) => ({ ...r })),
     /** A reminder from the host's own control (a menu, say) for the person, with when worked out as for the model;

@@ -1,13 +1,14 @@
 // A checkpoint comes back from the host's own store, where anything could have changed it: before a task is restored
 // from one, it is checked to be what a checkpoint is, each part of it, and its views are the model's, under names the
-// model may show. Its template is checked as any template is when it loads.
+// model may show. Its template is checked as any template is when it loads. A snapshot's drafts are checked the same
+// way before a window starts from it.
 import { z } from 'zod';
 import { CARDS } from '../cards.js';
 import { DRAFT_LIMITS } from '../message-draft.js';
 import { keptFor } from '../shell-roles.js';
 import { checkTemplate } from '../templates.js';
 import type { ViewCheckpoint } from './contracts.js';
-import { digestOf } from './message-drafts.js';
+import { digestOf, type SavedDraft } from './message-drafts.js';
 import type { Session } from './state.js';
 
 const Name = z.string().min(1).max(200);
@@ -57,7 +58,7 @@ const Draft = z.object({
     fields: DraftFields,
     format: z.enum(['text', 'markdown']),
     original: z
-      .object({ id: z.string().max(500), from: z.string().max(DRAFT_LIMITS.address), time: z.string().max(100), subject: z.string().max(DRAFT_LIMITS.subject), body: z.string().max(DRAFT_LIMITS.body) })
+      .object({ id: z.string().max(500), ref: z.string().max(500), from: z.string().max(DRAFT_LIMITS.address), time: z.string().max(100), subject: z.string().max(DRAFT_LIMITS.subject), body: z.string().max(DRAFT_LIMITS.body) })
       .partial()
       .optional(),
   }).optional(),
@@ -65,6 +66,15 @@ const Draft = z.object({
   state: z.enum(['draft', 'sent', 'failed', 'unknown']), // a send under way is kept as unknown
   reason: z.string().max(1000).optional(),
 });
+const Drafts = z.array(Draft).max(200);
+/** Each draft, naming the mail the model drafted by its digest (of): a checkpoint kept before drafts were kept by
+ *  digest kept the mail itself. */
+const byDigest = (drafts: z.infer<typeof Drafts>, kept: 'task checkpoint' | 'view snapshot'): SavedDraft[] =>
+  drafts.map(({ model, of, ...d }) => {
+    const mail = of ?? (model && digestOf(model));
+    if (!mail) throw new Error(`Not a ${kept}: the draft in "${d.view}" names no mail`);
+    return { ...d, of: mail };
+  });
 const Text = (most: number) => z.string().max(most);
 const Pointer = z.discriminatedUnion('kind', [
   z.object({ id: z.string().regex(/^r\d+$/), kind: z.literal('result'), server: Text(200), tool: Text(200), input: z.unknown().optional(), ref: Text(1000).optional() }),
@@ -120,22 +130,29 @@ const Checkpoint = z.object({
     .array(z.tuple([Name, z.array(z.tuple([z.string().max(80), z.number().min(0).max(1)])).max(200)]))
     .max(200)
     .optional(),
-  drafts: z.array(Draft).max(200).optional(),
+  drafts: Drafts.optional(),
   pointers: z.array(Pointer).max(5000).optional(),
   answers: z.array(Answer).max(1000).optional(),
   reminders: z.array(Kept).max(1000).optional(),
 });
 
+/** What is wrong, in a few words for the host's log. */
+const issuesOf = (error: z.ZodError) =>
+  error.issues
+    .slice(0, 3)
+    .map((i) => `${i.path.join('.') || 'it'}: ${i.message}`)
+    .join('; ');
+/** A snapshot's drafts (startFrom), as a checkpoint's are, or why they are not. */
+export const checkedDrafts = (saved: unknown): SavedDraft[] | undefined => {
+  if (saved === undefined) return undefined;
+  const r = Drafts.safeParse(saved);
+  if (!r.success) throw new Error(`Not a view snapshot: its drafts: ${issuesOf(r.error)}`);
+  return byDigest(r.data, 'view snapshot');
+};
 /** The checkpoint, as a checkpoint, or why it is not one: what is wrong, in a few words for the host's log. */
 export const checkedCheckpoint = (session: Session, saved: unknown): ViewCheckpoint => {
   const r = Checkpoint.safeParse(saved);
-  if (!r.success)
-    throw new Error(
-      `Not a task checkpoint: ${r.error.issues
-        .slice(0, 3)
-        .map((i) => `${i.path.join('.') || 'it'}: ${i.message}`)
-        .join('; ')}`,
-    );
+  if (!r.success) throw new Error(`Not a task checkpoint: ${issuesOf(r.error)}`);
   const cp = r.data;
   for (const v of cp.views) {
     if (v.args.name !== v.name) throw new Error(`Not a task checkpoint: view "${v.name}" is shown under another name`);
@@ -154,11 +171,7 @@ export const checkedCheckpoint = (session: Session, saved: unknown): ViewCheckpo
     mode = { ...cp.mode, template: t.template };
   }
   const picked = cp.picked as ViewCheckpoint['picked']; // each a view's, as pointing reads it; what does not fit it is dropped there
-  const drafts = cp.drafts?.map(({ model, of, ...d }) => {
-    const mail = of ?? (model && digestOf(model)); // a checkpoint kept before drafts were kept by digest
-    if (!mail) throw new Error(`Not a task checkpoint: the draft in "${d.view}" names no mail`);
-    return { ...d, of: mail };
-  });
+  const drafts = cp.drafts && byDigest(cp.drafts, 'task checkpoint');
   const rest = cp as Omit<ViewCheckpoint, 'mode' | 'picked' | 'drafts'>;
   return { ...rest, picked, ...(mode ? { mode } : {}), ...(drafts ? { drafts } : {}) };
 };

@@ -4,14 +4,16 @@
 // anew starts a new draft. Send is the person's alone: only their click in the window sends the mail, as they see it,
 // and the click is their yes; the host sends it and says how it went (onSendMessage). Each event about a draft carries
 // the token only the window that draws it has. The model is told each outcome once, with the fields as they were sent,
-// and never what the person changes while they draft.
+// and never what the person changes while they draft (draft-told.ts). A send the host could not say had gone, it may
+// settle later, as the person learns on their side (settleDraft).
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { filesProblem, type DraftLook, type LookedFile, type ModelDraft } from '../block-drafts.js';
 import { checkDraftEdit, draftProblems, fieldsWithin, type DraftFields, type DraftSending, type DraftState as DraftWhere, type SendResult } from '../message-draft.js';
 import type { MessageDraft } from './contracts.js';
-import { keep, log, stableJson, whoOf } from './records.js';
+import { forModelOf, toldSent, toldSettled } from './draft-told.js';
+import { log, stableJson, whoOf } from './records.js';
 import type { Session } from './state.js';
 import { asText } from '../format.js';
 
@@ -161,13 +163,16 @@ function sendFromWindow(session: Session, d: KeptDraft, x: Record<string, unknow
   return true;
 }
 
-/** How the host said it went, as a send's outcome: anything else, or a throw, is unknown, as it may have gone. */
+/** The host's reason for the person, as one line of at most 500 characters. */
+const reasonOf = (said: unknown) => (typeof said === 'string' ? said.replace(/\s+/g, ' ').trim().slice(0, 500) : '');
+/** How the host said it went, as a send's outcome, with its words for the model cleaned (forModelOf): anything else, or
+ *  a throw, is unknown, as it may have gone. */
 const outcomeOf = (r: unknown): SendResult => {
-  const o = (r && typeof r === 'object' ? r : {}) as { outcome?: unknown; reason?: unknown };
-  const reason = typeof o.reason === 'string' ? o.reason.replace(/\s+/g, ' ').trim().slice(0, 500) : '';
-  if (o.outcome === 'sent') return { outcome: 'sent' };
-  if (o.outcome === 'failed') return { outcome: 'failed', reason: reason || 'the host gave no reason' };
-  if (o.outcome === 'unknown') return reason ? { outcome: 'unknown', reason } : { outcome: 'unknown' };
+  const o = (r && typeof r === 'object' ? r : {}) as { outcome?: unknown; reason?: unknown; forModel?: unknown };
+  const reason = reasonOf(o.reason), forModel = forModelOf(o.forModel), told = forModel ? { forModel } : {};
+  if (o.outcome === 'sent') return { outcome: 'sent', ...told };
+  if (o.outcome === 'failed') return { outcome: 'failed', reason: reason || 'the host gave no reason', ...told };
+  if (o.outcome === 'unknown') return { outcome: 'unknown', ...(reason ? { reason } : {}), ...told };
   return { outcome: 'unknown', reason: 'the host said nothing of how it went' };
 };
 async function sent(session: Session, d: KeptDraft, draft: MessageDraft) {
@@ -175,39 +180,33 @@ async function sent(session: Session, d: KeptDraft, draft: MessageDraft) {
   try {
     result = outcomeOf(await session.more.onSendMessage!(structuredClone(draft)));
   } catch (e) {
-    result = { outcome: 'unknown', reason: String((e as Error)?.message ?? e).replace(/\s+/g, ' ').slice(0, 500) };
+    result = { outcome: 'unknown', reason: reasonOf(String((e as Error)?.message ?? e)) };
   }
   if (session.closed) return;
   d.state = result.outcome;
   if ('reason' in result && result.reason) d.reason = result.reason;
   d.rev++;
-  told(session, draft, result);
+  toldSent(session, draft, result);
   if (session.drafts.get(keyOf(d.view, d.panel)) === d) redraw(session, d.view); // a draft the model showed anew since is not this one
 }
 
-/** How a send went, as the model is told it. */
-const OUTCOME = {
-  sent: () => 'the host sent it',
-  failed: (why?: string) => `the host could not send it (${why}): it did not go, and the person may change it and send it again`,
-  unknown: (why?: string) => `the host cannot say whether it went${why ? ` (${why})` : ''}: it may not have arrived, and the person checks before sending it again`,
-};
-/** What the model hears of a Send, once, with the next message: how it went, and the fields as they were sent (the body's
- *  start), with all of them kept as the person's answer (a p-id) for ctx_read. */
-function told(session: Session, draft: MessageDraft, result: SendResult) {
-  const reason = 'reason' in result ? result.reason : undefined;
-  const { id: _id, view, panel, by, ...fields } = draft;
-  const e = keep(session, { to: `Send on the mail drafted in view "${view}"`, by: 'person', values: { outcome: result.outcome, ...(reason ? { reason } : {}), ...fields }, who: [by.name] });
-  session.heard.add(e.id); // told here, with what went: not again as an answer
-  const who = by.name === 'the person' ? 'the person' : `${by.name} (${by.window})`;
-  const body = draft.body.length > 200 ? `${JSON.stringify(draft.body.slice(0, 199))}…` : JSON.stringify(draft.body);
-  const parts = [
-    `to ${draft.to.join(', ')}`, draft.cc.length ? `cc ${draft.cc.join(', ')}` : '', `subject ${JSON.stringify(draft.subject)}`,
-    `body (${draft.body.length} characters${draft.format === 'markdown' ? ', Markdown' : ''}) ${body}`,
-    draft.attachments.length ? `attached ${draft.attachments.map((f) => `${f.path} (${f.size} bytes)`).join(', ')}` : '',
-    draft.in_reply_to?.subject ? `in reply to ${JSON.stringify(draft.in_reply_to.subject)}` : '',
-  ].filter(Boolean);
-  session.shell.say(`${who} pressed Send on the mail drafted in "${session.shown.get(view)?.title ?? view}" (${panel}), and ${OUTCOME[result.outcome](reason)}; as it was sent: ${parts.join('; ')} (all of it: ctx_read ${e.id})`);
-  log(session, { drafts: { draft: draft.id, view, panel, outcome: result.outcome, ...(reason ? { reason } : {}), entry: e.id } });
+/** The host settles a send it could not say had gone (unknown), as the person learned on their side: sent, and the
+ *  draft locks; or failed, with the person's reason, and they may change it and send it again. The draft is drawn
+ *  again and the model told once, in Vindu's words and the host's forModel alone. Only for a draft drawn in this window
+ *  whose last send ended unknown (or was under way when its task was kept); anything else is refused (false). */
+export function settleDraft(session: Session, id: unknown, outcome: unknown, reason?: unknown, forModel?: unknown): boolean {
+  if (session.closed || (outcome !== 'sent' && outcome !== 'failed')) return false;
+  const d = [...session.drafts.values()].find((x) => x.id === id);
+  if (!d || d.state !== 'unknown') return false;
+  const result = outcomeOf({ outcome, reason, forModel }) as SendResult & { outcome: typeof outcome };
+  d.state = result.outcome;
+  delete d.reason;
+  if ('reason' in result && result.reason) d.reason = result.reason;
+  d.rev++;
+  const { format, original } = d.model, fields = d.edited ?? d.model.fields; // as it was last sent
+  toldSettled(session, { id: d.id, view: d.view, panel: d.panel, fields, format, ...(original ? { original } : {}) }, result);
+  redraw(session, d.view);
+  return true;
 }
 
 /** The person clicked the host's own action in place of Send: the host runs it. */
@@ -231,8 +230,8 @@ export const savedDrafts = (session: Session): SavedDraft[] => [
   })),
   ...[...session.savedDrafts.values()].map((d) => structuredClone(d)),
 ];
-/** The drafts a checkpoint kept: each one the person's again once its view draws the same mail. */
+/** The drafts a checkpoint or a snapshot kept (restore, startFrom): each one the person's again, as they left it, once
+ *  its view draws the same mail: a sent one sent and read-only, under its id. */
 export const restoreDrafts = (session: Session, saved: readonly SavedDraft[] = []) => {
-  session.drafts = new Map();
-  session.savedDrafts = new Map(saved.map((s) => [keyOf(s.view, s.panel), structuredClone(s)]));
+  for (const s of saved) session.savedDrafts.set(keyOf(s.view, s.panel), structuredClone(s));
 };
