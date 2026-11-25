@@ -27,6 +27,8 @@ export const NYNORSK: Partial<ShellLabels> = {
   resize: (a, b) => `Endre storleik på ${a} og ${b}`,
   mode: (m, n) => ({ empty: '', single: 'éi vising', tiled: `${n} ruter`, stacked: 'stabla', maximized: 'maksimert · esc gjenopprettar' })[m],
   missing: c => `Dette kortet treng komponenten «${c}», som ikkje er registrert i dette vindauget.`,
+  showAs: 'Vis visingane som', cards: 'Kort', content: 'Innhald', backToCards: '‹ Kort',
+  openCard: (title, lines) => `${title}${lines ? `: ${lines}` : ''}. Opne ho åleine`,
 };
 // #endregion
 

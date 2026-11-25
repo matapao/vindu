@@ -15,6 +15,7 @@ import {
   defineBlock,
 } from './shared.js';
 import { sendBlockAction } from '../dom.js';
+import { agendaDays, carries, dayCarries, dayWarnings, warningBand, weekDays } from './calendar-week.js';
 
 /** What a dragged event carries: its own type, so a task dropped on a day is not taken for an event. */
 const EVENT_ROW = 'text/x-vindu-event';
@@ -46,13 +47,13 @@ const hourOf = (props: BlockProps, v: unknown) => {
     .map(Number);
   return h + m / 60;
 };
-export const VEvents = defineBlock('VEvents', 'vindu-events', { words: 'value' }, (props) => {
+export const VEvents = defineBlock('VEvents', 'vindu-events', { words: 'value', days: 'value', warnings: 'value' }, (props) => {
   const rows = props.rows;
   const words = wordsGiven(props.words, BLOCK_WORDS.events);
   if (!rows.length) return emptyMessage(props.layout === 'free' ? words.noFree : words.none);
   if (props.layout === 'free') return freeTime(props, words);
-  if (props.layout === 'week') return weekCalendar(props);
-  return agenda(props);
+  if (props.layout === 'week') return weekCalendar(props, words);
+  return agenda(props, words);
 });
 
 /** A length of time in hours and minutes, in the view's words, its numbers as the locale writes them. */
@@ -78,11 +79,9 @@ function freeTime(props: RowBlockProps, words: EventWords) {
   })}</div>`;
 }
 
-function weekCalendar(props: RowBlockProps) {
+function weekCalendar(props: RowBlockProps, words: EventWords) {
   const rows = props.rows;
-  const days = [...new Set(rows.map((row) => dayKey(props, fieldValue(props, row, 'start'))))]
-    .sort()
-    .slice(0, 7);
+  const days = weekDays(props, rows.map((row) => dayKey(props, fieldValue(props, row, 'start')))); // with its weather: seven in a row
   const startHours = rows.map((row) => hourOf(props, fieldValue(props, row, 'start'))).filter(Number.isFinite),
     endHours = rows
       .map((row) => hourOf(props, fieldValue(props, row, 'end') ?? fieldValue(props, row, 'start')))
@@ -145,7 +144,7 @@ function weekCalendar(props: RowBlockProps) {
     e.preventDefault();
     plan(e, index, step);
   };
-  return html`<div class="vb-week" style=${`--days:${days.length}`}><div class="vb-hours">${
+  return html`${warningBand(props, words, days)}<div class=${carries(props) ? 'vb-week vb-carries' : 'vb-week'} style=${`--days:${days.length}`}><div class="vb-hours">${
     Array.from(
       { length: lastHour - firstHour },
       (_, index) =>
@@ -156,7 +155,7 @@ function weekCalendar(props: RowBlockProps) {
   }</div>${
     days.map((d) => {
       const dropHandlers = dropOn(d);
-      return html`<div class="vb-day"><div class="vb-dayhead">${formatTime(props, d, false)}</div><div class="vb-daybody" style=${
+      return html`<div class="vb-day"><div class="vb-dayhead">${formatTime(props, d, false)}${dayCarries(props, words, d)}</div><div class="vb-daybody" style=${
         `height:calc(var(--vb-hour,30px) * ${lastHour - firstHour})`
       } data-day=${d} @dragover=${dropHandlers.over} @drop=${dropHandlers.drop}>${
         rows.map((row, index) => {
@@ -187,16 +186,18 @@ function weekCalendar(props: RowBlockProps) {
   }</div>`;
 }
 
-function agenda(props: RowBlockProps) {
+function agenda(props: RowBlockProps, words: EventWords) {
   const rows = props.rows;
   const byDay = new Map<string, number[]>();
   rows.forEach((row, index) => {
     const day = dayKey(props, fieldValue(props, row, 'start'));
     byDay.set(day, [...(byDay.get(day) ?? []), index]);
   });
-  return html`<div class="vb-agenda">${[...byDay].map(
+  // the days with events, in the order the events come, or every day with events, weather or tasks, in order
+  const days: [string, number[]][] = carries(props) ? agendaDays(props, [...byDay.keys()]).map((d) => [d, byDay.get(d) ?? []]) : [...byDay];
+  return html`<div class="vb-agenda">${days.map(
     ([d, rowIndices]) =>
-      html`<div class="vb-dayhead">${formatTime(props, d, false)}</div>${rowIndices.map((index) => {
+      html`<div class="vb-dayhead">${formatTime(props, d, false)}${dayCarries(props, words, d)}</div>${dayWarnings(props, words, d)}${rowIndices.map((index) => {
         const row = rows[index];
         return rowContainer(
           props,

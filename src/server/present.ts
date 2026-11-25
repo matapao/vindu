@@ -5,6 +5,7 @@ import { panelsOf, pidFor, type PanelSpec } from '../cards.js';
 import type { Place } from '../layout.js';
 import { presentationOf } from '../presentation.js';
 import { showView } from '../view.js';
+import { viewSummaryOf, type ViewChange } from '../view-summary.js';
 import { afterShown } from './live-panels.js';
 import { draftLook, dropDrafts } from './message-drafts.js';
 import { check, REPORT_MS } from './page-checks.js';
@@ -25,7 +26,9 @@ const setPage = (session: Session, view: string, id: string, pg: PageEntry) => {
  *  checks and is shown, before anything is awaited, so whatever goes with the showing is done with it, or not at all.
  *  anew: the model's view in place of the one under its name, so what was made or allowed inside the old one goes with
  *  it once this showing passes its checks (shownAnew), and its hooks' jobs are drawn and told as off, as they then are.
- *  A showing drawn again while its checks run leaves the rest to the newer one: its account says so. */
+ *  A showing drawn again while its checks run leaves the rest to the newer one: its account says so. by: who changed
+ *  the view with this showing (an action inside it, a what-if, a drill); a showing anew is the model's, and a redraw
+ *  by the system leaves the view as last changed. */
 export const present = async (
   session: Session,
   args: Record<string, unknown>,
@@ -33,6 +36,7 @@ export const present = async (
   restoring = false,
   committed?: () => void,
   anew = false,
+  by?: ViewChange['by'],
 ): Promise<Account> => {
   if (session.closed) throw new Error('This task is closed');
   const mounts: (() => void)[] = [];
@@ -46,6 +50,11 @@ export const present = async (
   session.specs.set(v.spec.name, kept);
   session.shown.set(v.spec.name, v.spec);
   session.data.set(v.spec.name, v.data);
+  const at = new Date().toISOString();
+  if (by || !redraw) session.changed.set(v.spec.name, { by: by ?? 'model', at });
+  const changed = session.changed.get(v.spec.name);
+  const kit = { locale: session.format.locale, timeZone: session.format.timeZone, words: session.viewWords };
+  const summary = viewSummaryOf(v.spec, v.data, kit, changed);
   const seq = (session.probes.get(v.spec.name)?.seq ?? 0) + 1; // which showing of the view this is
   const probes = {
     wide: probesFor(v.spec, v.data, v.wide, session.runtime.cards),
@@ -63,7 +72,7 @@ export const present = async (
   const framed = (ps: PanelSpec[]) => ps.length === 1 && !!kindOf(ps[0].card, session.runtime.cards)?.framed; // one page, or one in each tab: it fills its pane
   const fill = v.spec.tabs ? v.spec.tabs.every((t) => framed(t.panels)) : framed(panels);
   const placed =
-    redraw && session.shell.redrawn(v.spec.name, { title: v.spec.title, subtitle: v.spec.subtitle })
+    redraw && session.shell.redrawn(v.spec.name, { title: v.spec.title, subtitle: v.spec.subtitle, summary })
       ? []
       : session.shell.show(
           v.spec.name,
@@ -74,6 +83,7 @@ export const present = async (
             panels: panels.map((p) => p.card).join(', '),
             cards: panels.map((p) => p.card),
             ...(masters.length ? { masters } : {}),
+            summary,
           },
           (args as { place?: Place }).place,
         );
@@ -104,7 +114,7 @@ export const present = async (
   if (session.more.onPresentation) {
     // Native windows can interact as soon as they receive the resolved view, while checks are still running.
     try {
-      session.more.onPresentation(presentationOf(v.spec, v.data, seq, session.runtime.cards));
+      session.more.onPresentation(presentationOf(v.spec, v.data, seq, session.runtime.cards, { ...kit, ...(changed ? { changed } : {}) }));
     } catch (error) {
       log(session, { presentation: v.spec.name, failed: String((error as Error).message) });
     }

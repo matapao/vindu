@@ -1,11 +1,13 @@
 // The events block: an agenda by day, a week of columns by hour, or the free time between them; events moved by hand
-// in the window are a plan, not saved, whose clashes the system finds.
+// in the window are a plan, not saved, whose clashes the system finds. A week carries its weather, its warnings and the
+// tasks due on its days (block-week.ts).
 import { z } from 'zod';
 import { block, needOne, type Roles } from './block-kit.js';
-import { SOURCE, sourceRow, type CardAction, type CardDef, type PanelSpec } from './cards.js';
+import { resultRef, SOURCE, sourceRow, type CardAction, type CardDef, type PanelSpec } from './cards.js';
 import type { Row } from './results.js';
 import { rowAt, rowKey, rowLabel } from './row-keys.js';
 import { asText } from './format.js';
+import { weekOf } from './block-week.js';
 
 const EV: Roles = { title: /^(title|summary|subject|name|event|what)$/i, start: /^(start|starts|from|begin|begins|dtstart|start_?time|when|date|time)$/i, end: /^(end|ends|to|until|dtend|end_?time)$/i,
   where: /^(location|where|place|room|theatre|theater)$/i, who: /^(attendees|who|people|participants|organizer|staff|owner)$/i, status: /^(status|state)$/i };
@@ -77,15 +79,21 @@ function planAccount(rows: Row[], m: Record<string, string>): Record<string, unk
 }
 
 export const EVENTS = block({
-  name: 'events', component: 'VEvents', about: 'events: an agenda by day, a week of columns by hour, or the free time between them (layout free, with within and hours)',
+  name: 'events', component: 'VEvents', about: 'events: an agenda by day, a week of columns by hour, or the free time between them (layout free, with within and hours). A week carries its weather: with forecast (a time series of instants with temperature, precipitation and wind), warnings (each with a level, yellow, orange or red, from, to and an area) and tasks (each with a title and a due date), as result ids or rows, each day shows its symbol, lowest and highest temperature, precipitation and wind, the warnings are a coloured strip over the days they cover, and the tasks are on the day they are due, worked out by the system. When you have forecast or warning data for the days of a calendar, compose the week this way, in one events panel: no line chart of temperatures by date and no list of warnings beside it',
   roles: EV, layouts: ['agenda', 'week', 'free'],
   fields: { within: z.object({ from: z.string(), to: z.string() }).optional().describe('events, layout free: the range to find free time in, ISO dates or times'),
     hours: z.array(z.string()).optional().describe('events, layout free: the day\'s hours to look in, e.g. ["08:00", "16:00"] (UTC); default 08:00 to 16:00'),
-    length: z.string().optional().describe('events, layout free: the least free time worth showing, e.g. "30m" or "1h"; default 30m') },
+    length: z.string().optional().describe('events, layout free: the least free time worth showing, e.g. "30m" or "1h"; default 30m'),
+    forecast: resultRef(z.union([z.string(), z.array(z.record(z.string(), z.unknown()))]).optional().describe('events: the weather to draw on each day: a result id (or rows) holding a time series of instants, each with a time and a temperature, and precipitation, wind and a symbol where it has them, wherever they sit in it')),
+    warnings: resultRef(z.union([z.string(), z.array(z.record(z.string(), z.unknown()))]).optional().describe('events: warnings to draw as a coloured strip over the days they cover: a result id (or rows), each with a level (yellow, orange or red), from, to and an area')),
+    tasks: resultRef(z.union([z.string(), z.array(z.record(z.string(), z.unknown()))]).optional().describe('events: tasks to list on the day each is due: a result id (or rows), each with a title and a due date, and a state where it has one')) },
   check: (rows, p, m) => needOne(m, ['start'], 'an event', rows) ?? (p.layout === 'free' && !p.within ? 'layout free needs within: {"from": …, "to": …}' : null),
-  rows: (rows, p, m) => {
+  rows: (rows, p, m, read, _inputs, _draft, timeZone = 'UTC') => {
     const out = [...planOf(rows, p, m)].sort((a, b) => String(a[m.start]).localeCompare(String(b[m.start])));
-    if (p.layout !== 'free') return out;
+    if (p.layout !== 'free') {
+      const week = weekOf(p, read, timeZone); // what each day carries besides its events, worked out by the system
+      return week ? { rows: out, props: { days: week.days, warnings: week.warnings }, account: week.account } : out;
+    }
     const w = p.within as { from: string; to: string }; const [h0 = '08:00', h1 = '16:00'] = (p.hours as string[] | undefined) ?? []; // each left out: its default
     const length = asText(p.length ?? '30m'), len = minutes(length); if (len === null) throw new Error(`length "${length}": write it as 30m or 1h`);
     const from = Date.parse(w.from), to = Date.parse(w.to.length === 10 ? `${w.to}T23:59:59Z` : w.to);

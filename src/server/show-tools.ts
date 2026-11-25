@@ -9,7 +9,7 @@ import { Refusal } from '../view-context.js';
 import { askPanes } from './asks.js';
 import { showBrowser } from './browser-views.js';
 import { notYet } from './gates.js';
-import { DRAFTS_TEXT, type Has, offersDrafts, showText } from './instructions.js';
+import { DRAFTS_TEXT, type Has, offersDrafts, offersWeek, showText, WEEK_TEXT } from './instructions.js';
 import { checkCtxFor } from './present.js';
 import { json, log, loggedJson, text } from './records.js';
 import type { Gate, Session } from './state.js';
@@ -84,7 +84,7 @@ export function registerShowTools(server: McpServer, session: Session, has: Has)
   server.registerTool(
     'show_view',
     {
-      description: showText(has) + (offersDrafts(session.runtime.cards) ? DRAFTS_TEXT : ''),
+      description: showText(has) + (offersDrafts(session.runtime.cards) ? DRAFTS_TEXT : '') + (offersWeek(session.runtime.cards) ? WEEK_TEXT : ''),
       inputSchema: has.pages ? session.runtime.showView : session.runtime.showViewPlain,
       annotations: HINTS.ui, // the boundary check; each card's own check runs after the data is resolved
     },

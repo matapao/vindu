@@ -9,61 +9,15 @@
 // where it was, or where the person drops it. One the person collapsed stays collapsed when the model shows it again:
 // its content is updated in the shelf and marked, and the model is told so. A group of panes can be a stack instead:
 // one in front, the others tabs above it (layout.ts), by the person's choice, the model's, or for want of room.
-import { place, insert, remove, readLayout, shorthand, where, viewsOf, nodeAt, isPane, layoutOptions, openView, slotOf, setStack, setFront, type LayoutNode, type LayoutOptions, type Place, type PlacedPane, type Size, type Slot, type Split } from './layout.js';
+import { place, insert, remove, readLayout, shorthand, where, viewsOf, nodeAt, isPane, layoutOptions, openView, slotOf, setStack, setFront, type LayoutNode, type LayoutOptions, type Place, type PlacedPane, type Size, type Split } from './layout.js';
 import { measuredFromWindow, recordResize, resizeFromWindow, type Measured, type Sight, type WindowChange } from './shell-resize.js';
 import { keptFor, RESERVED, ROLES, roleFor, type ViewOwner, type ViewRole } from './shell-roles.js';
 import { layoutGeometry } from './layout-geometry.js';
+import type { ModelArrange, Shelved, ShellState, ShownMeta, ViewMeta, ViewMark } from './shell-types.js';
+import { PRESENTATION, presentationAccount, presentationEvent, refusesFullscreen, showsOf, type ShellPresentation, type Shows } from './shell-presentation.js';
 export type { ViewOwner, ViewRole } from './shell-roles.js';
 export type { Sight } from './shell-resize.js';
-
-/** What the shell knows of a view: its title, whether it is one page (which takes its pane's whole height), its cards
- *  (panels: their names in words; cards: the same, one by one). kind: a pane the host draws itself (a terminal, a browser
- *  page), with no surfaces of Vindu's. role: whose it is and what the window does with it (shell-roles.ts). */
-export type ViewMeta = { title: string; subtitle?: string; fill: boolean; panels: string; cards?: string[]; kind?: string; ask?: boolean; mark?: ViewMark; loading?: boolean; // ask: a question to the person
-  masters?: string[]; role?: ViewRole }; // masters: panels other panels follow (detail): a plain click on a row picks it (by panel id and by its components' id)
-/** What changed how a view shows what it shows, and who did it, with its undo; or what the model suggests, to take or not. */
-export type ViewMark = { text: string; by: 'person' | 'model'; undo?: boolean; suggestion?: boolean };
-/** A view collapsed in the shelf: who put it there (the person, the model, or no room for it when another view came),
- *  when (the revision), where it was (its slot), and whether it was shown again while there. */
-export type Shelved = { by: 'person' | 'model' | 'room'; at: number; slot?: Slot; updated?: boolean };
-/** What a renderer draws: the layout, every view shown (in the order first shown), the shelf, the maximized and focused
- *  panes, the revision (one more on every change, whoever made it), and a layout the model suggested, for the person to take. */
-export type ShellState = { tree: LayoutNode | null; views: ShownMeta[]; shelf: Record<string, Shelved>; maximized: string | null; focus: string | null; recent: string[]; options: LayoutOptions;
-  rev: number; suggestion: { tree: LayoutNode | null; maximize?: string | null } | null;
-  pointing?: { picked: unknown[]; attached: string[] };  // what the person points at, and the panes in the chat
-  reminders?: { set: number; due: number } };          // the process's reminders: how many are set, and how many are due now (the bar's chip)
-/** A view in the window, as state gives it: its name, what the shell knows of it, and always its role. */
-export type ShownMeta = { name: string } & ViewMeta & { role: ViewRole };
-/** How far the model arranges the window: it does (allow), it proposes and the person takes it (suggest), or never (off). */
-export type ModelArrange = 'allow' | 'suggest' | 'off';
-/** What the window reports: its size, what the person did, and how tall each view's content is. */
-export type ShellEvent =
-  | { type: 'window'; w: number; h: number }
-  | { type: 'resize'; path: number[]; sizes: number[] }
-  | { type: 'collapse'; view: string }                 // a pane into the shelf ("close" is read the same)
-  | { type: 'open'; view: string; place?: Place }      // out of the shelf: where it was, or beside the pane it was dropped on ("show" is read the same)
-  | { type: 'move'; view: string; place: Place }       // a pane dragged beside another
-  | { type: 'maximize'; view: string | null }
-  | { type: 'focus'; view: string }
-  | { type: 'take-suggestion' }
-  | { type: 'stack'; path: number[] } | { type: 'spread'; path: number[] } | { type: 'front'; path: number[]; index: number } // a split as a stack, or spread out; a tab in front
-  | { type: 'view'; view: string; action: string; [k: string]: unknown } // an action inside a view (actions.ts), or its mark's undo, take or dismiss
-  | { type: 'measure'; views: Record<string, { content: number; visible: number; sight?: Record<string, Sight> }> }
-  // for the UI server, not the layout: a button in an ask's pane, what a view drew, an app's message, what a page sent
-  // (task.send, while the person used it), an operation run by the person
-  | { type: 'action'; view: string; name?: string; context?: unknown }
-  | { type: 'rendered'; view: string; seq?: number; surface: 'wide' | 'compact'; tab?: number; got: { i: number; text: string | null; visible: boolean; frame?: { w: number; h: number; loaded: boolean } }[] }
-  | { type: 'app'; view: string; panel: string; resource: string; mount: string; msg: unknown }
-  | { type: 'send'; view: string; panel: string; value: unknown }
-  | { type: 'report'; view: string; panel: string; report: unknown } // how a page runs in the window: the page itself (page-report.ts)
-  | { type: 'read'; view: string; seq?: number; read: Record<string, number> } // how far each panel is read, by pid: for the host, never the model
-  | { type: 'operation'; name: string }
-  | { type: 'reminders' }                              // the bar's chip: show the Reminders pane
-  // what the person points at (pointing.ts): marked things, a pane in the chat, a bar opened, a page's bridge
-  | { type: 'select'; by?: string; items: unknown[] }
-  | { type: 'attach'; view: string; on: boolean }
-  | { type: 'drill'; view: string; panel?: string; pid?: string; row: number }
-  | { type: 'page'; kind: 'select' | 'ask'; view: string; panel?: string; items?: unknown; note?: string; prompt?: string };
+export type { ModelArrange, Shelved, ShellEvent, ShellState, ShownMeta, ViewMeta, ViewMark } from './shell-types.js';
 
 const ASSUMED: Size = { w: 1280, h: 800 };
 const px = (n: number) => Math.round(n).toLocaleString('en-GB');
@@ -96,6 +50,7 @@ export class Shell {
   private suggestion: ShellState['suggestion'] = null;
   private verified = new Map<string, { v: unknown; at: number }>(); // what the window read back from each view it drew, and when
   private laidAt = 0;              // when the panes last moved or changed size
+  private presenting: ShellPresentation = { ...PRESENTATION }; // how the views are shown: as cards or as their content
   readonly arranges: ModelArrange;
 
   constructor(o: { options?: Partial<LayoutOptions>; onChange?: (s: ShellState) => void; arrange?: ModelArrange } = {}) {
@@ -151,9 +106,10 @@ export class Shell {
 
   /** A view's content drawn again by the system (a read that has changed since, marked): its pane stays as it is, shown
    *  or hidden, and nothing moves. False if it was never shown. */
-  redrawn(name: string, words?: { title?: string; subtitle?: string }): boolean {
+  redrawn(name: string, words?: Partial<Pick<ViewMeta, 'title' | 'subtitle' | 'summary'>>): boolean {
     const m = this.meta.get(name); if (!m) return false;
     if (words?.title) m.title = words.title;
+    if (words?.summary) m.summary = words.summary; // what its card says, as now drawn
     if (words) { if (words.subtitle) m.subtitle = words.subtitle; else delete m.subtitle; } // its title and subtitle as now drawn
     this.measured.delete(name); this.emit(); return true;
   }
@@ -262,6 +218,8 @@ export class Shell {
     if (maximize && this.stacks()) notes.push(`the window is phone-width, so its panes are one after another: "${maximize}" fills it once it is wider`);
     const hidden = (a.keep ?? []).filter(v => this.inSight(this.tree, this.maximized, v) && !this.inSight(tree, over, v));
     if (hidden.length) return { refusal: `${quoted(hidden)} must stay in sight while the person is asked: nothing was moved; arrange the other panes around ${hidden.length > 1 ? 'them' : 'it'}`, notes };
+    const small = typeof a.maximize === 'string' ? refusesFullscreen(this.meta.get(a.maximize)) : undefined;
+    if (small) return { refusal: `"${a.maximize}" is not maximized: ${small}`, notes };
     if (this.arranges === 'suggest' && moves) {
       this.suggestion = { tree, ...(maximize !== undefined ? { maximize } : {}) }; this.emit();
       return { notes: [...notes, 'suggested to the person, who takes it or not: nothing moved yet'], suggested: true };
@@ -368,8 +326,12 @@ export class Shell {
       }
       case 'maximize': { // a pane maximized has the focus; a phone-width window stacks its panes and maximizes none
         if (x.view === null) { if (!this.maximized) return false; this.changed('maximize', `restored the layout ("${this.maximized}" was maximized)`); this.maximized = null; }
-        else { if (!inTree(view) || this.maximized === view || this.stacks()) return false; this.maximized = this.focus = view; this.used(view); this.changed('maximize', `maximized "${view}"`); }
+        else { if (!inTree(view) || this.maximized === view || this.stacks() || refusesFullscreen(this.meta.get(view))) return false; this.maximized = this.focus = view; this.used(view); this.changed('maximize', `maximized "${view}"`); }
         this.laidAt = Date.now(); this.measured.clear(); this.emit(); return true;
+      }
+      case 'presentation': case 'card': { // the person's Cards or Content, a card opened alone and the way back from it
+        const r = presentationEvent(this.presenting, x, this.shows()); if (!r) return false;
+        this.presenting = r.next; this.changed(String(x.type), r.said); this.laidAt = Date.now(); this.emit(); return true;
       }
       case 'focus': {
         if (!inTree(view) || this.focus === view) return false;
@@ -403,9 +365,17 @@ export class Shell {
     return false;
   }
 
+  /** How the host would have the views shown, and whether the window is narrow: what is not given stays as it was. */
+  setPresentation(p: Partial<Pick<ShellPresentation, 'as' | 'narrow'>>): void {
+    const next = { ...this.presenting, ...p, alone: p.as && p.as !== this.presenting.as ? null : this.presenting.alone };
+    if (JSON.stringify(next) !== JSON.stringify(this.presenting)) { this.presenting = next; this.emit(); }
+  }
+  /** What is drawn now: which views are cards, which are whole, and the one opened alone. */
+  shows(): Shows { return showsOf([...this.meta].map(([name, m]) => ({ name, ...m })), this.panes(), this.presenting, this.stacks()); }
+
   state(): ShellState {
     return { tree: this.tree, views: [...this.meta].map(([name, m]) => ({ name, ...m })), shelf: Object.fromEntries(this.shelf), maximized: this.maximized, focus: this.focus, recent: [...this.recent], options: this.options,
-      rev: this.rev, suggestion: this.suggestion, pointing: this.pointing, ...(this.rem ? { reminders: { ...this.rem } } : {}) };
+      rev: this.rev, suggestion: this.suggestion, pointing: this.pointing, ...(this.rem ? { reminders: { ...this.rem } } : {}), presentation: { ...this.presenting } };
   }
   private rem: { set: number; due: number } | undefined;
   /** How many reminders are set and due (server.ts keeps them), for the bar's chip. */
@@ -457,7 +427,7 @@ export class Shell {
     }[p.mode];
     const notes = [...(o.notes ?? []), ...p.notes];
     const parked = (v: string) => { const s = this.shelf.get(v); return { view: v, title: this.meta.get(v)!.title, ...(this.meta.get(v)?.loading ? { state: 'loading' } : {}), by: BY[s?.by ?? 'model'], ...(s?.updated ? { updated: 'shown again while collapsed: marked as new' } : {}) }; };
-    return {
+    return presentationAccount({
       rev: this.rev,
       window: this.window ? `${win.w} × ${win.h}` : `${win.w} × ${win.h}, assumed: no window has reported its size`,
       mode,
@@ -471,7 +441,7 @@ export class Shell {
       ...(notes.length ? { notes } : {}),
       ...(this.suggestion ? { suggested: `${JSON.stringify(shorthand(this.suggestion.tree))}: waiting for the person` } : {}),
       ...(this.changes.length || this.elsewhere.length ? { person: o.keep ? [...this.pending(), ...this.elsewhere] : this.takePerson() } : {}), // keep: an account no model reads now
-    };
+    }, this.shows(), this.presenting, o.full); // said as the views are shown: as cards, or as their content
   }
 
   /** What the person changed that the model has not read yet, for the note that goes with the next prompt. */

@@ -191,7 +191,7 @@ function resolve(p: PanelSpec, view: ViewSpec, ctx: ViewContext, notes: string[]
   if (kind.rows && rows.length) { // a block's own shaping (totals, free slots, tracked changes, a layout), by the system
     const before = rows; let made: ReturnType<NonNullable<typeof kind.rows>>;
     const draft = ctx.draft && ((model: ModelDraft) => ctx.draft!(view.name, p.id, model)); // the person's own draft of it, where the window keeps one
-    try { made = kind.rows(rows, p, id => ctx.results.get(id), { inputs, ...(draft ? { draft } : {}) }); } catch (x) { throw new Refusal(`panel ${p.id}: ${(x as Error).message}`); }
+    try { made = kind.rows(rows, p, id => ctx.results.get(id), { inputs, ...(draft ? { draft } : {}), ...(ctx.format ? { timeZone: ctx.format.timeZone } : {}) }); } catch (x) { throw new Refusal(`panel ${p.id}: ${(x as Error).message}`); }
     const { rows: out, ...worked } = Array.isArray(made) ? { rows: made } : made;
     rows = out; if (Object.keys(worked).length) shaped = worked;
     if (rows !== before && !behind) reindex(at, before, rows); // a group's rows stand for the rows behind them

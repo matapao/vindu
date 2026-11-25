@@ -9,6 +9,7 @@ import type { PageDriver } from '../page-check.js';
 import type { HeadText, Library } from '../pages.js';
 import type { PointItem } from '../pointing.js';
 import type { ViewPresentation } from '../presentation.js';
+import type { Presentation } from '../shell-presentation.js';
 import type { Reminder, ReminderWords } from '../reminders.js';
 import type { AnswerEntry, Entry, ResultSource } from '../results.js';
 import type { ModelArrange, ShellState, ViewMark } from '../shell.js';
@@ -209,6 +210,14 @@ export type OpenMore = {
    *  setViewWords changes them while it runs. One that is none is refused as the window opens (a RangeError). */
   locale?: string;
   timeZone?: string;
+  /** How the window shows what the views hold: each in its pane (content, the default), each as a card the person opens
+   *  alone (cards), or as cards once there are several (auto). What waits for the person, a notice and the host's panes
+   *  are always drawn whole. setPresentation changes it while it runs; the person's own switch comes through the
+   *  window's events ({ type: 'presentation', as }), for the host to keep and give here the next time. */
+  presentation?: Presentation;
+  /** The window is narrow (a phone, a side panel): the cards are a list, and no switch between cards and content is
+   *  offered. A phone-width window is narrow whatever this says. */
+  narrow?: boolean;
   /** A source kept fresh (a slot's source with every): the host reads it again every so many seconds, from the result
    *  it starts from (after), and says each new result's id when what it read changed. Returns a stop. */
   watch?: (

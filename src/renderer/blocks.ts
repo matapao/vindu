@@ -6,6 +6,7 @@
 import type { VinduComponent } from './define.js';
 import { VMessages, VDocument } from './blocks/communications.js';
 import { VEvents } from './blocks/calendar.js';
+import { VNotice } from './blocks/notice.js';
 import { VTasks } from './blocks/tasks.js';
 import { VFiles, VMap, VContacts } from './blocks/records.js';
 import { VMoney } from './blocks/money.js';
@@ -21,6 +22,7 @@ export const BLOCK_COMPONENTS: VinduComponent[] = [
   VMessages,
   VDocument,
   VEvents,
+  VNotice,
   VTasks,
   VMoney,
   VFiles,

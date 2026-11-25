@@ -9,6 +9,8 @@ const DARK = '--v-desk:#0d0d0d;--v-pane:#1a1a19;--v-head:#151514;--v-line:#35353
 import { captionSize, headingSize, rhythm, space, typeSize } from './metrics.js';
 import { PRIMITIVE_METRICS_CSS } from './primitive-metrics.js';
 import { BLOCKS_CSS } from './blocks-css.js';
+import { CARDS_CSS } from './shell-cards-css.js';
+import { WEEK_CSS } from './blocks/week-css.js';
 export const THEME_CSS = `
 .vindu-theme{${LIGHT}
   --a2ui-color-background:var(--v-pane);--a2ui-color-on-background:var(--v-ink);--a2ui-color-surface:var(--v-pane);--a2ui-color-on-surface:var(--v-ink);
@@ -164,7 +166,7 @@ function stylesheet(doc: Document, name: string, css: string): void {
 }
 
 export function useTheme(doc: Document = document): void {
-  stylesheet(doc, 'theme', THEME_CSS + BLOCKS_CSS);
+  stylesheet(doc, 'theme', THEME_CSS + BLOCKS_CSS + WEEK_CSS + CARDS_CSS);
 }
 
 /** Standalone views can opt into sizing without loading the shell's theme. */

@@ -5,6 +5,9 @@ export { defineComponent, Page, McpApp, vinduCatalog, drawSurface, withoutHead, 
 export { mountShell, skinCss, sideAt, SHELL_LABELS, type ShellHandle, type ShellOptions, type ShellTokens, type ShellSkin, type ShellLabels, type ShellAction, type ShellCommand, type ShownView, type PaneDrawer, type HostPane } from './shell.js';
 export type { ViewMetrics } from './metrics.js';
 export type { PanelPresentation, ViewPresentation } from '../presentation.js';
+export type { PanelSummary } from '../panel-summary.js';
+export type { ViewSummary, ViewChange, ViewSize } from '../view-summary.js';
+export { showsOf, PRESENTATION, type Presentation, type ShellPresentation, type Shows } from '../shell-presentation.js'; // for a host that draws the cards itself
 export type { PointItem } from '../pointing.js';
 export { useTheme, THEME_CSS } from './theme.js';
 export { guardA2uiArrays } from './a2ui-limits.js'; // for a host that checks with A2UI's schemas before the window starts

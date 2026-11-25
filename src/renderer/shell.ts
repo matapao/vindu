@@ -39,6 +39,8 @@ import { mountDividers } from './shell-dividers.js';
 import { mountStacks } from './shell-stacks.js';
 import { guardA2uiArrays } from './a2ui-limits.js';
 import { checkedSources, setPictureSources } from './picture-sources.js';
+import { mountCards } from './shell-cards.js';
+import { PRESENTATION, refusesFullscreen } from '../shell-presentation.js';
 
 export { moveLine } from './shell-dividers.js';
 export * from './shell-options.js';
@@ -214,10 +216,10 @@ export function mountShell(host: HTMLElement, o: ShellOptions = {}): ShellHandle
   };
   const layout = () => {
     const win = deskSize();
-    placed = place(st.tree, win, { maximized: st.maximized, fill: new Set(st.views.filter(v => v.fill).map(v => v.name)), options: st.options,
-      asks: new Set(st.views.filter(v => v.ask).map(v => v.name)), recent: st.recent });
+    placed = cards.arrange(st, place(st.tree, win, { maximized: st.maximized, fill: new Set(st.views.filter(v => v.fill).map(v => v.name)), options: st.options,
+      asks: new Set(st.views.filter(v => v.ask).map(v => v.name)), recent: st.recent }), win.w); // as cards: what is drawn whole, then the cards
     const pl = placed;
-    root.dataset.mode = pl.mode;
+    root.dataset.mode = cards.shows.as === 'cards' ? 'cards' : pl.mode;
     const shown = new Set(pl.panes.map(p => p.view));
     for (const [name, p] of panes) if (!shown.has(name) && name !== peeking) p.el.hidden = true;
     if (peeking && shown.has(peeking)) { const p = panes.get(peeking); p?.el.classList.remove('is-peek'); p?.open.remove(); peeking = null; }
@@ -247,7 +249,8 @@ export function mountShell(host: HTMLElement, o: ShellOptions = {}): ShellHandle
       p.el.toggleAttribute('data-focus', st.focus === pp.view);
       p.body.toggleAttribute('data-fill', !!m?.fill);
       const isMax = st.maximized === pp.view;
-      p.max.hidden = pl.mode === 'stacked'; // a phone-width window maximizes none
+      p.max.hidden = pl.mode === 'stacked' || !!refusesFullscreen(m); // a phone-width window maximizes none, and a small view is never fullscreen
+      p.el.classList.toggle('is-strip', m?.summary?.size === 'notice'); // a notice: a strip, without a title bar
       if (p.maxed !== isMax) { p.maxed = isMax; p.max.innerHTML = isMax ? ICON.restore : ICON.max; p.max.setAttribute('aria-label', isMax ? L.restore : L.maximize); p.max.title = isMax ? L.restoreHint : L.maximizeHint; }
       syncActs(p, pp.view);
       draw(pp.view, pp.compact ? 'compact' : 'wide');
@@ -258,11 +261,16 @@ export function mountShell(host: HTMLElement, o: ShellOptions = {}): ShellHandle
     placeHosts();
     dividers.render(pl);
     stacks.render(pl);
+    cards.render();
     empty.hidden = pl.mode !== 'empty';
     renderBar();
     scheduleMeasure();
     recheckAll();
   };
+  // the views as cards: a card opened alone or the person's switch, drawn at once, then told (shell-cards.ts)
+  const presenting = (p: Partial<typeof PRESENTATION>, e: ShellEvent) => { st = { ...st, presentation: { ...(st.presentation ?? PRESENTATION), ...p } }; layout(); emit(e); };
+  const cards = mountCards({ desk, bar, make, labels: L, meta, pane: name => panes.get(name),
+    open: view => presenting({ alone: view }, { type: 'card', view }), presentAs: as => presenting({ as, alone: null }, { type: 'presentation', as }) });
   const stacks = mountStacks({
     desk, make, labels: L, emit,
     title: view => meta(view)?.title ?? view,
@@ -295,7 +303,7 @@ export function mountShell(host: HTMLElement, o: ShellOptions = {}): ShellHandle
   // a pane maximized has the focus; a phone-width window stacks its panes, every one in sight, and maximizes none
   const toggleMax = (name: string): boolean => {
     const next = st.maximized === name ? null : name;
-    if (next && isStacked()) return false;
+    if (next && (isStacked() || refusesFullscreen(meta(next)))) return false;
     st = { ...st, maximized: next, focus: next ?? st.focus }; layout(); emit({ type: 'maximize', view: next });
     return true;
   };
@@ -373,7 +381,7 @@ export function mountShell(host: HTMLElement, o: ShellOptions = {}): ShellHandle
       b.setAttribute('aria-pressed', String(st.focus === v.name));
     });
     const pl = placed;
-    barMode.textContent = pl ? L.mode(pl.mode, pl.panes.filter(x => !x.behind).length) : '';
+    barMode.textContent = pl && cards.shows.as !== 'cards' ? L.mode(pl.mode, pl.panes.filter(x => !x.behind).length) : '';
     suggest.hidden = !st.suggestion;
     const rem = st.reminders; remChip.hidden = !rem;
     if (rem) { remChip.textContent = L.reminders(rem.set, rem.due); remChip.title = L.remindersHint; remChip.classList.toggle('is-due', rem.due > 0); remChip.setAttribute('aria-live', 'polite'); }
@@ -390,6 +398,7 @@ export function mountShell(host: HTMLElement, o: ShellOptions = {}): ShellHandle
   root.addEventListener('keydown', e => {
     const own = (e.target as Element | null)?.closest?.('.vindu-pane-body[data-host]'); // a host's pane (a terminal) gets its own Esc
     if (e.key === 'Escape' && peeking && !own) { e.preventDefault(); unpeek(true); return; }
+    if (e.key === 'Escape' && !own && cards.back()) { e.preventDefault(); return; } // a card opened alone: back to the cards
     if (e.key === 'Escape' && st.maximized && !own) { e.preventDefault(); toggleMax(st.maximized); }
     if (e.key === 'F6' && step(e.shiftKey)) e.preventDefault();
   });

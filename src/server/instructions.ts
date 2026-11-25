@@ -1,4 +1,5 @@
 import { MESSAGE } from '../blocks.js';
+import { EVENTS } from '../block-events.js';
 import type { CardDef } from '../cards.js';
 import { Views } from '../views/views.js';
 
@@ -68,6 +69,11 @@ export const readText = (h: Has) =>
  *  sends, never words in the model's answer. */
 export const DRAFTS_TEXT =
   ' A mail meant to be sent is shown as a message draft ({"card": "message", "layout": "draft", "data": {"to", "subject", "body", …}}), never written as text in your answer: the person reads it, edits it and sends it in the window; you never press Send, and you are told how it went.';
+/** What the model is told of a week, where the events block is offered: its weather, warnings and tasks go on its days. */
+export const WEEK_TEXT =
+  ' A week with forecast or warning data is one events panel that carries them ({"card": "events", "from": …, "forecast": …, "warnings": …, "tasks": …}): each day shows its weather and the tasks due, and the warnings are a strip over the days they cover; never a line chart of temperatures by date or a list of warnings beside it.';
+/** Whether this window offers Vindu's events block, and so a week that carries its weather. */
+export const offersWeek = (cards: ReadonlyMap<string, CardDef>) => cards.get('events') === EVENTS;
 /** Whether this window offers Vindu's message block, and so its drafts. */
 export const offersDrafts = (cards: ReadonlyMap<string, CardDef>) => cards.get('message') === MESSAGE;
 export const showText = (h: Has) =>

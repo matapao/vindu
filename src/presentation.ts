@@ -1,7 +1,9 @@
 // A host can draw a resolved view with its own components and still share Vindu's state and actions.
 import { kindOf } from './card-kinds/registry.js';
-import { MAX_ROWS, panelsOf, recordFields, shownFields, type CardDef, type PanelSpec, type Resolved, type ViewSpec } from './cards.js';
+import { MAX_ROWS, recordFields, shownFields, type CardDef, type PanelSpec, type Resolved, type ViewSpec } from './cards.js';
+import { panelSummaryOf, type PanelSummary, type SummaryKit } from './panel-summary.js';
 import type { Row } from './results.js';
+import { shownPanels, viewSize, waitsForPerson, type ViewChange, type ViewSize } from './view-summary.js';
 
 export type PanelPresentation = {
   id: string;
@@ -33,6 +35,9 @@ export type PanelPresentation = {
   /** A waiting panel's result the host could not read again: the person's Try again, as Vindu's own panel sends it
    *  through the window's events, { type: 'action', view: name, name: again.event, context: again.context }. */
   again?: { event: 'try_again'; context: { panel: string } };
+  /** What its card says: its kind, its title, one line of what it holds in the view's words and locale, and a picture
+   *  where one says more (panel-summary.ts). */
+  summary: PanelSummary;
 };
 
 export type ViewPresentation = {
@@ -48,14 +53,24 @@ export type ViewPresentation = {
   /** The way back up one step, as Vindu's own head sends it: a host's own back control sends this action through the
    *  window's events, { type: 'action', view: name, name: back.event, context: back.context }. */
   back?: { event: 'drill_back'; context: { depth: number } };
+  /** Who changed the view last, and when: the model showing it or acting in it, or the person acting in it; so a host
+   *  can show what this turn made apart from what came before. */
+  changed: ViewChange;
+  /** It waits for the person (a call that failed, a mail drafted for them and not yet sent): draw it whole, never as a card. */
+  waits?: true;
+  /** small: never drawn fullscreen (a kpi, a short record, a line of text); notice: notices alone, drawn as a strip. */
+  size?: ViewSize;
 };
+/** What a view's presentation is written with besides its data: the view's locale, time zone and words, and who
+ *  changed it last (now, by the model, when not given). */
+export type PresentationKit = Omit<SummaryKit, 'title'> & { changed?: ViewChange };
 
 const project = (row: Row, fields: string[]): Row =>
   Object.fromEntries(fields.filter(field => Object.hasOwn(row, field)).map(field => [field, row[field]]));
 
-function panelOf(p: PanelSpec, d: Resolved, cards: ReadonlyMap<string, CardDef>): PanelPresentation {
+function panelOf(p: PanelSpec, d: Resolved, cards: ReadonlyMap<string, CardDef>, kit: SummaryKit): PanelPresentation {
   const def = cards.get(p.card); const kind = kindOf(p.card, cards);
-  const base = { id: p.id, card: d.waiting?.card ?? p.card, ...(p.title === undefined ? {} : { title: p.title }) };
+  const base = { id: p.id, card: d.waiting?.card ?? p.card, ...(p.title === undefined ? {} : { title: p.title }), summary: panelSummaryOf(p, d, kit) };
   if (d.failed !== undefined) return { ...base, state: 'error', message: d.failed };
   if (d.waiting) {
     const again = d.waiting.again ? { again: { event: 'try_again' as const, context: { panel: p.id } } } : {}; // as a2ui.ts draws it
@@ -96,10 +111,13 @@ function panelOf(p: PanelSpec, d: Resolved, cards: ReadonlyMap<string, CardDef>)
   return result;
 }
 
-export function presentationOf(spec: ViewSpec, data: Record<string, Resolved>, seq: number, cards: ReadonlyMap<string, CardDef>): ViewPresentation {
-  const panels = spec.step && spec.panels ? spec.panels.slice(0, spec.step.at) : panelsOf(spec);
+export function presentationOf(spec: ViewSpec, data: Record<string, Resolved>, seq: number, cards: ReadonlyMap<string, CardDef>, kit: PresentationKit): ViewPresentation {
+  const panels = shownPanels(spec), { changed, ...words } = kit, size = viewSize(spec, data);
   const result: ViewPresentation = {
-    name: spec.name, title: spec.title, seq, panels: panels.map(p => panelOf(p, data[p.id], cards)),
+    name: spec.name, title: spec.title, seq, panels: panels.map(p => panelOf(p, data[p.id], cards, { ...words, title: spec.title })),
+    changed: changed ?? { by: 'model', at: new Date(kit.now ?? Date.now()).toISOString() },
+    ...(panels.some(p => waitsForPerson(p, data[p.id])) ? { waits: true as const } : {}),
+    ...(size ? { size } : {}),
     ...(spec.subtitle === undefined ? {} : { subtitle: spec.subtitle }),
     ...(spec.tabs ? { tabs: spec.tabs.map(tab => ({ title: tab.title, panels: tab.panels.map(p => p.id) })) } : {}),
     ...(spec.step ? { step: spec.step } : {}),

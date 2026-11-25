@@ -1,9 +1,10 @@
 // The words Vindu draws on a view's own surface, besides what the model wrote: what a panel says of itself, the way
 // back and through steps and a gallery, the system's own suggestions, each hook's line with its switch, a mail
-// drafted for the person to send, and what the blocks say of their rows (block-words.ts). English by default; a host
-// gives its own, whole or word by word (view-words-norwegian.ts has Bokmål and Nynorsk). What the model is told stays
-// in English, whatever the person reads.
+// drafted for the person to send, what the blocks say of their rows (block-words.ts), and the line each panel's card
+// says of what it holds (summary-words.ts). English by default; a host gives its own, whole or word by word
+// (view-words-norwegian.ts has Bokmål and Nynorsk). What the model is told stays in English, whatever the person reads.
 import { BLOCK_WORDS, type BlockWords } from './block-words.js';
+import { SUMMARY_WORDS, type SummaryWords } from './summary-words.js';
 
 /** A hook's line, as the person reads it: when it runs, then each thing it does; and why it is off where it cannot be
  *  turned on. Panels come by their titles, an operation by its name with spaces. */
@@ -69,9 +70,10 @@ export type ViewWords = {
   turnOff: string;
   hook: HookWords;
   message: MessageWords;
+  summary: SummaryWords;
 } & BlockWords;
 /** The groups of words, each merged word by word. */
-const GROUPS = ['hook', 'message', 'money', 'events', 'batch', 'map', 'tasks', 'pdf'] as const satisfies readonly (keyof ViewWords)[];
+const GROUPS = ['hook', 'message', 'summary', 'money', 'events', 'notice', 'batch', 'map', 'tasks', 'pdf'] as const satisfies readonly (keyof ViewWords)[];
 type Group = (typeof GROUPS)[number];
 /** Words a host gives: any of them; each one it leaves out is the one under it. */
 export type PartialViewWords = Partial<Omit<ViewWords, Group>> & { [G in Group]?: Partial<ViewWords[G]> };
@@ -140,6 +142,7 @@ export const VIEW_WORDS: ViewWords = {
     copy: 'Copy',
     copied: 'Copied',
   },
+  summary: SUMMARY_WORDS,
   ...BLOCK_WORDS,
 };
 

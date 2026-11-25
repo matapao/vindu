@@ -33,7 +33,7 @@ export const act = async (
       const account = await session.present(last.args, true, false, () => {
         if (h.at(-1) === last) h.pop();
         done?.(`undid "${last.what}"`);
-      });
+      }, false, by);
       const prev = h.at(-1);
       session.shell.mark(view, prev ? { text: markOf(prev.what), by: prev.by, undo: true } : undefined);
       return { what: `undid "${last.what}"`, account };
@@ -44,7 +44,7 @@ export const act = async (
       h.push({ args, by, what: r.what });
       session.vhistory.set(view, h.slice(-20));
       done?.(r.what);
-    }); // its pane stays as it is
+    }, false, by); // its pane stays as it is
     if (r.mark) session.shell.mark(view, { text: r.mark, by, undo: true }); // a row picked for linked panels is no change to mark
     if (a.action === 'select') {
       wakeWaiting(session); // what waited for a pick goes on

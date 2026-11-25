@@ -82,7 +82,7 @@ test('refusals say what to send instead', async () => {
 test('common shapes are read, with a note; a card there is not is refused, with what to send instead', async () => {
   const gauge = await call('show_view', { name: 'diff', title: 'Export vs database', panels: [{ card: 'gauge', title: 'Difference', value: 'count()', rows: [{ a: 1 }] }] });
   assert.equal(gauge.ok, false);
-  assert.equal(gauge.text, 'not shown: panel difference: there is no "gauge" card: draw it in a page (ECharts, Chart.js and three.js are pinned), or use the nearest card for what you sent: kpi. The cards: kpi, table, list, record, timeline, bar-chart, line-chart, media, gallery, text, page, code, diff, pdf, message, document, events, tasks, money, files, map, contacts, sheet, slides, signature, diagram, devices, batch, changes, decision'); // the blocks too
+  assert.equal(gauge.text, 'not shown: panel difference: there is no "gauge" card: draw it in a page (ECharts, Chart.js and three.js are pinned), or use the nearest card for what you sent: kpi. The cards: kpi, table, list, record, timeline, bar-chart, line-chart, media, gallery, text, page, code, diff, pdf, message, document, events, notice, tasks, money, files, map, contacts, sheet, slides, signature, diagram, devices, batch, changes, decision'); // the blocks too
   const pie = await call('show_view', { name: 'diff', title: 'Shares', panels: [{ card: 'pie-chart', value: 'sum(amount_nok)', group: 'customer', from: 'r1' }] });
   assert.match(pie.text, /there is no "pie-chart" card: for parts of a whole, a bar-chart with the same group and value shows the same numbers/);
   const r = await call('show_view', { name: 'diff', title: 'Export vs database', panels: [

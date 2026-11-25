@@ -323,8 +323,9 @@ test('a pane the host draws itself: its drawer draws it, it is told its box as t
   const told = async () => (await page.evaluate(() => (window as any).app.hosted())).boxes.filter((b: { view: string }) => b.view === 'term').map((b: { box: unknown }) => b.box);
   await sleep(200);
   assert.deepEqual((await told()).at(-1), await boxOf()); // the body's box, in the window: where a native view lies
-  await page.evaluate(() => (window as any).app.command({ type: 'open', view: 'overdue' })); // the tests before may have left it in the shelf
-  assert.equal(await page.evaluate(() => (window as any).app.command({ type: 'maximize', view: 'overdue' })), true);
+  await page.evaluate(() => (window as any).app.command({ type: 'open', view: 'runner' })); // the tests before may have left it in the shelf
+  assert.equal(await page.evaluate(() => (window as any).app.command({ type: 'maximize', view: 'overdue' })), false); // a kpi alone is small: never fullscreen
+  assert.equal(await page.evaluate(() => (window as any).app.command({ type: 'maximize', view: 'runner' })), true);
   await sleep(150);
   assert.deepEqual((await told()).at(-1), null); // behind the maximized pane: a native view would cover it, so it goes
   await page.evaluate(() => (window as any).app.command({ type: 'restore' }));

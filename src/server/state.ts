@@ -10,6 +10,7 @@ import type { Reminder } from '../reminders.js';
 import type { AnswerEntry, ResultSource } from '../results.js';
 import { Shell } from '../shell.js';
 import type { Template } from '../templates.js';
+import type { ViewChange } from '../view-summary.js';
 import type { ViewWords } from '../view-words.js';
 import type { ViewFormat } from './view-words.js';
 import { Views } from '../views/views.js';
@@ -72,6 +73,7 @@ export type Session = {
     restoring?: boolean,
     committed?: () => void,
     anew?: boolean,
+    by?: ViewChange['by'],
   ): Promise<Account>;
   fireHooks(view: string, event: HookEvent, only?: number): Promise<void>;
   resumeWaiting(): Promise<void>;
@@ -110,6 +112,7 @@ export type Session = {
   watches: (() => void)[]; // sources kept fresh: each one's stop
   fresh: Map<string, string>; // every read of a source kept fresh: that source's newest read
   vhistory: Map<string, { args: Record<string, unknown>; by: 'person' | 'model'; what: string }[]>; // each view's changes inside it, for undo
+  changed: Map<string, ViewChange>; // who changed each view last, and when: the model showing it, or either acting in it (its card says so)
   vsuggest: Map<string, ViewAction & { what: string }>; // a change inside a view the model suggested, for the person to take or not
   vunseen: Map<string, string[]>; // the person's changes inside a view the model has not been told of yet
   receipts: Receipt[]; // what the person's yeses let go, and how it went

@@ -67,9 +67,9 @@ export type CardFile = {
   most: number;
   rows: (text: string, panel: PanelSpec) => { rows: Row[]; cut?: string };
 };
-/** What a card's rows are shaped with besides them: the inputs the values are computed with, and the person's own draft
- *  of the panel, where the window keeps one (a message block's draft: block-drafts.ts). */
-type RowsContext = { inputs: Record<string, number>; draft?: DraftContext };
+/** What a card's rows are shaped with besides them: the inputs the values are computed with, the person's own draft
+ *  of the panel, where the window keeps one (a message block's draft: block-drafts.ts), and the view's time zone. */
+type RowsContext = { inputs: Record<string, number>; draft?: DraftContext; timeZone?: string }; // timeZone: the view's, for what falls on which day
 /** What a card's own shaping worked out besides its rows, so nothing is kept on the panel: props for its component (an
  *  invoice's totals, where nodes go), what its account adds, and the rows its check reads when not these (free time is
  *  checked against the events it was found between). */
@@ -287,7 +287,7 @@ export type Resolved = {
   gallery?: GalleryItem[];           // a gallery's pictures and videos, in order
   page?: { url: string; label: string; uses: string[]; height: number; static?: true }; // static: it runs nothing
   code?: { path: string; language: string; lines: number; line?: number; against?: string; added?: number; removed?: number; new?: boolean };
-  pdf?: { name: string; bytes: number };   // a PDF in Vindu's own viewer (page has its address): its file's name and size
+  pdf?: { name: string; bytes: number; pages?: number }; // a PDF in Vindu's own viewer (page has its address): its file's name, size and pages, once known
   /** A file the system read for the card, where it is (an attachment's id, or work/<path>) and its name: a data file the
    *  rows were read from (data-files.ts), with its format, how many rows and columns it has, and each row's own row in
    *  it (row 1 its header); or a file the card reads itself (a document's Markdown), with the bytes read of its size,

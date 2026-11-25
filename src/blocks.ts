@@ -10,6 +10,7 @@ import { block, needOne, type Roles } from './block-kit.js';
 import { BATCH } from './block-batch.js';
 import { draftShaped } from './block-drafts.js';
 import { EVENTS } from './block-events.js';
+import { NOTICE } from './block-notice.js';
 import { panelOption, resultRef, rowFields, type CardDef } from './cards.js';
 import { changedFields } from './changes.js';
 import { addFields, num, parse as parseExpr, setValue } from './compute.js';
@@ -268,4 +269,4 @@ export const DECISION = block({
   account: rows => ({ decisions: rows.length }),
 });
 
-export const BLOCKS: CardDef[] = [MESSAGE, DOCUMENT, EVENTS, TASKS, MONEY_BLOCK, FILES, MAP_BLOCK, CONTACTS, SHEET, SLIDES, SIGNATURE, DIAGRAM, DEVICES, BATCH, CHANGES, DECISION];
+export const BLOCKS: CardDef[] = [MESSAGE, DOCUMENT, EVENTS, NOTICE, TASKS, MONEY_BLOCK, FILES, MAP_BLOCK, CONTACTS, SHEET, SLIDES, SIGNATURE, DIAGRAM, DEVICES, BATCH, CHANGES, DECISION];

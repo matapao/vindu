@@ -1,6 +1,7 @@
 // A view's own words in Norwegian: Bokmål (nb) and Nynorsk (nn), each a whole set (view-words.ts). Numbers a hook
 // looks at are written with a decimal comma; the blocks' numbers and dates are the view's locale's (block-words.ts).
 import type { BlockWords } from './block-words.js';
+import { SUMMARY_WORDS_NB, SUMMARY_WORDS_NN } from './summary-words.js';
 import { lineIn, type ViewWords } from './view-words.js';
 
 const decimalComma = (n: number) => String(n).replace('.', ',');
@@ -14,7 +15,9 @@ const BLOCK_WORDS_NB: BlockWords = {
     agrees: 'dokumentets egen totalsum, {stated}, stemmer med summen av linjene',
     differs: 'dokumentet oppgir {stated}, men linjene blir til sammen {total}',
   },
-  events: { free: 'ledig {time}', hours: '{hours} t', minutes: '{minutes} min', none: 'Ingen avtaler.', noFree: 'Ingen ledig tid av den lengden i dette tidsrommet.' },
+  events: { free: 'ledig {time}', hours: '{hours} t', minutes: '{minutes} min', none: 'Ingen avtaler.', noFree: 'Ingen ledig tid av den lengden i dette tidsrommet.',
+    rain: '{amount} mm', wind: '{speed} m/s', yellow: 'Gult farevarsel', orange: 'Oransje farevarsel', red: 'Rødt farevarsel', due: 'Frist: {title}' },
+  notice: { yellow: 'Gult farevarsel', orange: 'Oransje farevarsel', red: 'Rødt farevarsel', from: 'fra {when}', until: 'til {when}' },
   batch: { ok: '{count} ok', failed: '{count} feilet', missing: '{count} mangler', of: 'av {count}' },
   map: { drawn: 'Posisjonene er tegnet av systemet, uten kartfliser.' },
   tasks: { due: 'frist {date}' },
@@ -28,7 +31,9 @@ const BLOCK_WORDS_NN: BlockWords = {
     agrees: 'dokumentet sin eigen totalsum, {stated}, stemmer med summen av linjene',
     differs: 'dokumentet oppgir {stated}, men linjene blir til saman {total}',
   },
-  events: { free: 'ledig {time}', hours: '{hours} t', minutes: '{minutes} min', none: 'Ingen avtalar.', noFree: 'Inga ledig tid av den lengda i dette tidsrommet.' },
+  events: { free: 'ledig {time}', hours: '{hours} t', minutes: '{minutes} min', none: 'Ingen avtalar.', noFree: 'Inga ledig tid av den lengda i dette tidsrommet.',
+    rain: '{amount} mm', wind: '{speed} m/s', yellow: 'Gult farevarsel', orange: 'Oransje farevarsel', red: 'Raudt farevarsel', due: 'Frist: {title}' },
+  notice: { yellow: 'Gult farevarsel', orange: 'Oransje farevarsel', red: 'Raudt farevarsel', from: 'frå {when}', until: 'til {when}' },
   batch: { ok: '{count} ok', failed: '{count} feila', missing: '{count} manglar', of: 'av {count}' },
   map: { drawn: 'Posisjonane er teikna av systemet, utan kartfliser.' },
   tasks: { due: 'frist {date}' },
@@ -90,6 +95,7 @@ export const VIEW_WORDS_NB: ViewWords = {
     copy: 'Kopier',
     copied: 'Kopiert',
   },
+  summary: SUMMARY_WORDS_NB,
   ...BLOCK_WORDS_NB,
 };
 
@@ -148,5 +154,6 @@ export const VIEW_WORDS_NN: ViewWords = {
     copy: 'Kopier',
     copied: 'Kopiert',
   },
+  summary: SUMMARY_WORDS_NN,
   ...BLOCK_WORDS_NN,
 };

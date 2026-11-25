@@ -11,13 +11,24 @@ export type MoneyWords = {
   agrees: string;  // "the document's own total, {stated}, is what its lines add up to"
   differs: string; // "the document says {stated}; its lines add up to {total}"
 };
-/** The events block: free time between events, and what it says with nothing to show. */
+/** The events block: free time between events, what it says with nothing to show, and what a week carries: each day's
+ *  precipitation and wind, the warnings over its days by level, and the tasks due on it. */
 export type EventWords = {
   free: string;    // "free {time}": the time, in hours and minutes
   hours: string;   // "{hours} h"
   minutes: string; // "{minutes} min"
   none: string;    // "No events."
   noFree: string;  // no free time of the length asked for
+  rain: string;    // "{amount} mm": a day's precipitation
+  wind: string;    // "{speed} m/s": a day's strongest wind
+  yellow: string; orange: string; red: string; // a warning, by its level: "Yellow warning"
+  due: string;     // "Due: {title}": a task due that day, for a screen reader
+};
+/** The notice block: a notice by its level, and when it is from and to. */
+export type NoticeWords = {
+  yellow: string; orange: string; red: string; // "Yellow warning"
+  from: string;    // "from {when}"
+  until: string;   // "until {when}"
 };
 /** The batch block: how many calls went how, of all of them. */
 export type BatchWords = {
@@ -37,7 +48,7 @@ export type PdfWords = {
   locked: string;     // a PDF protected by a password
   unreadable: string; // "This PDF could not be read: {why}"
 };
-export type BlockWords = { money: MoneyWords; events: EventWords; batch: BatchWords; map: MapWords; tasks: TaskWords; pdf: PdfWords };
+export type BlockWords = { money: MoneyWords; events: EventWords; notice: NoticeWords; batch: BatchWords; map: MapWords; tasks: TaskWords; pdf: PdfWords };
 
 export const BLOCK_WORDS: BlockWords = {
   money: {
@@ -47,7 +58,9 @@ export const BLOCK_WORDS: BlockWords = {
     agrees: 'the document\'s own total, {stated}, is what its lines add up to',
     differs: 'the document says {stated}; its lines add up to {total}',
   },
-  events: { free: 'free {time}', hours: '{hours} h', minutes: '{minutes} min', none: 'No events.', noFree: 'No free time of that length in that range.' },
+  events: { free: 'free {time}', hours: '{hours} h', minutes: '{minutes} min', none: 'No events.', noFree: 'No free time of that length in that range.',
+    rain: '{amount} mm', wind: '{speed} m/s', yellow: 'Yellow warning', orange: 'Orange warning', red: 'Red warning', due: 'Due: {title}' },
+  notice: { yellow: 'Yellow warning', orange: 'Orange warning', red: 'Red warning', from: 'from {when}', until: 'until {when}' },
   batch: { ok: '{count} ok', failed: '{count} failed', missing: '{count} missing', of: 'of {count}' },
   map: { drawn: 'Positions drawn by the system; no map tiles.' },
   tasks: { due: 'due {date}' },

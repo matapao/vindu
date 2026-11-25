@@ -5,6 +5,7 @@ import type { CardFile, CardFileRead, GalleryItem, PanelSpec, Resolved, ViewSpec
 import { codePage, languageOf, type CodeSpec } from './code.js';
 import { extensionOf, MEDIA_EXTENSIONS, typeOfFile } from './file-types.js';
 import { href, STATIC_QUERY } from './page-workspace.js';
+import { pdfPages } from './pdf-count.js';
 import { PDF_MAX, pdfPage, type PdfSpec } from './pdf-page.js';
 import type { Entry, Row } from './results.js';
 import { readTextStart, type TextStart } from './text-start.js';
@@ -151,7 +152,8 @@ export function pdfOf(p: PanelSpec, view: ViewSpec, ctx: ViewContext): Resolved 
   if (size > PDF_MAX) throw new Refusal(`panel ${p.id}: ${at.name} is ${(size / 1e6).toFixed(1)} MB; a pdf panel shows PDFs up to ${PDF_MAX / 1e6} MB`);
   if (!head.includes('%PDF-')) throw new Refusal(`panel ${p.id}: ${at.name} is not a PDF: it does not begin with "%PDF-"`);
   const file = pages.writeView(pageName(view.name, p.id), pdfPage(at.spec, { words: ctx.words?.pdf, locale: ctx.format?.locale })); // in the view's words
-  return { page: { url: pageUrl(`${pages.base}/view/${file}`, '', []), label: at.from, uses: [], height: heightOf(p) }, pdf: { name: at.name, bytes: size } };
+  const count = pdfPages(at.file);
+  return { page: { url: pageUrl(`${pages.base}/view/${file}`, '', []), label: at.from, uses: [], height: heightOf(p) }, pdf: { name: at.name, bytes: size, ...(count ? { pages: count } : {}) } };
 }
 
 /** An MCP App's own UI for a result: only for a connection the host turned MCP Apps on for, and only for a tool that

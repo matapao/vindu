@@ -37,6 +37,7 @@ const examples: Record<string, Example> = {
   VMessages: { part: '.vb-meta', property: 'column-gap' },
   VDocument: { part: '.vb-sec', property: 'padding-top' },
   VEvents: { part: '.vb-dayhead', property: 'font-size' },
+  VNotice: { part: '.vb-notice', property: 'padding-left' },
   VTasks: { part: '.vb-item', property: 'padding-top' },
   VMoney: { part: 'td', property: 'padding-left' },
   VFiles: { part: '.vb-icon', property: 'font-size' },

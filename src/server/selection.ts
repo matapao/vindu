@@ -29,7 +29,7 @@ export const setInputs = (session: Session, x: Record<string, unknown>): boolean
   void session
     .present(args, true, false, () => {
       drawn = true;
-    }) // drawn again where it is, shown or hidden
+    }, false, 'person') // drawn again where it is, shown or hidden
     .then((acc) => {
       const pa = acc.panels.find((q) => q.id === panel);
       const w = whoOf(x);
@@ -165,7 +165,7 @@ export const drillIn = async (session: Session, x: Record<string, unknown>): Pro
     ...(spec.subtitle ? { subtitle: spec.subtitle } : {}),
     panels: [inner],
     path,
-  });
+  }, false, false, undefined, false, 'person');
   session.drills.set(view, [...stack, args]);
   session.shell.tell(
     `opened ${key} in ${spec.title} (${p.title ?? p.id}): the ${data[p.id].behind?.get(key)?.length ?? 'rows'} rows behind it`,
@@ -176,7 +176,7 @@ export const drillBack = async (session: Session, view: string): Promise<boolean
   const stack = session.drills.get(view);
   if (!stack?.length) return false;
   const prev = stack.pop()!;
-  await session.present(prev);
+  await session.present(prev, false, false, undefined, false, 'person');
   if (!stack.length) session.drills.delete(view);
   session.shell.tell(`went back in ${session.shown.get(view)?.title ?? view}`);
   return true;

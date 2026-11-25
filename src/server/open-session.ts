@@ -7,7 +7,9 @@ import { remindersFrom } from '../reminders.js';
 import { type AnswerEntry, type Entry, withOwn } from '../results.js';
 import { Shell, type ShellState } from '../shell.js';
 import { ROLES } from '../shell-roles.js';
+import { presentationGiven } from './presentation-option.js';
 import { templateNote } from '../templates.js';
+import type { Presentation } from '../shell-presentation.js';
 import type { PartialViewWords } from '../view-words.js';
 import { Views } from '../views/views.js';
 import { appControls } from './app-events.js';
@@ -59,7 +61,7 @@ export function openSession(
   const key = host.add({ ...inFolder, results });
   holdResults(proc.results);
   const session: Session = {
-    present: (args, redraw, restoring, committed, anew) => present(session, args, redraw, restoring, committed, anew),
+    present: (args, redraw, restoring, committed, anew, by) => present(session, args, redraw, restoring, committed, anew, by),
     fireHooks: (view, event, only) => fire(session, view, event, only),
     resumeWaiting: () => wake(session),
     runtime,
@@ -103,6 +105,7 @@ export function openSession(
     watches: [],
     fresh: new Map(),
     vhistory: new Map(),
+    changed: new Map(),
     vsuggest: new Map(),
     vunseen: new Map(),
     receipts: [],
@@ -122,6 +125,7 @@ export function openSession(
     savedDrafts: new Map(),
     rereading: new Map(),
   };
+  session.shell.setPresentation(presentationGiven(more.presentation, { narrow: more.narrow })); // refused before anything is drawn
   const layoutToken = randomBytes(16).toString('hex');
   endpoints.set(token, () => serverFor(session));
   endpoints.set(layoutToken, () => layoutServerFor(session.shell));
@@ -278,6 +282,10 @@ export function openSession(
      *  account of a view says the locale it is drawn in. A locale or time zone that is none is refused (a RangeError),
      *  and nothing changes. */
     setViewWords: (words?: PartialViewWords, format?: Partial<ViewFormat>) => setViewWords(session, words, format),
+    /** How the window shows what the views hold now (auto, cards or content), and whether it is narrow: each one given
+     *  in place of the one it had (open's presentation and narrow). The window draws it at once, and the model's look
+     *  says it. One that is none is refused (a RangeError), and nothing changes. */
+    setPresentation: (as?: Presentation, o: { narrow?: boolean } = {}) => session.shell.setPresentation(presentationGiven(as, o)),
     /** The host's messageSending says something else now (a mail connection made, or gone): every mail drafted for the
      *  person is drawn again, with Send, or the host's own action in its place. */
     messagesChanged: () => messagesChanged(session),

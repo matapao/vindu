@@ -48,6 +48,10 @@ export type ShellLabels = {
   noDrawer(kind: string): string;     // in a host's pane, when the window has no drawer for its kind
   stack: string; stackHint: string; spread: string; spreadHint: string; // a pane's Stack button; a stack's Spread out
   tab(titles: string[], o: { front: boolean; changed: boolean; asks: boolean }): string; // a stack's tab, for screen readers
+  showAs: string; cards: string; content: string; // the shelf's switch: the views as cards, or as their content
+  cardKind(kinds: string[]): string;  // what a view's card holds, by its panels' kinds ("kpi · table")
+  openCard(title: string, lines: string): string; // a card, for screen readers: what opening it shows
+  backToCards: string;                // in the title bar of a card opened alone: back to the cards
 };
 export const SHELL_LABELS: ShellLabels = {
   empty: 'Views appear here as the task shows them.', loading: 'Waiting for content', views: 'Views', shelf: 'Collapsed', actions: 'Actions',
@@ -64,6 +68,10 @@ export const SHELL_LABELS: ShellLabels = {
   noDrawer: k => `This window cannot show a ${k} pane.`,
   stack: 'Stack', stackHint: 'Stack with its neighbours: one in front, the others as tabs', spread: 'Spread out', spreadHint: 'Show these views side by side again',
   tab: (t, o) => `${t.join(' + ')}${o.asks ? ': waiting for you' : o.changed ? ': changed' : ''}${o.front ? ' (in front)' : ''}`,
+  showAs: 'Show the views as', cards: 'Cards', content: 'Content',
+  cardKind: kinds => kinds.join(' · '),
+  openCard: (title, lines) => `${title}${lines ? `: ${lines}` : ''}. Open it alone`,
+  backToCards: '‹ Cards',
 };
 
 /** A view as the shell knows it: its name, title, subtitle, whether it is one page, its cards ("kpi, table"), and its
