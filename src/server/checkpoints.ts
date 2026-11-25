@@ -122,9 +122,9 @@ export const checkpoint = (session: Session): ViewCheckpoint => {
   };
 };
 /** A gate as restored: on what was read again, or waiting for what comes after the restore (since), saying why, with
- *  the pointer it may be read again from (gateRestored). */
+ *  the pointer it may be read again from (gateRestored); either way filling the same field of its panel. */
 const restoredGate = (g: Gate, since: number, sinceOwn: number, r: ReturnType<typeof gateRestored>): Gate => {
-  const gate: Gate = { want: g.want, since, sinceOwn };
+  const gate: Gate = { want: g.want, since, sinceOwn, ...(g.fills ? { fills: { ...g.fills } } : {}) };
   if (r.got) gate.got = r.got;
   else if (r.why) {
     gate.why = r.why;

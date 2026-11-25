@@ -44,6 +44,10 @@ const Gate = z.object({
   got: z.string().optional(),
   why: z.string().max(1000).optional(),
   pointer: ResultPointer.optional(), // a restored panel's result the host could not read, to read again
+  fills: z.discriminatedUnion('field', [ // the field of its panel the result fills: from, a picture's media, or a gallery's item
+    z.object({ field: z.literal('from') }),
+    z.object({ field: z.literal('media'), at: Count.optional() }),
+  ]).optional(),
 });
 const Fill = z.object({
   by: z.enum(['source', 'model', 'person']),

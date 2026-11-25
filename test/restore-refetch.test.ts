@@ -123,7 +123,7 @@ test('restoring calls the host with each pointer and draws the views from what c
     assert.ok(drawnOf(shown, 'cust').includes('Not read again: the host could not (crm is offline). Waiting for crm.list_customers: it fills in here when it comes.'));
     assert.ok(drawnOf(shown, 'made').includes('Not called again: accounts.create_invoice changes things, as its server says.'));
     assert.ok(drawnOf(shown, 'note').includes('Not read again: the host could not. Waiting for notes.read_note'));
-    assert.ok(drawnOf(shown, 'photo').includes('Not read again: the host could not. It showed what camera.snapshot gave.')); // its picture too
+    assert.ok(drawnOf(shown, 'photo').includes('Not read again: the host could not. Waiting for camera.snapshot: it fills in here when it comes.')); // its picture too
     assert.match(ui.delta(), /opened again where the person left it[\s\S]*4 panels wait for their results: cust \(list\): Not read again: the host could not \(crm is offline\)\./);
     assert.deepEqual(ui.reminders().map(r => r.what), ['Call Strand Bygg']);
     // the call comes again: the panel fills in, exactly as it came
@@ -151,7 +151,8 @@ test('without the host\'s refetch, every panel on a result restores waiting, say
   } finally { ui.close(); await vindu.close(); }
 });
 
-/** A host that reads again what it can now: the person's file always; online, the results, but never the note. */
+/** A host that reads again what it can now: the person's file always; online, the results and the picture, but never
+ *  the note. */
 const hostOf = () => {
   const results = memoryResults();
   const calls: ResultPointer[] = [];
@@ -163,6 +164,7 @@ const hostOf = () => {
       if (!host.online) throw new Error('the computer is offline');
       if (p.tool === 'list_invoices') return results.add({ server: p.server, tool: p.tool, input: p.input, value: invoices('paid') }).id;
       if (p.tool === 'list_customers') return results.add({ server: p.server, tool: p.tool, input: p.input, value: [{ customer: 'Havgap Media', city: 'Alta' }] }).id;
+      if (p.tool === 'snapshot') return results.add({ server: p.server, tool: p.tool, input: p.input, images: [{ data: PNG, mime: 'image/png' }] }).id;
       if (p.ref === 'sent-0418') return results.add({ server: p.server, tool: p.tool, ref: p.ref, value: { number: 'INV-2026-0418', sent: 'on Tuesday' } }).id;
       return undefined;
     },
@@ -187,6 +189,7 @@ const KEPT = {
   'cust/list': { id: 'r2', kind: 'result', server: 'crm', tool: 'list_customers', input: {} },
   'sent/one': { id: 'r4', kind: 'result', server: 'accounts', tool: 'send_invoice', ref: 'sent-0418' }, // by the host's ref
   'note/body': { id: 'r5', kind: 'result', server: 'notes', tool: 'read_note', input: { id: 7 } },
+  'photo/shot': { id: 'r6', kind: 'result', server: 'camera', tool: 'snapshot', input: { site: 'Voss' } }, // the picture a tool returned
 };
 
 test('a panel whose result the host could not read again keeps its pointer, the host\'s ref with it, in every checkpoint until a result fills it; each restore reads it again by the same rules', async () => {
@@ -208,7 +211,7 @@ test('a panel whose result the host could not read again keeps its pointer, the 
     assert.equal(offline.calls.filter(c => nameOf(c) === 'accounts.list_invoices').length, 1); // two panels, one call
     assert.ok(!offline.calls.some(c => nameOf(c) === 'accounts.create_invoice'));
     assert.ok(drawnOf(second.shown, 'cust').includes('Not read again: the host could not (the computer is offline). Waiting for crm.list_customers'));
-    assert.match(second.ui.delta(), /5 panels wait for their results: [^\]]*cust \(list\): Not read again: the host could not \(the computer is offline\)\./);
+    assert.match(second.ui.delta(), /6 panels wait for their results: [^\]]*cust \(list\): Not read again: the host could not \(the computer is offline\)\./);
     cp3 = JSON.parse(JSON.stringify(second.ui.checkpoint())) as ViewCheckpoint;
   } finally { await second.close(); }
   assert.deepEqual(keptOf(cp3), KEPT);
@@ -219,6 +222,8 @@ test('a panel whose result the host could not read again keeps its pointer, the 
   try {
     assert.ok(drawnOf(third.shown, 'cust').includes('Alta'));
     assert.ok(drawnOf(third.shown, 'sent').includes('on Tuesday'));
+    const snapshot = online.results.all().find(e => e.kind === 'result' && e.tool === 'snapshot')!.id;
+    assert.ok(drawnOf(third.shown, 'photo').includes(`/media/${snapshot}`)); // the picture, under its new id
     assert.equal(modelOf(third.shown, 'inv').p_total.value, '15,525'); // the person's what-if, on what came
     assert.match(third.ui.delta(), /one panel waits for its result: note \(body\): Not read again: the host could not\./);
     const cp4 = JSON.parse(JSON.stringify(third.ui.checkpoint())) as ViewCheckpoint;
@@ -237,13 +242,13 @@ test('ui.refetchWaiting reads again every panel waiting for its result: those th
     host.calls.length = 0;
     const run = t.ui.refetchWaiting();
     assert.equal(t.ui.refetchWaiting(), run); // one run
-    assert.deepEqual(await run, { filled: 4, still: 1 });
-    assert.deepEqual(host.calls.map(nameOf).sort(), ['accounts.list_invoices', 'accounts.send_invoice', 'crm.list_customers', 'notes.read_note']); // each call once
+    assert.deepEqual(await run, { filled: 5, still: 1 });
+    assert.deepEqual(host.calls.map(nameOf).sort(), ['accounts.list_invoices', 'accounts.send_invoice', 'camera.snapshot', 'crm.list_customers', 'notes.read_note']); // each call once
     assert.ok(drawnOf(t.shown, 'cust').includes('Alta') && !drawnOf(t.shown, 'cust').includes('try_again'));
     assert.equal(modelOf(t.shown, 'inv').p_total.value, '15,525');
     assert.ok(drawnOf(t.shown, 'note').includes('Not read again: the host could not. Waiting for notes.read_note'));
     const told = t.ui.delta();
-    assert.match(told, /4 panels that waited are drawn from their results read again: inv \(rows\), from r\d+; /);
+    assert.match(told, /5 panels that waited are drawn from their results read again: inv \(rows\), from r\d+; /);
     assert.match(told, /; one panel waits for its result: note \(body\): Not read again: the host could not\./);
     assert.equal(told.split('drawn from').length, 2, told); // told once
     assert.deepEqual(await t.ui.refetchWaiting(), { filled: 0, still: 1 }); // nothing changed: nothing told

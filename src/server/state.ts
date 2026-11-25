@@ -2,7 +2,7 @@ import type { Probe } from '../a2ui.js';
 import type { Account } from '../account.js';
 import type { ViewAction } from '../actions.js';
 import type { After, Resolved, ViewSpec } from '../cards.js';
-import type { HookEvent } from '../gates.js';
+import type { Fills, HookEvent } from '../gates.js';
 import type { Approval, Ask, Binding, Operation } from '../operations.js';
 import type { WindowReport } from '../page-report.js';
 import type { PointItem } from '../pointing.js';
@@ -153,8 +153,9 @@ export type Session = {
   refetching?: Promise<Refetched>; // every waiting panel's result being read again (refetchWaiting)
 };
 /** What a panel or a held view waits for, and since when: the process's entries and the person's answers at that moment;
- *  why, when the system made it wait (a restored panel whose result was not read again); and the pointer to that
- *  result, where it may be read again later (refetch-waiting.ts), until a result fills the panel. */
+ *  why, when the system made it wait (a restored panel whose result was not read again); the pointer to that result,
+ *  where it may be read again later (refetch-waiting.ts), until a result fills the panel; and the field of the panel
+ *  the result fills, where it is not from (a restored picture's media). */
 export type Gate = {
   want: string;
   since: number;
@@ -162,6 +163,7 @@ export type Gate = {
   got?: string;
   why?: string;
   pointer?: Extract<ResultPointer, { kind: 'result' }>;
+  fills?: Fills;
 };
 /** A live panel's source: what is read again, every read of it so far, what the last said, who shows it, and its stop. */
 export type Live = {

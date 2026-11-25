@@ -1,7 +1,7 @@
 // What a panel or a view waits for, worked out by the system: a result this process does not have yet (awaits), or
 // something the person does (after): an answer, a pick, a panel filled. Pure: the UI server keeps the state.
 import type { Entry, ResultEntry } from './results.js';
-import type { Await, Hook } from './cards.js';
+import type { Await, Hook, PanelSpec } from './cards.js';
 import { VIEW_WORDS, type HookWords } from './view-words.js';
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -16,6 +16,15 @@ function isAwaited(e: Entry, a: Await): e is ResultEntry {
 }
 /** The first result after since (an index into the process's entries) that is the call awaited: the first that came wins. */
 export const firstAfter = (all: readonly Entry[], since: number, a: Await): ResultEntry | undefined => all.slice(since).find((e): e is ResultEntry => isAwaited(e, a));
+/** The field of its panel that the result a wait gets fills: from, or media (the one picture a media panel shows), or one
+ *  item of a gallery's media (at, counted from 0). A wait that names none fills from. */
+export type Fills = { field: 'from' } | { field: 'media'; at?: number };
+/** A panel with the result its wait got in the field that wait fills. */
+export function fillWith(p: PanelSpec, id: string, fills: Fills = { field: 'from' }): void {
+  if (fills.field === 'from') p.from = id;
+  else if (fills.at === undefined) p.media = id;
+  else { const items = [p.media ?? []].flat(); items.splice(Math.min(fills.at, items.length), 0, id); p.media = items; }
+}
 /** A view and a panel, from "view/panel", or the panel of this view. */
 export const panelRef = (ref: string, view: string): [string, string] => { const i = ref.indexOf('/'); return i > 0 ? [ref.slice(0, i), ref.slice(i + 1)] : [view, ref]; };
 

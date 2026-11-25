@@ -1,9 +1,10 @@
 // A checkpoint keeps where each result came from, never what it held: on restore, the host reads each one again
 // (refetch), and the restored views are drawn from what came. A panel whose result was not read again waits for it,
-// saying why: for the same call again where it showed a result, or in words where it showed something else; the rest
-// of its view is drawn as it was. One that waits for the same call keeps the pointer, to be read again later
-// (refetch-waiting.ts).
-import { panelIdsOf } from '../cards.js';
+// saying why: for the same call again where it showed a result (from it, or as its picture: a media panel's, or one
+// of a gallery's), or in words where it showed something else; the rest of its view is drawn as it was. One that
+// waits for the same call keeps the pointer, to be read again later (refetch-waiting.ts).
+import { panelIdsOf, resultIds } from '../cards.js';
+import type { Fills } from '../gates.js';
 import type { Row } from '../results.js';
 import type { ResultPointer } from './contracts.js';
 import { stableJson } from './records.js';
@@ -135,6 +136,37 @@ const showed = (p: ResultPointer | undefined): string => {
   return p.kind === 'result' ? ` It showed what ${nameOf(p)} gave.` : ` It showed ${p.name}, which the person gave.`;
 };
 
+/** A gallery's items, each run of result ids written out (r5-r8 as r5, r6, r7, r8); undefined for a list that is not
+ *  one of names and ids. */
+const itemsOf = (media: unknown): string[] | undefined => {
+  if (!Array.isArray(media) || !media.every((x) => typeof x === 'string')) return undefined;
+  try {
+    return resultIds(media);
+  } catch {
+    return undefined;
+  }
+};
+/** Where the same call again fills a panel that showed one id not read again: its from, a media panel's picture, or one
+ *  item of a gallery, its other items on the ids read again. The panel without that id, and the field the call fills
+ *  where it is not from. Undefined where that id is anywhere else, or in a panel that waits already. */
+function waitsIn(panel: Row, gone: string, r: Restoring): { rest: Row; fills?: Fills } | undefined {
+  const swapped = swapIds(panel, r.refs, r.map) as Row;
+  if (panel.from === gone) {
+    const { from: _from, ...rest } = swapped;
+    return { rest };
+  }
+  if (panel.awaits !== undefined) return undefined;
+  if (panel.card === 'media' && panel.media === gone) {
+    const { media: _media, ...rest } = swapped;
+    return { rest, fills: { field: 'media' } };
+  }
+  const items = panel.card === 'gallery' ? itemsOf(panel.media) : undefined;
+  if (!items || items.filter((x) => x === gone).length !== 1) return undefined;
+  const at = items.indexOf(gone);
+  const media = items.filter((_, i) => i !== at).map((x) => (Object.hasOwn(r.map, x) ? r.map[x] : x));
+  return { rest: { ...swapped, media }, fills: { field: 'media', at } };
+}
+
 /** A panel as restored: on the ids read again; or, where one it shows was not, waiting for it with why. */
 function restoredPanel(session: Session, view: string, id: string, panel: Row, r: Restoring): Row {
   const gone = [...idsIn(panel, r.refs)].filter((x) => !Object.hasOwn(r.map, x));
@@ -142,18 +174,27 @@ function restoredPanel(session: Session, view: string, id: string, panel: Row, r
   const why = r.missing.get(gone[0]) ?? NOT_KEPT;
   const p = r.pointers.get(gone[0]);
   r.waits.push(`${view} (${id}): ${why}`);
-  if (gone.length === 1 && panel.from === gone[0] && p?.kind === 'result') {
-    // the same call again fills it, exactly as it comes
-    const { from: _from, ...rest } = swapIds(panel, r.refs, r.map) as Row;
+  const call = gone.length === 1 && p?.kind === 'result' ? p : undefined; // the one id it showed, a tool's result
+  const waiting = call && waitsIn(panel, gone[0], r);
+  if (call && waiting) {
+    // the same call again fills it, exactly as it comes: in from, or in the field named
+    const { rest, fills } = waiting;
     const awaits = {
-      tool: p.tool,
-      server: p.server,
-      ...(p.ref === undefined && isRecord(p.input) ? { input: p.input } : {}),
+      tool: call.tool,
+      server: call.server,
+      ...(call.ref === undefined && isRecord(call.input) ? { input: call.input } : {}),
     };
     const since = session.results.all().length;
     const want = JSON.stringify({ awaits, after: rest.after ?? null });
-    const kept = r.again.has(gone[0]) ? { pointer: p } : {}; // read again later, on the next restore or a try again
-    session.gates.set(`${view}/${id}`, { want, since, sinceOwn: session.own.length, why, ...kept });
+    const kept = r.again.has(gone[0]) ? { pointer: call } : {}; // read again later, on the next restore or a try again
+    session.gates.set(`${view}/${id}`, {
+      want,
+      since,
+      sinceOwn: session.own.length,
+      why,
+      ...kept,
+      ...(fills ? { fills } : {}),
+    });
     return { ...rest, id, awaits };
   }
   return {

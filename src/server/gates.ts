@@ -1,5 +1,5 @@
 import { type After, type Await, panelsOf, type PanelSpec, type ViewSpec } from '../cards.js';
-import { awaitName, firstAfter, panelRef } from '../gates.js';
+import { awaitName, type Fills, firstAfter, panelRef } from '../gates.js';
 import { log } from './records.js';
 import type { Gate, Session } from './state.js';
 
@@ -15,7 +15,7 @@ export const gateOf = (
   view: string,
   p: PanelSpec,
   spec: ViewSpec,
-): { from?: string; wait?: string; failed?: string; again?: boolean } => {
+): { from?: string; fills?: Fills; wait?: string; failed?: string; again?: boolean } => {
   const key = `${view}/${p.id}`,
     want = JSON.stringify({ awaits: p.awaits ?? null, after: p.after ?? null });
   let gate = session.gates.get(key);
@@ -34,9 +34,10 @@ export const gateOf = (
       ...(gate.pointer && session.more.refetch ? { again: true } : {}), // the person may have it read again now
     };
   const came = session.results.get(gate.got);
+  const fills = gate.fills ? { fills: gate.fills } : {}; // the field it fills, where not from
   return came?.kind === 'result' && came.error
-    ? { from: gate.got, failed: `${awaitName(awaited)} failed (${gate.got}): ${came.text.slice(0, 600)}` }
-    : { from: gate.got };
+    ? { from: gate.got, ...fills, failed: `${awaitName(awaited)} failed (${gate.got}): ${came.text.slice(0, 600)}` }
+    : { from: gate.got, ...fills };
 };
 /** Why a panel or a view is not shown yet, in the person's words; undefined once what it is after has happened. */
 export const notYet = (

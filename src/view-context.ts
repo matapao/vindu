@@ -1,5 +1,6 @@
 import type { DraftLook, ModelDraft } from './block-drafts.js';
 import type { CardDef, PanelSpec, ViewSpec } from './cards.js';
+import type { Fills } from './gates.js';
 import type { HeadText } from './pages.js';
 import { brief, type Entry, type ResultSource } from './results.js';
 import type { ViewWords } from './view-words.js';
@@ -29,10 +30,11 @@ export type ViewContext = {
   /** For a read the app keeps fresh (a source read again): the newest read of that source, which is the read itself
    *  while nothing has changed. Undefined for anything else. */
   newest?: (id: string) => string | undefined;
-  /** A panel that waits (awaits a result, or after something): the result that came (from), or what it still waits
-   *  for (wait), said for the person; failed: that result is a failed call (the server's own answer); again: what it
-   *  waits for is a result the host could not read again, which the person may have it try again now. */
-  gate?: (view: string, p: PanelSpec, spec: ViewSpec) => { from?: string; wait?: string; failed?: string; again?: boolean };
+  /** A panel that waits (awaits a result, or after something): the result that came (from) and the field of the panel
+   *  it fills (fills: from where none is named), or what it still waits for (wait), said for the person; failed: that
+   *  result is a failed call (the server's own answer); again: what it waits for is a result the host could not read
+   *  again, which the person may have it try again now. */
+  gate?: (view: string, p: PanelSpec, spec: ViewSpec) => { from?: string; fills?: Fills; wait?: string; failed?: string; again?: boolean };
   /** A view with steps: how many of its panels are shown now (1 to start). */
   step?: (view: string) => number;
   /** A view's hook, as the person sees it: a job they turned on or not (or jobs are off here), or the system's own. */

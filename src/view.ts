@@ -13,7 +13,7 @@ import { check, kindOf } from './card-kinds/registry.js';
 import { addFields } from './compute.js';
 import { dataFileOf } from './data-files.js';
 import { groupsBehind } from './pointing.js';
-import { hookWords } from './gates.js';
+import { fillWith, hookWords } from './gates.js';
 import { checkSurface } from './surface-check.js';
 import { Refusal, listing, type ViewContext } from './view-context.js';
 import { rowsOf, shape, matcher } from './view-rows.js';
@@ -30,7 +30,7 @@ export function showView(input: Record<string, unknown>, ctx: ViewContext): Show
     try {
       // a panel that waits: the result that came is its source; until then (or after a failed call) it says so, in words
       const g = (p.awaits || p.after) ? ctx.gate?.(spec.name, p, spec) ?? { wait: 'Waiting.' } : undefined;
-      if (g?.from && !g.failed) p.from = g.from;
+      if (g?.from && !g.failed) fillWith(p, g.from, g.fills); // in from, or in the field its wait fills (a restored picture's media)
       if (g?.wait || g?.failed) {
         const card = p.card; p.card = 'text'; p.text = g.failed ?? g.wait; delete p.from;
         data[p.id] = { text: p.text, waiting: { card, for: g.failed ?? g.wait!, ...(g.again && !g.failed ? { again: true as const } : {}) }, ...(g.failed ? { failed: g.failed } : {}) };
