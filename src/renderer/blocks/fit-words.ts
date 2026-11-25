@@ -1,12 +1,19 @@
 // Text cut at a word's end to fit a box of a set size (an event in a week), with an ellipsis where it is cut: never
 // inside a word. The parts that are cut are spans marked data-full, which hold the whole text; the box keeps the whole
-// text as its title and accessible name. Measured in the window as the box is drawn, and again whenever it resizes.
+// text as its title and accessible name. Measured in the window on the frame after the box is drawn, and on the frame
+// after its size changes: never inside the observer's own delivery, so that a box cut there resizes no other box in it.
 import { ref } from 'lit/directives/ref.js';
 
 const ELLIPSIS = '…';
-/** The observer of every box fitted in a window, and the boxes it watches. */
+/** The observer of every box fitted in a window, the boxes it watches, and each box's size when it was last fitted. */
 const observers = new WeakMap<Window, ResizeObserver>();
 const watched = new WeakSet<HTMLElement>();
+const fittedAt = new WeakMap<HTMLElement, string>();
+/** The boxes of a window to fit on its next frame. */
+const waiting = new WeakMap<Window, Set<HTMLElement>>();
+
+/** A box's size, as the observer and the fitting compare it. */
+const sizeOf = (box: HTMLElement) => `${box.clientWidth}x${box.clientHeight}`;
 
 /** A part of a box's text: its span, and its words with the spaces between them. */
 type Part = { span: HTMLElement; full: string; tokens: string[]; words: number };
@@ -58,6 +65,25 @@ function fitWords(box: HTMLElement): void {
   show(parts, fits, all);
 }
 
+/** Fit the boxes on the window's next frame, each once however often it was asked, and keep the size each has then. */
+function fitSoon(win: Window, box: HTMLElement): void {
+  const boxes = waiting.get(win);
+  if (boxes) {
+    boxes.add(box);
+    return;
+  }
+  const next = new Set([box]);
+  waiting.set(win, next);
+  win.requestAnimationFrame(() => {
+    waiting.delete(win);
+    for (const each of next) {
+      if (!each.isConnected) continue;
+      fitWords(each);
+      fittedAt.set(each, sizeOf(each));
+    }
+  });
+}
+
 /** A directive for a box to fit: fitted once it is drawn, after each drawing, and whenever its size changes. */
 export const fitted = () =>
   ref((drawn) => {
@@ -67,7 +93,10 @@ export const fitted = () =>
     let observer = observers.get(win);
     if (!observer) {
       observer = new win.ResizeObserver((entries) => {
-        for (const entry of entries) fitWords(entry.target as HTMLElement);
+        for (const entry of entries) {
+          const box = entry.target as HTMLElement;
+          if (fittedAt.get(box) !== sizeOf(box)) fitSoon(win, box);
+        }
       });
       observers.set(win, observer);
     }
@@ -75,7 +104,5 @@ export const fitted = () =>
       watched.add(element);
       observer.observe(element);
     }
-    win.requestAnimationFrame(() => {
-      if (element.isConnected) fitWords(element);
-    });
+    fitSoon(win, element);
   });

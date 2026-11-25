@@ -71,17 +71,22 @@ const specOf = (v: unknown): ChartSpec | undefined => {
 /** The width of each chart's box, by its element, once measured; and the boxes measured. */
 const widths = new WeakMap<HTMLElement, number>();
 const measuring = new WeakSet<Element>();
-/** Measure a chart's box, and draw the chart again whenever its width changes. */
+/** Measure a chart's box, and draw the chart again on the frame after its width changes (never inside the observer's
+ *  own delivery), once for the last width it had in that frame. */
 const measured = (element: HTMLElement) =>
   ref((box) => {
     const win = box?.ownerDocument.defaultView;
     if (!box || !win || measuring.has(box)) return;
     measuring.add(box);
+    let frame = 0;
     new win.ResizeObserver(([entry]) => {
       const width = Math.round(entry.contentRect.width);
+      win.cancelAnimationFrame(frame);
       if (!width || width === widths.get(element)) return;
-      widths.set(element, width);
-      (element as HTMLElement & { requestUpdate(): void }).requestUpdate();
+      frame = win.requestAnimationFrame(() => {
+        widths.set(element, width);
+        (element as HTMLElement & { requestUpdate(): void }).requestUpdate();
+      });
     }).observe(box);
   });
 
