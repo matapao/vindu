@@ -40,6 +40,14 @@ export function showView(input: Record<string, unknown>, ctx: ViewContext): Show
       const given = p.from; const newest = given ? ctx.newest?.(given) : undefined;
       if (p.follow && given && newest === undefined) notes.push(`panel ${p.id}: follow keeps nothing fresh here: ${given} is not a read the app keeps fresh`);
       if ((p.follow || p.live) && newest && newest !== given) p.from = newest; // a live panel follows its own reads
+      // a linked panel without a result of its own shows what is picked in the panel it follows: while that one waits
+      // (for its call, or for its result read again on restore), it waits too, for the same, and its view is drawn
+      const followed = p.detail && !p.from ? data[(p.detail as { of: string }).of] : undefined;
+      if (followed?.waiting) {
+        const card = p.card; p.card = 'text'; p.text = followed.waiting.for;
+        data[p.id] = { text: p.text, waiting: { card, for: followed.waiting.for } };
+        continue;
+      }
       const link = p.detail ? linkOf(p, spec, data) : undefined; // a linked panel: what is picked in the panel it follows
       if (link && !p.from) { p.from = link.panel.from; if (link.panel.pick) p.pick = link.panel.pick; } // the followed panel's result: read, not typed
       const d = resolve(link ? link.panel : p, spec, ctx, notes);

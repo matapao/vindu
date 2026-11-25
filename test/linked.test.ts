@@ -1,6 +1,7 @@
 // Linked panels: the model writes a view once, and a list drives the panels that follow it, without the model: a plain
 // click on a customer, and its invoices and its card show what was picked, exactly, from their results. The model is
-// told what the person picked, and can pick too. In Chromium: the click. All synthetic.
+// told what the person picked, and can pick too. A panel that follows one that waits waits too. In Chromium: the click.
+// All synthetic.
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -65,6 +66,34 @@ test('a list drives the panels that follow it: the first row to start with, a cl
     assert.match((await w.call('show_view', { name: 'x', title: 'X', panels: [{ id: 'a', card: 'table', from: 'r1', detail: { of: 'b' } }, { id: 'b', card: 'table', from: 'r2', detail: { of: 'a' } }] })).text, /panels a, b follow each other in a circle/);
     assert.match((await w.call('show_view', { name: 'y', title: 'Y', panels: [{ id: 'a', card: 'table', from: 'r1' }, { id: 'b', card: 'table', from: 'r2', detail: { of: 'a', by: 'region' } }] })).text, /detail\.by "region" is not a field of a/);
   } finally { await w.close(); }
+});
+
+test('a panel that follows one that waits waits too, and fills in with it: its view is drawn, and restored', async () => {
+  const vindu = await startVindu({ waitMs: 300, verifyMs: 0 });
+  const results = memoryResults(), shown: Shown[] = [];
+  const ui = vindu.open({ results }, { onView: v => shown.push(v) });
+  const { mcp, json } = await mcpClient(ui.url);
+  const drawn = (view: string) => JSON.stringify(shown.filter(v => v.name === view).at(-1)?.wide ?? null);
+  const follows = { id: 'card', card: 'record', title: 'Customer', detail: { of: 'cust' } };
+  try {
+    // the list waits for its call: the card that follows it waits for the same, and the view is drawn
+    const waits = await json('show_view', { name: 'crm', title: 'Customers', panels: [{ id: 'cust', card: 'table', title: 'Customers', awaits: { server: 'crm', tool: 'list_customers' } }, follows] });
+    assert.deepEqual(waits.panels.map((p: any) => [p.id, p.card, p.from]), [['cust', 'table', 'waiting'], ['card', 'record', 'waiting']]);
+    const n = shown.length;
+    ui.result(results.add({ server: 'crm', tool: 'list_customers', value: customers }).id);
+    await until(() => shown.length > n && drawn('crm').includes('Customer: Havgap Media')); // the call came: the card shows the first row
+    assert.ok(drawn('crm').includes('Bergen'));
+    // restored where the host reads nothing again: the list and its card wait, and the view is drawn
+    await json('show_view', { name: 'list', title: 'List', panels: [{ id: 'cust', card: 'table', title: 'Customers', from: results.all()[0].id }, follows] });
+    const saved = ui.checkpoint();
+    const again: Shown[] = [];
+    const restored = vindu.open({ results: memoryResults() }, { onView: v => again.push(v) });
+    try {
+      assert.deepEqual(await restored.restore(saved), []); // no view is refused
+      const list = JSON.stringify(again.filter(v => v.name === 'list').at(-1)!.wide);
+      assert.equal(list.split('Not read again: this host reads nothing again for a task restored.').length - 1, 2, list); // the list, and its card
+    } finally { restored.close(); }
+  } finally { await mcp.close(); ui.close(); await vindu.close(); }
 });
 
 test('in Chromium: a plain click on a row of the list picks it; elsewhere a click picks nothing', async () => {
