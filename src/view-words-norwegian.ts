@@ -22,6 +22,7 @@ const BLOCK_WORDS_NB: BlockWords = {
   map: { drawn: 'Posisjonene er tegnet av systemet, uten kartfliser.' },
   tasks: { due: 'frist {date}' },
   pdf: { page: 'side {at} av {of}', loading: 'Laster inn PDF-en…', locked: 'Denne PDF-en er beskyttet med passord, så den vises ikke.', unreadable: 'Denne PDF-en kunne ikke leses: {why}' },
+  sheet: { true: 'SANN', false: 'USANN', sheets: 'Ark' },
 };
 const BLOCK_WORDS_NN: BlockWords = {
   money: {
@@ -38,6 +39,7 @@ const BLOCK_WORDS_NN: BlockWords = {
   map: { drawn: 'Posisjonane er teikna av systemet, utan kartfliser.' },
   tasks: { due: 'frist {date}' },
   pdf: { page: 'side {at} av {of}', loading: 'Lastar inn PDF-en…', locked: 'Denne PDF-en er verna med passord og blir difor ikkje vist.', unreadable: 'Denne PDF-en kunne ikkje lesast: {why}' },
+  sheet: { true: 'SANN', false: 'USANN', sheets: 'Ark' },
 };
 
 export const VIEW_WORDS_NB: ViewWords = {

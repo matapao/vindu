@@ -100,7 +100,7 @@ test('a file a document does not show is refused, with why and what to send inst
     { id: 'folder', card: 'document', path: 'notes/site.md' },
   ] })).text;
   assert.match(bad, /^not shown: 7 panels need changes/);
-  assert.match(bad, new RegExp(`panel png: ${picture} is shot.png \\(image/png\\); a document shows Markdown files \\(.md or .markdown, or an attachment of type text/markdown\\); show it with a media panel \\("media": "${picture}"\\)`));
+  assert.match(bad, new RegExp(`panel png: ${picture} is shot.png \\(image/png\\); a document shows Markdown files \\(.md or .markdown, or an attachment of type text/markdown\\) or Word documents \\(.docx\\); show it with a media panel \\("media": "${picture}"\\)`));
   assert.match(bad, /panel txt: "notes\/plan.txt" is not a file a document shows: it shows Markdown files .*; show another file with a code panel/);
   assert.match(bad, /panel none: no file "notes\/missing.md" in the working folder/);
   assert.match(bad, /panel both: a document shows "from" \(an attachment\) or "path" \(a file in the working folder\), not both/);

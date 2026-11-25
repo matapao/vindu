@@ -56,6 +56,8 @@ export type CardKind = {
   /** It draws its rows as cells by A1 address (a table, a sheet): the cells it draws of the resolved rows. A card that
    *  has it reads a data file (CSV, TSV or JSON) as rows, and takes the model's notes on its cells. */
   cells?: (p: PanelSpec, d: Resolved) => DrawnCells;
+  /** It reads a workbook (.xlsx) too, a tab for each of its sheets (a sheet). */
+  workbooks?: true;
   /** A file the panel names that the card reads itself (a document's Markdown): its rows, and which file it is;
    *  undefined when the panel names none. */
   file?: (p: PanelSpec, e: Entry | undefined, ctx: ViewContext) => { rows: Row[]; file: CardFileRead } | undefined;

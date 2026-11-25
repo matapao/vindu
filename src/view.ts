@@ -147,7 +147,7 @@ function resolve(p: PanelSpec, view: ViewSpec, ctx: ViewContext, notes: string[]
   if (p.from && !e) throw new Refusal(`panel ${p.id}: no result "${p.from}". This task has: ${listing(ctx.results)}`);
   const direct = kind.direct?.(p, e); if (direct) return direct;
   let rows: Row[]; let src: Resolved['src'];
-  const read = kind.cells ? dataFileOf(p, e, ctx, notes) : undefined; // a CSV, TSV or JSON file, read by the system
+  const read = kind.cells ? dataFileOf(p, e, ctx, notes, !!kind.workbooks) : undefined; // a CSV, TSV or JSON file (or a workbook), read by the system
   const own = read ? undefined : kind.file?.(p, e, ctx); // a file the card reads itself (a document's Markdown), by the system
   if (read) rows = read.rows;
   else if (own) rows = own.rows;

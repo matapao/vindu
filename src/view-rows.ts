@@ -20,6 +20,7 @@ const wrap = (x: unknown): Row => { const r = { value: x }; wrapped.add(r); retu
 export function rowsOf(e: Entry, p: PanelSpec, notes: string[], whole = false): { rows: Row[]; pointer: string; columns?: boolean } {
   if (e.kind === 'attachment') {
     const format = dataFormat(e.name, e.mime);
+    if (format === 'xlsx') throw new Refusal(`panel ${p.id}: ${e.id} is a workbook (${e.name}); a sheet shows it, a tab for each of its sheets, read by the system`);
     if (format) throw new Refusal(`panel ${p.id}: ${e.id} is a ${format.toUpperCase()} file (${e.name}); a table or a sheet shows its rows, read by the system`);
     throw new Refusal(`panel ${p.id}: ${e.id} is an attachment (${e.mime}); show it with a ${e.mime === 'application/pdf' ? 'pdf' : 'media'} panel, or point at the result where you read it`);
   }

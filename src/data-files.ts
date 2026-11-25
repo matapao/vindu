@@ -1,30 +1,37 @@
 // A data file shown as rows by a table or a sheet: a CSV, TSV or JSON file the person attached (from: a1) or one in the
-// working folder (path). The system reads and parses it, so every value is the file's own and none is typed by the
-// model. A cell of a CSV or TSV file that is a number exactly as written (31050, -2.5) is that number; every other
-// cell is its text as written ("007", "1.50", "").
+// working folder (path), and for a sheet a workbook (.xlsx) too, a tab for each of its sheets (workbook-file.ts). The
+// system reads and parses it, so every value is the file's own and none is typed by the model. A cell of a CSV or TSV
+// file that is a number exactly as written (31050, -2.5) is that number; every other cell is its text as written ("007",
+// "1.50", "").
 import type { DataFileRead, PanelSpec } from './cards.js';
 import { parseDelimited } from './delimited.js';
 import { extensionOf } from './file-types.js';
 import { asText } from './format.js';
+import { headerOf } from './header-row.js';
 import { readText } from './page-head.js';
 import type { Entry, Row } from './results.js';
 import { Refusal, type ViewContext } from './view-context.js';
+import { workbookOf } from './workbook-file.js';
 
 /** The largest data file a table or a sheet reads. */
 const DATA_MAX = 5_000_000;
-export type DataFormat = 'csv' | 'tsv' | 'json';
-const BY_TYPE: Record<string, DataFormat> = { 'text/csv': 'csv', 'text/tab-separated-values': 'tsv', 'application/json': 'json' };
-const BY_EXTENSION: Record<string, DataFormat> = { csv: 'csv', tsv: 'tsv', json: 'json' };
+export type DataFormat = 'csv' | 'tsv' | 'json' | 'xlsx';
+const BY_TYPE: Record<string, DataFormat> = {
+  'text/csv': 'csv', 'text/tab-separated-values': 'tsv', 'application/json': 'json',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  'application/vnd.ms-excel.sheet.macroenabled.12': 'xlsx', // a workbook with macros, refused for them
+};
+const BY_EXTENSION: Record<string, DataFormat> = { csv: 'csv', tsv: 'tsv', json: 'json', xlsx: 'xlsx', xlsm: 'xlsx' };
 
-/** A file's data format by its type (text/csv, text/tab-separated-values, application/json), or else by its name's
- *  extension (.csv, .tsv, .json); undefined for any other file. */
+/** A file's data format by its type (text/csv, text/tab-separated-values, application/json, a workbook's), or else by
+ *  its name's extension (.csv, .tsv, .json, .xlsx, and .xlsm, refused for its macros); undefined for any other file. */
 export function dataFormat(name: string, mime = ''): DataFormat | undefined {
   const type = mime.split(';')[0].trim().toLowerCase();
   if (Object.hasOwn(BY_TYPE, type)) return BY_TYPE[type];
   const extension = extensionOf(name);
   return Object.hasOwn(BY_EXTENSION, extension) ? BY_EXTENSION[extension] : undefined;
 }
-/** An attachment a table or a sheet reads as rows: a CSV, TSV or JSON file. */
+/** An attachment a table or a sheet reads as rows: a CSV, TSV or JSON file, or a workbook. */
 const isDataAttachment = (e: Entry | undefined): e is Extract<Entry, { kind: 'attachment' }> =>
   e?.kind === 'attachment' && dataFormat(e.name, e.mime) !== undefined;
 
@@ -35,18 +42,6 @@ const NUMBER = /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/;
 /** A cell as written, or the number it is when the number is written exactly so. */
 const cellValue = (s: string): string | number => (NUMBER.test(s) && String(Number(s)) === s ? Number(s) : s);
 
-/** The header's names, each once: an empty one named by its place (c3), one written twice with its count ("total (2)"). */
-function headerOf(names: string[], said: string[]): string[] {
-  const seen = new Map<string, number>(); const out: string[] = [];
-  for (const [i, raw] of names.entries()) {
-    const base = raw.trim() === '' ? `c${i + 1}` : raw;
-    const n = (seen.get(base) ?? 0) + 1; seen.set(base, n);
-    out.push(n > 1 ? `${base} (${n})` : base);
-  }
-  const renamed = out.filter((x, i) => x !== names[i]);
-  if (renamed.length) said.push(`named ${renamed.length} column${renamed.length > 1 ? 's' : ''} of the header that ${renamed.length > 1 ? 'were' : 'was'} empty or written twice: ${renamed.slice(0, 6).join(', ')}`);
-  return out;
-}
 /** Records under a header row: one row each, a cell past the header named by its place. */
 function underHeader(records: unknown[][], toValue: (x: unknown) => unknown, said: string[]): DataTable {
   const columns = headerOf((records[0] ?? []).map(x => asText(x ?? '')), said);
@@ -91,7 +86,7 @@ function jsonTable(text: string, name: string, pick: string | undefined, said: s
 /** A data file's text as rows. Throws, saying why, when it holds no rows that can be shown. */
 function tableOf(text: string, format: DataFormat, name: string, pick: string | undefined, said: string[]): DataTable {
   if (format === 'json') return jsonTable(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text, name, pick, said);
-  if (pick) throw new Error(`pick reads inside a JSON file; "${name}" is one table, shown whole`);
+  if (pick) throw new Error(`pick reads inside a JSON file, or names a workbook's sheet; "${name}" is one table, shown whole`);
   let records: string[][];
   try { records = parseDelimited(text, format === 'tsv' ? '\t' : ','); } catch (e) { throw new Error(`"${name}" is not ${format.toUpperCase()} the system can read: ${(e as Error).message}`); }
   return underHeader(records, x => cellValue(x as string), said);
@@ -106,10 +101,10 @@ function textOfFile(file: string, name: string): string {
 
 /** Where a data file is: an attachment, or a file in the working folder (path), with its name and format. */
 type Source = { name: string; from: string; file: string; format: DataFormat };
-function sourceOf(p: PanelSpec, e: Entry | undefined, ctx: ViewContext): Source {
+function sourceOf(p: PanelSpec, e: Entry | undefined, ctx: ViewContext, workbooks: boolean): Source {
   if (p.path !== undefined && p.from !== undefined) throw new Error(`a ${p.card} shows from (a result or an attachment) or path (a file in the working folder), not both`);
   if (isDataAttachment(e)) return { name: e.name, from: e.id, file: e.file, format: dataFormat(e.name, e.mime)! };
-  const want = String(p.path), notData = `"${want}" is not a data file: a ${p.card} reads .csv, .tsv and .json files`;
+  const want = String(p.path), notData = `"${want}" is not a data file: a ${p.card} reads .csv, .tsv${workbooks ? ', .json and .xlsx' : ' and .json'} files`;
   if (!dataFormat(want)) throw new Error(notData);
   if (!ctx.pages?.workPath) throw new Error('this host reads no files from a working folder');
   const found = ctx.pages.workPath(want);
@@ -120,13 +115,20 @@ function sourceOf(p: PanelSpec, e: Entry | undefined, ctx: ViewContext): Source 
 }
 
 /** The rows a table or a sheet shows from a data file, and what the file is: an attachment that is CSV, TSV or JSON
- *  (from), or a file of these in the working folder (path). Undefined when the panel names neither. */
-export function dataFileOf(p: PanelSpec, e: Entry | undefined, ctx: ViewContext, said: string[]): { rows: Row[]; file: DataFileRead } | undefined {
+ *  (from), or a file of these in the working folder (path); and a workbook, for a card that reads them (workbooks: a
+ *  sheet). Undefined when the panel names neither. */
+export function dataFileOf(p: PanelSpec, e: Entry | undefined, ctx: ViewContext, said: string[], workbooks = false): { rows: Row[]; file: DataFileRead } | undefined {
   if (p.path === undefined && !isDataAttachment(e)) return undefined;
   const notes: string[] = [];
   let at: Source, table: DataTable;
   try {
-    at = sourceOf(p, e, ctx);
+    at = sourceOf(p, e, ctx, workbooks);
+    if (at.format === 'xlsx' && !workbooks) throw new Error(`"${at.name}" is a workbook; a ${p.card} reads .csv, .tsv and .json files: show a workbook in a sheet, a tab for each of its sheets`);
+    if (at.format === 'xlsx') {
+      const book = workbookOf(at.file, at.name, p, notes);
+      for (const n of notes) said.push(`panel ${p.id}: ${n}`);
+      return { rows: book.rows, file: { name: at.name, from: at.from, ...book.file } };
+    }
     table = tableOf(textOfFile(at.file, at.name), at.format, at.name, p.pick, notes);
   } catch (x) { throw new Refusal(`panel ${p.id}: ${(x as Error).message}`); }
   for (const n of notes) said.push(`panel ${p.id}: ${n}`);

@@ -122,7 +122,8 @@ function rowPoint(
 function seenOf(data: Resolved, row: Row): string {
   const read = data.file && 'format' in data.file ? data.file : undefined; // a data file: each row is one of its own
   const line = read?.index.get(row);
-  if (data.file && line !== undefined) return `read by the system from ${data.file.name}, its row ${line}`;
+  const sheet = read?.sheets && (read.sheets.length === 1 ? read.sheets[0] : read.sheets.find(s => s.rows.includes(row))); // a workbook's
+  if (data.file && line !== undefined) return `read by the system from ${data.file.name}${sheet ? `, its sheet ${sheet.name}` : ''}, its row ${line}`;
   if (data.file) return `computed by the system from ${data.file.name}`;
   return data.src ? 'computed by the system' : 'typed by the model';
 }

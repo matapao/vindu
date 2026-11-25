@@ -7,9 +7,9 @@ import { html, nothing } from 'lit';
 /** A note as the server placed it: its number, its address and text, and its row (-1 the header) and column. */
 export type CellNote = { n: number; cell: string; note: string; row: number; column: number };
 /** What the server says of the cells it sends: their fields, the notes on them, how many rows and columns there are
- *  (a sheet), and how the table is sorted and the columns of each row that hold a number (a table, whose cells come
- *  as text). */
-export type Cells = { fields?: string[]; notes?: CellNote[]; rows?: number; columns?: number; sort?: string; numbers?: number[][] };
+ *  (a sheet), how the table is sorted and the columns of each row that hold a number (a table, whose cells come as
+ *  text), and of a workbook its sheets and each row's looks (sheet-workbook.ts). */
+export type Cells = { fields?: string[]; notes?: CellNote[]; rows?: number; columns?: number; sort?: string; numbers?: number[][]; sheets?: unknown; looks?: unknown };
 
 /** A browser breaks a word after a hyphen, a dash or a slash. */
 const BREAKS_INSIDE = /[-\u2010\u2013\u2014/]/;
@@ -33,16 +33,18 @@ const noteClass = (className: string, note: CellNote | undefined) =>
 /** The mark on a noted cell: its note's number, which assistive technology skips (the note is its description). */
 const noteMark = (note: CellNote | undefined) =>
   note ? html`<sup class="vb-notemark" aria-hidden="true">${note.n}</sup>` : nothing;
-/** How a cell is drawn besides its value: its note, its class, its title when it has no note, and its field. */
-type CellLook = { note?: CellNote; className?: string; title?: string; field?: string };
+/** How a cell is drawn besides its value: its note, its class, its title when it has no note, its field, and the rows
+ *  and columns it spans (a workbook's merged cells). */
+type CellLook = { note?: CellNote; className?: string; title?: string; field?: string; span?: { rows: number; columns: number } };
+const spanned = (n: number | undefined) => (n && n > 1 ? String(n) : nothing);
 /** A data cell: its value (text kept whole, word by word), marked, focusable and described by its note when it has one. */
-export const dataCell = (content: unknown, { note, className = '', title = '', field }: CellLook) =>
-  html`<td class=${noteClass(className, note)} data-col=${field ?? nothing} tabindex=${note ? '0' : nothing} title=${
+export const dataCell = (content: unknown, { note, className = '', title = '', field, span }: CellLook) =>
+  html`<td class=${noteClass(className, note)} data-col=${field ?? nothing} colspan=${spanned(span?.columns)} rowspan=${spanned(span?.rows)} tabindex=${note ? '0' : nothing} title=${
     note ? note.note : title || nothing
   } aria-description=${note ? note.note : nothing}>${typeof content === 'string' ? unbroken(content) : content}${noteMark(note)}</td>`;
 /** A header cell, the same way. */
-export const headCell = (content: unknown, { note, className = '', title = '' }: CellLook) =>
-  html`<th scope="col" class=${noteClass(className, note)} tabindex=${note ? '0' : nothing} title=${
+export const headCell = (content: unknown, { note, className = '', title = '', span }: CellLook) =>
+  html`<th scope=${span && span.columns > 1 ? 'colgroup' : 'col'} class=${noteClass(className, note)} colspan=${spanned(span?.columns)} rowspan=${spanned(span?.rows)} tabindex=${note ? '0' : nothing} title=${
     note ? note.note : title || nothing
   } aria-description=${note ? note.note : nothing}>${content}${noteMark(note)}</th>`;
 /** The numbered list of the notes, below the cells. */

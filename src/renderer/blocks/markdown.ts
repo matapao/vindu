@@ -1,10 +1,11 @@
-// A document read from a Markdown file (markdown-document.ts), drawn as elements: each section with its heading, and
-// its blocks as paragraphs, lists, quotes, code, tables and rules, in the theme's own look. Everything it is sent is
-// set as text, never as markup, and read as untrusted: a link is drawn only to http or https, checked here again, and
+// A document read from a Markdown file or a Word document (markdown-document.ts, word-document.ts), drawn as elements:
+// each section with its heading, and its blocks as paragraphs, lists, quotes, code, tables and rules, in the theme's own
+// look. Everything it is sent is set as text, never as markup, and read as untrusted: a link is drawn only to http or
+// https, or a mailto: address from a Word document, checked here again, and
 // opens as the host opens links (a new window, which the browser, or an Electron host's window-open handler, decides
 // on). A document of more than two headings has a table of contents beside it, where its pane is wide enough.
 import { html, nothing } from 'lit';
-import { webAddress } from '../../markdown-inline.js';
+import { linkAddress } from '../../markdown-inline.js';
 import { type BlockRow, type RowBlockProps, fieldValue, rowContainer } from './shared.js';
 
 type Json = Record<string, unknown>;
@@ -27,7 +28,7 @@ function inline(x: unknown, depth: number): unknown {
   if ('strong' in x) return html`<strong>${inlines(x.strong, depth)}</strong>`;
   if ('del' in x) return html`<s>${inlines(x.del, depth)}</s>`;
   if ('link' in x) {
-    const href = typeof x.link === 'string' ? webAddress(x.link) : null, text = inlines(x.text, depth);
+    const href = typeof x.link === 'string' ? linkAddress(x.link) : null, text = inlines(x.text, depth);
     return href ? html`<a href=${href} target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">${text}</a>` : text;
   }
   return nothing;

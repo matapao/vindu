@@ -246,7 +246,6 @@ function fit(sections: MarkdownSection[], most: number): { sections: MarkdownSec
 /** A Markdown text as sections: one for each heading of the levels that keep to at most `sections` of them (a deeper
  *  heading is then a heading inside its section), cut where the window would be given more than `values` values. */
 export function parseMarkdown(source: string, o: { sections?: number; values?: number } = {}): MarkdownDocument {
-  const most = o.sections ?? 100;
   const text = source.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').replace(/\0/g, '�');
   const lines = text.split('\n');
   const front: MarkdownBlock[] = [];
@@ -254,7 +253,13 @@ export function parseMarkdown(source: string, o: { sections?: number; values?: n
     const end = lines.slice(1, 200).findIndex(l => l === '---' || l === '...');
     if (end >= 0) { front.push({ code: lines.slice(1, end + 1).join('\n'), language: 'yaml' }); lines.splice(0, end + 2); }
   }
-  const blocks = [...front, ...blocksOf(lines, 0)];
+  return documentOf([...front, ...blocksOf(lines, 0)], o);
+}
+
+/** Blocks as a document's sections (from Markdown, or a Word document): one for each heading of the levels that keep to
+ *  at most `sections` of them, each heading with its anchor, cut where the window would be given more than `values`. */
+export function documentOf(blocks: MarkdownBlock[], o: { sections?: number; values?: number } = {}): MarkdownDocument {
+  const most = o.sections ?? 100;
   const used = new Map<string, number>(); const headings: { heading: Inline[]; level: number; anchor?: string }[] = [];
   for (const b of blocks) if ('heading' in b) { b.anchor = anchorOf(plainOf(b.heading), used); headings.push(b); }
   // the deepest level that still keeps to most sections: a heading below it goes into the section above it

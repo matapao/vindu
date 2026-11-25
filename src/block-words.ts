@@ -48,7 +48,13 @@ export type PdfWords = {
   locked: string;     // a PDF protected by a password
   unreadable: string; // "This PDF could not be read: {why}"
 };
-export type BlockWords = { money: MoneyWords; events: EventWords; notice: NoticeWords; batch: BatchWords; map: MapWords; tasks: TaskWords; pdf: PdfWords };
+/** A sheet of a workbook: its booleans, as Excel writes them in the language, and its list of tabs. */
+export type SheetWords = {
+  true: string;   // "TRUE"
+  false: string;  // "FALSE"
+  sheets: string; // "Sheets": what the tabs of a workbook's sheets are called, for assistive technology
+};
+export type BlockWords = { money: MoneyWords; events: EventWords; notice: NoticeWords; batch: BatchWords; map: MapWords; tasks: TaskWords; pdf: PdfWords; sheet: SheetWords };
 
 export const BLOCK_WORDS: BlockWords = {
   money: {
@@ -65,6 +71,7 @@ export const BLOCK_WORDS: BlockWords = {
   map: { drawn: 'Positions drawn by the system; no map tiles.' },
   tasks: { due: 'due {date}' },
   pdf: { page: 'page {at} of {of}', loading: 'Loading the PDF…', locked: 'This PDF is protected by a password, so it is not shown.', unreadable: 'This PDF could not be read: {why}' },
+  sheet: { true: 'TRUE', false: 'FALSE', sheets: 'Sheets' },
 };
 
 /** A word with its slots filled: "{count} ok" with count "4" is "4 ok". A slot with no value is left as it is. */

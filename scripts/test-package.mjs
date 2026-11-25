@@ -1,7 +1,8 @@
 // Install exactly what downstream apps receive, outside this repository and its dependency overrides.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -46,6 +47,9 @@ await withPackedSdk('test:package', async ({ dir, archive, pnpm }) => {
     const stylesheet = outputFiles.find(file => file.path.endsWith('.css'));
     assert.ok(javascript);
     assert.ok(stylesheet?.text.includes('.xterm'), 'The terminal entry includes its stylesheet');
+    // the server's unzipping (workbooks and Word documents) resolves where the SDK is installed, and no browser entry takes it in
+    assert.ok(createRequire(realpathSync(join(dir, 'node_modules', manifest.name, 'package.json'))).resolve('fflate'), 'The SDK\'s unzipping resolves');
+    assert.ok(!javascript.text.includes('fflate'), 'The browser entries leave out the server\'s unzipping');
     await page.addStyleTag({ content: stylesheet.text });
     await page.addScriptTag({ content: javascript.text });
     assert.deepEqual(await page.evaluate(() => globalThis.consumer.check()), {

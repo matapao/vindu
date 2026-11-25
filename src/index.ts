@@ -13,7 +13,7 @@ export { addDates, addTime, dayOf, parseDateExpr, today, type DateExpr } from '.
 export { whenOf, instantOf, localOf, sayTime, remindersSurface, REMINDER_WORDS, DEFAULT_TIME, type Reminder, type ReminderWords } from './reminders.js';
 export { FieldSchema, formBinding, readAnswer, fieldsOf, checkValue, checkDigits, FORMATS, CHECKS, permissionDetails, lineDiff, confirms, HINTS, WORDS, type Format, type Check, type Operation, type Effect, type Field, type Form, type Detail, type Ask, type Binding, type Words } from './operations.js';
 export { VIEW_WORDS, type ViewWords, type HookWords, type MessageWords, type PartialViewWords } from './view-words.js';
-export { BLOCK_WORDS, wordWith, type BlockWords, type MoneyWords, type EventWords, type NoticeWords, type BatchWords, type MapWords, type TaskWords, type PdfWords } from './block-words.js';
+export { BLOCK_WORDS, wordWith, type BlockWords, type MoneyWords, type EventWords, type NoticeWords, type BatchWords, type MapWords, type TaskWords, type PdfWords, type SheetWords } from './block-words.js';
 export { SUMMARY_WORDS, type SummaryWords } from './summary-words.js';
 export { readableName } from './field-names.js';
 export { VIEW_WORDS_NB, VIEW_WORDS_NN } from './view-words-norwegian.js';
@@ -21,7 +21,7 @@ export { fromApp, appHtml, resultFor, textOnly, appsOn, anyAppsOn, resourceOf, t
 export { memoryResults, brief, shapeOf, amountsOf, fileOf, readRef, refOf, dataOf, withOwn, type ResultSource, type Entry, type ResultEntry, type AttachmentEntry, type AnswerEntry, type Row } from './results.js';
 export { showView } from './view.js';
 export { Refusal, type ViewContext } from './view-context.js';
-export { CARDS, MAX_ROWS, Panel, ShowView, panelSchema, showViewSchema, resultRef, panelOption, type CardDef, type CardAction, type CardFile, type Shaped, type PanelSpec, type ViewSpec, type Resolved } from './cards.js';
+export { CARDS, MAX_ROWS, Panel, ShowView, panelSchema, showViewSchema, resultRef, panelOption, type CardDef, type CardAction, type CardFile, type CardFileRows, type Shaped, type PanelSpec, type ViewSpec, type Resolved } from './cards.js';
 export { z } from 'zod'; // the zod a host's card fields are written with: Vindu's own, so they compose with its schemas
 export { compile, probesFor, type Surface, type Component, type Probe } from './a2ui.js';
 export { checkSurface } from './surface-check.js';

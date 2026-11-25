@@ -38,6 +38,16 @@ export function webAddress(raw: string): string | null {
     return null;
   }
 }
+/** An address a Word document links to, and the window draws a link to: one webAddress takes, or a mail address
+ *  (mailto:); null for anything else. Markdown's links are only web addresses. */
+export function linkAddress(raw: string): string | null {
+  try {
+    const url = new URL(raw.trim());
+    return url.protocol === 'mailto:' ? url.href : webAddress(raw);
+  } catch {
+    return null;
+  }
+}
 
 /** The text alone, without its marks: what a heading says, for its anchor and the account. */
 export function plainOf(inlines: readonly Inline[]): string {

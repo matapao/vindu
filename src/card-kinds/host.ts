@@ -6,6 +6,7 @@ import { pointerStep, type Row } from '../results.js';
 import { VIEW_WORDS, type ViewWords } from '../view-words.js';
 import { notesAccount, notesProblem, placedNotes, type DrawnCells } from './cells.js';
 import { cardFileOf } from '../view-files.js';
+import { workbookAccount, workbookDrawing } from '../workbook-file.js';
 import { drawnFrom, type CardKind } from './kind.js';
 
 /** The fields of rows as cells: in the order they first appear, without those the system keeps to itself (__). */
@@ -39,15 +40,17 @@ export function hostKind(def: CardDef): CardKind {
   return {
     reads: [...PANEL_FIELDS, ...Object.keys(def.fields ?? {})], // a host's card may read any shared field, besides its own
     ...(def.one ? { one: true } : {}), ...(def.rows ? { rows: def.rows } : {}), ...(def.source ? { source: def.source } : {}),
-    ...(cells ? { cells } : {}),
+    ...(cells ? { cells, workbooks: true as const } : {}),
     ...(how ? { file: (p, e, ctx) => cardFileOf(p, e, ctx, how) } : {}),
     check: (p, d) => (d.rows && def.check ? def.check(d.rows, p, d.shaped) : null) ?? notesCheck(p, d),
     props,
     draw: (p, d, k) => {
       const all = drawnFrom(p, d, 'rows'), drawn = cells?.(p, d), rows = all.slice(0, drawn?.rows ?? MAX_ROWS);
-      // cells go as one JSON list of values a row, so that a sheet of 1,000 rows and 200 columns stays within a surface's limits
-      k.model.rows = drawn ? rows.map(r => JSON.stringify(drawn.fields.map(f => r[f] ?? null))) : rows;
-      const of = drawn && { fields: drawn.fields, notes: placedNotes(p), rows: all.length, columns: cellFields(rows).length };
+      // cells go as one JSON list of values a row, so that a sheet of 1,000 rows and 200 columns stays within a surface's
+      // limits; a workbook's, a tab after another, with each row's looks and each tab's own fields
+      const book = def.cells ? workbookDrawing(d, def.cells) : undefined;
+      k.model.rows = book?.rows ?? (drawn ? rows.map(r => JSON.stringify(drawn.fields.map(f => r[f] ?? null))) : rows);
+      const of = drawn && { fields: drawn.fields, notes: placedNotes(p), rows: all.length, columns: cellFields(rows).length, ...(book ? { sheets: book.sheets, looks: book.looks } : {}) };
       // A2UI takes plain values as they are and anything else bound by path: a block's maps and lists go in the data model
       const bound = Object.fromEntries(Object.entries({ ...props(p, d), ...words(k.words), ...(of ? { cells: of } : {}) }).map(([name, v]) => {
         if (v === null || typeof v !== 'object') return [name, v];
@@ -61,6 +64,7 @@ export function hostKind(def: CardDef): CardKind {
       if (drawn && drawn.fields.length < cellFields(d.rows!.slice(0, most)).length) o.shown_columns = drawn.fields.length;
       Object.assign(o, def.account?.(d.rows!, p), d.shaped?.account);
       if (drawn) notesAccount(o, p, d, drawn);
+      if (def.cells) workbookAccount(o, d, def.cells);
     },
     ...(def.presentFields ? { presentFields: (rows, p, d) => def.presentFields!(rows, p, props(p, d) ?? {}) } : {}),
     ...(def.suggest ? { suggest: def.suggest } : {}),

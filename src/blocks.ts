@@ -14,10 +14,11 @@ import { NOTICE } from './block-notice.js';
 import { panelOption, resultRef, rowFields, type CardDef } from './cards.js';
 import { changedFields } from './changes.js';
 import { addFields, num, parse as parseExpr, setValue } from './compute.js';
-import { MARKDOWN_FILE, isMarkdownSection, markdownAccount } from './markdown-document.js';
+import { isMarkdownSection, markdownAccount } from './markdown-document.js';
 import { DRAFT_LIMITS, megabytes } from './message-draft.js';
 import type { Row } from './results.js';
 import { asText } from './format.js';
+import { DOCUMENT_FILE } from './word-document.js';
 
 const T = /^(time|date|sent|received|at|timestamp|created|when|datetime)$/i;
 export const MESSAGE = block({
@@ -57,8 +58,8 @@ export function wordDiff(a: string, b: string): { op: '=' | '+' | '-'; t: string
 }
 const DOC: Roles = { anchor: /^(anchor|id|section|clause|ref|no|number|paragraph)$/i, heading: /^(heading|title|caption|name)$/i, text: /^(text|body|content|paragraph_?text|value)$/i, level: /^(level|depth)$/i, page: /^(page|p)$/i, sources: /^(sources?|cites?|citations?|refs)$/i };
 export const DOCUMENT = block({
-  name: 'document', component: 'VDocument', about: 'a document as sections or paragraphs, each with an anchor to cite (§ 4.2, page 3); with before: an earlier version\'s result id, what changed is shown as tracked changes. Or a Markdown file as it is, read and drawn by the system (headings, lists, code, tables, links), up to 512,000 bytes: from an attachment (a1), or path: a .md file in the working folder',
-  roles: DOC, file: MARKDOWN_FILE,
+  name: 'document', component: 'VDocument', about: 'a document as sections or paragraphs, each with an anchor to cite (§ 4.2, page 3); with before: an earlier version\'s result id, what changed is shown as tracked changes. Or a Markdown file as it is, read and drawn by the system (headings, lists, code, tables, links), up to 512,000 bytes; or a Word document (.docx), its headings, paragraphs, lists, tables and links read and drawn by the system, each picture as [picture]: from an attachment (a1), or path: a .md or .docx file in the working folder',
+  roles: DOC, file: DOCUMENT_FILE,
   fields: { before: resultRef(z.string().optional().describe('document: an earlier version (a result id with the same sections): what changed is computed word by word and shown as tracked changes')) },
   check: (rows, _p, m) => (rows.some(isMarkdownSection) ? null : needOne(m, ['text'], 'a document', rows)), derived: ['__changes', '__new', '__gone', '__heading', '__blocks'],
   rows: (rows, p, m, read) => {
@@ -170,7 +171,7 @@ export const CONTACTS = block({
 
 // ── a sheet: rows with formulas per column, inputs, and scenarios side by side, all computed by the system ─────────
 export const SHEET = block({
-  name: 'sheet', component: 'VSheet', about: 'a spreadsheet model: rows with computed columns (compute), inputs ($name) and scenarios side by side; every computed cell says its formula. Its columns are lettered A, B, … and its rows numbered, row 1 the header. A CSV, TSV or JSON file as rows: from, its attachment id, or path, the file in the working folder; the system reads it, and draws up to 1,000 rows and 200 columns of it. notes: your notes on its cells, by A1 address',
+  name: 'sheet', component: 'VSheet', about: 'a spreadsheet model: rows with computed columns (compute), inputs ($name) and scenarios side by side; every computed cell says its formula. Its columns are lettered A, B, … and its rows numbered, row 1 the header. A CSV, TSV or JSON file as rows: from, its attachment id, or path, the file in the working folder; the system reads it, and draws up to 1,000 rows and 200 columns of it. A workbook (.xlsx) the same way, a tab for each sheet that is not hidden, each value as Excel last saved it (formulas marked, never computed again); pick: one sheet by its name, shown alone, for where, sort, compute or notes. notes: your notes on its cells, by A1 address',
   roles: {}, cells: { rows: 1000, columns: 200 },
   fields: { scenarios: panelOption(z.record(z.string(), z.record(z.string(), z.number())).optional().describe('sheet: named sets of inputs, e.g. {"low": {"growth": 0.02}, "base": {"growth": 0.04}}; totals is computed for each')),
     totals: panelOption(z.record(z.string(), z.string()).optional().describe('sheet: values over all rows, e.g. {"Budget": "sum(budget)"}; with scenarios, one column per scenario')) },
@@ -191,7 +192,7 @@ export const SHEET = block({
       scenarios: Object.keys(sc),
     } } };
   },
-  props: () => ({ sheet: {} }), allFields: () => true,
+  props: () => ({ sheet: {} }), allFields: () => true, words: w => ({ ...w.sheet }),
   account: (rows, p, _m, props) => ({ rows: rows.length, formulas: p.compute ?? {}, totals: 'computed by the system for each scenario', values: (props.sheet as { totals?: unknown })?.totals }),
 });
 const valueOver = (expr: string, rows: Row[], inputs: Record<string, unknown>) => { const v = setValue(parseExpr(expr), rows, inputs); return v; };

@@ -73,7 +73,7 @@ export type ViewWords = {
   summary: SummaryWords;
 } & BlockWords;
 /** The groups of words, each merged word by word. */
-const GROUPS = ['hook', 'message', 'summary', 'money', 'events', 'notice', 'batch', 'map', 'tasks', 'pdf'] as const satisfies readonly (keyof ViewWords)[];
+const GROUPS = ['hook', 'message', 'summary', 'money', 'events', 'notice', 'batch', 'map', 'tasks', 'pdf', 'sheet'] as const satisfies readonly (keyof ViewWords)[];
 type Group = (typeof GROUPS)[number];
 /** Words a host gives: any of them; each one it leaves out is the one under it. */
 export type PartialViewWords = Partial<Omit<ViewWords, Group>> & { [G in Group]?: Partial<ViewWords[G]> };

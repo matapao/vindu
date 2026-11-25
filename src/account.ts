@@ -39,7 +39,7 @@ export function account(view: ViewSpec, data: Record<string, Resolved>, wide: Su
       if (d.src.digest) o.digest = d.src.digest.slice(0, 19); // sha256: and 12 hex
     } else if (d.file && 'format' in d.file) { // a data file read as rows
       o.seen = 'exact: the file, read by the system';
-      o.file = { name: d.file.name, format: d.file.format, rows: d.file.rows, columns: d.file.columns, ...(d.file.format === 'json' ? {} : { cells: 'a number written exactly as a number is that number; every other cell is its text as written' }) };
+      o.file = { name: d.file.name, format: d.file.format, rows: d.file.rows, columns: d.file.columns, ...(d.file.format === 'json' ? {} : { cells: 'a number written exactly as a number is that number; every other cell is its text as written' }), ...d.file.told };
     } else if (d.file) { // a file the card read itself: which, how big, and whether only its start is shown
       o.seen = 'the file itself, read by the system'; o.file = { name: d.file.name, bytes: d.file.size };
       if (d.file.cut) o.cut = `Only its start is shown: ${d.file.cut}`;
@@ -54,6 +54,7 @@ export function account(view: ViewSpec, data: Record<string, Resolved>, wide: Su
     if (d.waiting) { o.card = d.waiting.card; o.from = 'waiting'; o.waiting = d.failed ? 'the call it waited for failed: it shows the server\'s own answer' : `${d.waiting.for} The system fills it when that happens, without you`; delete o.seen; }
     if (d.picked) o.linked = `follows ${d.picked.of}: its rows where ${d.picked.by} is ${JSON.stringify(d.picked.value)}, as ${d.picked.label} is picked there; the person picks another with a click there, without you`;
     kind.account?.(o, p, d, { model: m, narrow: narrow[pid] ?? {} }); // what its card's kind says of it
+    if (d.file && !('format' in d.file) && d.file.told) Object.assign(o, d.file.told); // and what the card's reading of its file says
     if (o.from === 'typed') typed.push(JSON.stringify(d.rows ?? d.record ?? d.value ?? d.text ?? ''));
     return o;
   });

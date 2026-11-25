@@ -2,13 +2,13 @@
 // its body as blocks the window draws as elements (renderer/blocks/markdown.ts). The file is read by the system, at
 // most MARKDOWN_MOST bytes of it, and parsed on the server (markdown.ts); its account says what it shows.
 import type { CardFile, PanelSpec } from './cards.js';
-import { parseMarkdown, type MarkdownBlock } from './markdown.js';
+import { parseMarkdown, type MarkdownBlock, type MarkdownDocument } from './markdown.js';
 import type { Row } from './results.js';
 
 /** The bytes of a Markdown file a document reads at most: of a longer one, its start. */
 export const MARKDOWN_MOST = 512_000;
 /** The sections a document from a file draws at most: deeper headings go into the section above them first. */
-const MOST_SECTIONS = 100;
+export const MOST_SECTIONS = 100;
 
 const MARKDOWN_NAME = /\.(md|markdown)$/i;
 const MARKDOWN_TYPE = /^text\/(x-)?markdown\s*(;|$)/i;
@@ -19,7 +19,10 @@ export const isMarkdownSection = (r: Row) => Array.isArray(r.__blocks);
 /** The sections of a Markdown text as rows; cut says what of the text they leave out, if anything. */
 function markdownRows(text: string, panel: PanelSpec): { rows: Row[]; cut?: string } {
   if (panel.before) throw new Error('before compares sections with an earlier result\'s; a Markdown file is shown as it is, without it');
-  const doc = parseMarkdown(text, { sections: MOST_SECTIONS });
+  return documentRows(parseMarkdown(text, { sections: MOST_SECTIONS }));
+}
+/** A document's sections as rows (a Markdown file's, or a Word document's): its heading, level, anchor and blocks each. */
+export function documentRows(doc: MarkdownDocument): { rows: Row[]; cut?: string } {
   const rows = doc.sections.map((s): Row => ({
     ...(s.anchor !== undefined ? { anchor: s.anchor } : {}), ...(s.heading !== undefined ? { heading: s.heading } : {}), level: s.level,
     ...(s.title ? { __heading: s.title } : {}), __blocks: s.blocks,

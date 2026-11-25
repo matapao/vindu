@@ -137,6 +137,9 @@ packages:
   echarts@6.1.0:
     resolution: {integrity: sha512-q0yaFPggC9FUdsWH4blavRWFmxdrIodbkoKNAjJudAI6CA9gNPxHtV2RcZNEepZVlk4yvBYkOkbk6HIVpIyHZA==}
 
+  fflate@0.8.3:
+    resolution: {integrity: sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==}
+
   hono@4.13.18:
     resolution: {integrity: sha512-H9q/E1XizaWstJxUW881dmLxEj+t/TrGGnyxINkm4+sK0qUwsMtFdo2BWI9Vs3cIS19MU6b6iCijoUoEf4f3DA==}
     engines: {node: '>=16.9.0'}
@@ -295,6 +298,7 @@ snapshots:
       axe-core: 4.14.0
       chart.js: 4.6.1
       echarts: 6.1.0
+      fflate: 0.8.3
       lit: 3.3.3
       monaco-editor: 0.58.0-dev-20261109
       pdfjs-dist: 6.5.438
@@ -346,6 +350,8 @@ snapshots:
       tslib: 2.3.0
       zrender: 6.1.0
 
+  fflate@0.8.3: {}
+
   hono@4.13.18: {}
 
   jsesc@3.1.0: {}
@@ -373,8 +379,7 @@ snapshots:
       dompurify: 3.4.17
       marked: 14.0.0
 
-  pdfjs-dist@6.5.438:
-    optionalDependencies: null
+  pdfjs-dist@6.5.438: {}
 
   redos-detector@6.1.4:
     dependencies:

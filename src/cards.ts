@@ -60,13 +60,19 @@ export const GALLERY_MOST = 40;
 export type GalleryItem = { name: string; mime: string; url: string; from: string };
 /** The files a card shows as they are, read by the system: which it takes (by name, and an attachment's type), at most
  *  how many bytes of one it reads (the start of a longer one), and the rows its text makes; cut says, in words, what of
- *  that text the rows leave out (the sections past the first 100, say). An error it throws is the panel's refusal. */
+ *  that text the rows leave out (the sections past the first 100, say), and told what the panel's account says of the
+ *  file besides. An error it throws is the panel's refusal. */
 export type CardFile = {
   kinds: string;                                          // the files it takes, in words, for a refusal
   takes: (name: string, mime?: string) => boolean;
   most: number;
-  rows: (text: string, panel: PanelSpec) => { rows: Row[]; cut?: string };
+  rows: (text: string, panel: PanelSpec) => CardFileRows;
+  /** Of the files it takes, those it reads whole and not as text (a Word document): which, and the rows it makes of
+   *  one, given where it is on disk and its name; it reads the file itself, within limits of its own. */
+  binary?: { takes: (name: string, mime?: string) => boolean; rows: (file: string, name: string, panel: PanelSpec) => CardFileRows };
 };
+/** The rows a card makes of a file, what of the file they leave out, and what the panel's account says of it besides. */
+export type CardFileRows = { rows: Row[]; cut?: string; told?: Record<string, unknown> };
 /** What a card's rows are shaped with besides them: the inputs the values are computed with, the person's own draft
  *  of the panel, where the window keeps one (a message block's draft: block-drafts.ts), and the view's time zone. */
 type RowsContext = { inputs: Record<string, number>; draft?: DraftContext; timeZone?: string }; // timeZone: the view's, for what falls on which day
@@ -309,11 +315,23 @@ export type Resolved = {
 };
 
 /** A data file the system read as rows (data-files.ts): where it is (an attachment's id, or work/<path>), its name, its
- *  format, how many rows and columns it has, and each row's own row in it (row 1 its header). */
-export type DataFileRead = { name: string; from: string; format: string; rows: number; columns: number; index: Map<Row, number> };
-/** A file a card reads itself (a document's Markdown): where it is, its name, the bytes read of its size, and what is
- *  left out. */
-export type CardFileRead = { from: string; name: string; bytes: number; size: number; cut?: string };
+ *  format, how many rows and columns it has, and each row's own row in it (row 1 its header). Of a workbook (.xlsx,
+ *  workbook-file.ts): the worksheets shown, each a tab of the sheet card, and what its account says of the file besides. */
+export type DataFileRead = { name: string; from: string; format: string; rows: number; columns: number; index: Map<Row, number>; sheets?: SheetRead[]; told?: Record<string, unknown> };
+/** A worksheet a sheet card shows: its name; where its first cell, the card's A1, is in the file ("B3"); its header's
+ *  fields and its rows, in order; how its cells are drawn besides their values, by their row in it (row 1 its header)
+ *  and their field; and its merged cells. */
+export type SheetRead = { name: string; at: string; fields: string[]; rows: Row[]; looks: Map<number, Record<string, CellLook>>; merges: CellMerge[] };
+/** How a cell of a worksheet is drawn besides its value: as a date, a time or both (seconds: whether it shows them), as a
+ *  percentage or a number with fixed decimals; and its formula as the file writes it, never computed again. */
+export type CellLook = { format?: 'date' | 'time' | 'datetime' | 'percent' | 'fixed'; decimals?: number; seconds?: true; formula?: string };
+/** Merged cells: the top left one, by its row (-1 the header, 0 the first row under it) and its column (from 0), and
+ *  how many rows and columns they span. */
+export type CellMerge = { row: number; column: number; rows: number; columns: number };
+/** A file a card reads itself (a document's Markdown or Word document): where it is, its name, the bytes read of its
+ *  size, what is left out, and what the panel's account says of it besides its card's own (a Word document's
+ *  paragraphs and tables, and what of it is not drawn). */
+export type CardFileRead = { from: string; name: string; bytes: number; size: number; cut?: string; told?: Record<string, unknown> };
 
 /** Every field the rows have, in the order they first appear. */
 export const rowFields = (rows: Row[]) => [...new Set(rows.flatMap(r => Object.keys(r ?? {})))];

@@ -174,6 +174,7 @@ export function appOf(p: PanelSpec, ctx: ViewContext): NonNullable<Resolved['app
 function otherwise(mime: string, attachment: string): string {
   if (/^(image|video|audio)\//.test(mime)) return `; show it with a media panel ("media": "${attachment}")`;
   if (mime === 'application/pdf') return `; show it with a pdf panel ("media": "${attachment}")`;
+  if (/spreadsheetml\.sheet/.test(mime)) return `; show it with a sheet ("from": "${attachment}"), a tab for each of its sheets`;
   return mime.startsWith('text/') ? `; show it with a text panel ("from": "${attachment}")` : '';
 }
 /** A file a card shows as it is (CardFile), read by the system: the attachment from names, or path, a file in the
@@ -184,6 +185,7 @@ export function cardFileOf(p: PanelSpec, e: Entry | undefined, ctx: ViewContext,
   let read: { name: string; from: string } & TextStart;
   if (e?.kind === 'attachment') {
     if (!how.takes(e.name, e.mime)) throw new Refusal(`panel ${p.id}: ${e.id} is ${e.name} (${e.mime}); a ${p.card} shows ${how.kinds}${otherwise(e.mime, e.id)}`);
+    if (how.binary?.takes(e.name, e.mime)) return binaryFileOf(p, { name: e.name, from: e.id, file: e.file }, how.binary);
     let start: TextStart | null;
     try { start = readTextStart(e.file, how.most); } catch { throw new Refusal(`panel ${p.id}: ${e.id} (${e.name}) could not be read`); }
     if (!start) throw new Refusal(`panel ${p.id}: ${e.name} is not text`);
@@ -192,6 +194,11 @@ export function cardFileOf(p: PanelSpec, e: Entry | undefined, ctx: ViewContext,
     const rel = splitPath(p.path!).file;
     if (!how.takes(rel)) throw new Refusal(`panel ${p.id}: "${rel}" is not a file a ${p.card} shows: it shows ${how.kinds}; show another file with a code panel`);
     if (!ctx.pages?.workStart) throw new Refusal(`panel ${p.id}: this host shows no files`);
+    if (how.binary?.takes(rel)) {
+      const found = ctx.pages.workPath?.(rel);
+      if (!found || !fs.statSync(found.file, { throwIfNoEntry: false })?.isFile()) throw new Refusal(`panel ${p.id}: no file "${rel}" in the working folder`);
+      return binaryFileOf(p, { name: path.basename(found.rel), from: `work/${found.rel}`, file: found.file }, how.binary);
+    }
     const f = ctx.pages.workStart(rel, how.most);
     if ('why' in f) throw new Refusal(`panel ${p.id}: ${f.why}`);
     if (!how.takes(f.rel)) throw new Refusal(`panel ${p.id}: "${rel}" is a folder, and ${p.card} panels show files: ${how.kinds}`); // its index.html
@@ -201,5 +208,13 @@ export function cardFileOf(p: PanelSpec, e: Entry | undefined, ctx: ViewContext,
   let made: ReturnType<CardFile['rows']>;
   try { made = how.rows(read.text, p); } catch (x) { throw new Refusal(`panel ${p.id}: ${(x as Error).message}`); }
   const cut = [read.bytes < read.size ? `the first ${read.bytes} of its ${read.size} bytes` : '', made.cut ?? ''].filter(Boolean).join('; ');
-  return { rows: made.rows, file: { from: read.from, name: read.name, bytes: read.bytes, size: read.size, ...(cut ? { cut } : {}) } };
+  return { rows: made.rows, file: { from: read.from, name: read.name, bytes: read.bytes, size: read.size, ...(cut ? { cut } : {}), ...(made.told ? { told: made.told } : {}) } };
+}
+/** A file a card reads whole and not as text (a Word document), by the card's own reader, which keeps to its limits. */
+function binaryFileOf(p: PanelSpec, at: { name: string; from: string; file: string }, how: NonNullable<CardFile['binary']>): { rows: Row[]; file: CardFileRead } {
+  let size: number;
+  try { size = fs.statSync(at.file).size; } catch { throw new Refusal(`panel ${p.id}: ${at.from} (${at.name}) could not be read`); }
+  let made: ReturnType<typeof how.rows>;
+  try { made = how.rows(at.file, at.name, p); } catch (x) { throw new Refusal(`panel ${p.id}: ${(x as Error).message}`); }
+  return { rows: made.rows, file: { from: at.from, name: at.name, bytes: size, size, ...(made.cut ? { cut: made.cut } : {}), ...(made.told ? { told: made.told } : {}) } };
 }

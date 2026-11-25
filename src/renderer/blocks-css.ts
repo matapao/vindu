@@ -81,6 +81,10 @@ export const BLOCKS_CSS = `
 .vindu-theme .vb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:${rhythm(8)} ${space(8)}}
 .vindu-theme .vb-sheet{overflow-x:auto} .vindu-theme .vb-f{color:var(--v-accent)} .vindu-theme .vb-fx{font-style:italic;color:var(--v-accent)}
 .vindu-theme .vb-sheet td{white-space:pre-line} .vindu-theme .vb-nobr{white-space:nowrap}
+.vindu-theme .vb-sheettabs{display:flex;flex-wrap:wrap;gap:${rhythm(2)} ${space(2)};margin-bottom:${rhythm(4)};border-bottom:1px solid var(--v-line)}
+.vindu-theme .vb-sheettab{border:0;border-bottom:2px solid transparent;background:none;color:var(--v-muted);font:inherit;font-size:${captionSize(12)};padding:${rhythm(3)} ${space(10)};cursor:pointer}
+.vindu-theme .vb-sheettab[aria-selected="true"]{color:var(--v-ink);font-weight:600;border-bottom-color:var(--v-accent)} .vindu-theme .vb-sheettab:focus-visible{outline:2px solid var(--v-accent);outline-offset:-2px}
+.vindu-theme .vb-sheet :is(th,td)[colspan]{text-align:center}
 .vindu-theme .vb-sheet .vb-letter,.vindu-theme .vb-sheet .vb-rownum{font-family:var(--v-mono);font-weight:400;font-size:${captionSize(10.5)};color:var(--v-muted);text-align:center;background:var(--v-wash)} .vindu-theme .vb-sheet .vb-rownum{width:1%;white-space:nowrap}
 .vindu-theme .vb-sheet .vb-noted{background:rgba(235,104,52,.12);box-shadow:inset 0 0 0 1px rgba(235,104,52,.6)} .vindu-theme .vb-noted:focus-visible{outline:2px solid var(--v-accent);outline-offset:-2px}
 .vindu-theme .vb-notemark{margin-left:${space(3)};font-size:${captionSize(9.5)};font-weight:600;color:#c4511f;line-height:0}
