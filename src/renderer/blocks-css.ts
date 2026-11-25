@@ -66,6 +66,12 @@ export const BLOCKS_CSS = `
 .vindu-theme .vb-big{font-size:${headingSize(26)};font-weight:600;letter-spacing:-.01em;white-space:nowrap}
 .vindu-theme :is(.vb-money,.vb-pay,.vb-sheet,.vb-slot){overflow-wrap:normal;word-break:normal;line-break:auto;hyphens:manual}
 .vindu-theme :is(.vb-lines,.vb-sheet) .vb-num{white-space:nowrap} .vindu-theme .vb-scroll{overflow-x:auto} .vindu-theme .vb-sum{text-align:right}
+.vindu-theme .vb-money{container:vb-money/inline-size}
+@container vb-money (max-width:480px){.vindu-theme .vb-lines :is(th,td){padding-left:${space(3)};padding-right:${space(3)}}}
+@property --vb-fade-start{syntax:'<length>';inherits:false;initial-value:0px}
+@property --vb-fade-end{syntax:'<length>';inherits:false;initial-value:0px}
+@keyframes vb-edges{0%{--vb-fade-start:0px;--vb-fade-end:${space(24)}}10%,90%{--vb-fade-start:${space(24)};--vb-fade-end:${space(24)}}100%{--vb-fade-start:${space(24)};--vb-fade-end:0px}}
+.vindu-theme :is(.vb-scroll,.vb-sheet){animation:vb-edges linear both;animation-timeline:scroll(self inline);mask-image:linear-gradient(to right,transparent,#000 var(--vb-fade-start),#000 calc(100% - var(--vb-fade-end)),transparent)}
 .vindu-theme .vb-file .vb-icon,.vindu-theme .vb-sign .vb-icon{font:600 ${captionSize(9.5)} var(--v-mono);border:1px solid var(--v-line);border-radius:3px;padding:${rhythm(1)} ${space(3)};color:var(--v-ink-2);min-width:30px;text-align:center}
 .vindu-theme .vb-file .vb-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .vindu-theme .vb-map svg{width:100%;height:auto;display:block;border:1px solid var(--v-hair);border-radius:6px} .vindu-theme .vb-sea{fill:var(--v-wash)}

@@ -1,8 +1,9 @@
 // Money as a document: an invoice or a receipt (its head, its lines, the totals the system added up, and whether the
 // document's own total is what its lines add up to), or one payment before it is made. Its labels are the view's
-// words; a field of its head that is none of the usual ones is labelled by its name, made readable. Its lines scroll
-// sideways in a narrow pane: a number is never wrapped, and text wraps at its spaces alone (an amount's own spaces
-// are no-break spaces, as the locale writes them).
+// words; a field of its head that is none of the usual ones is labelled by its name, made readable. In a narrow card
+// its cells close up, and lines that still do not fit scroll sideways, faded at the edge they go past: a number is
+// never wrapped, and text wraps at its spaces alone (an amount's own spaces are no-break spaces, as the locale writes
+// them).
 import { html, nothing } from 'lit';
 import { BLOCK_WORDS, wordsGiven, wordWith, type MoneyWords } from '../../block-words.js';
 import { readableName } from '../../field-names.js';
