@@ -2,6 +2,7 @@ import { html, svg, nothing } from 'lit';
 import { asText, ellipsis } from '../../format.js';
 import { fieldValue, formatCell, formatTime, rowContainer, defineBlock, imageSource } from './shared.js';
 import { sendBlockAction } from '../dom.js';
+import { pictureSchemes } from '../picture-sources.js';
 
 const slideByRows = new WeakMap<object, number>();
 const arrows = new WeakMap<object, string>();
@@ -62,9 +63,9 @@ export const VSignature = defineBlock(
   'VSignature',
   'vindu-signature',
   {},
-  (props) =>
+  (props, element) =>
     html`<div class="vb-list">${props.rows.map((row, index) => {
-      const img = imageSource(fieldValue(props, row, 'image'), /^data:image\/(png|svg\+xml);base64,/);
+      const img = imageSource(fieldValue(props, row, 'image'), /^data:image\/(png|svg\+xml);base64,/, pictureSchemes(element));
       return rowContainer(
         props,
         index,

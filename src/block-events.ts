@@ -95,6 +95,6 @@ export const EVENTS = block({
     return { rows: freeSlots(busy, from, to, [h0, h1], len).map(s => ({ free: true, start: s.start, end: s.end })), checkRows: rows };
   },
   props: p => (p.layout === 'free' ? { map: { start: 'start', end: 'end' } } : {}),
-  derived: ['planned_from', 'clashes'], actions: { plan }, suggest: clashCue,
+  derived: ['planned_from', 'clashes'], actions: { plan }, suggest: clashCue, words: w => ({ ...w.events }),
   account: (rows, p, m) => (p.layout !== 'free' && p.planned && Object.keys(p.planned).length ? { events: rows.length, ...planAccount(rows, m) } : p.layout === 'free' ? { free: `computed by the system from the busy events: ${rows.length} free spans of at least ${asText(p.length ?? '30m')}, ${(p.hours as string[] | undefined)?.join('–') ?? '08:00–16:00'} UTC` } : { events: rows.length }),
 });

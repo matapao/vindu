@@ -102,6 +102,10 @@ export type ShellOptions = {
   actions?: ShellAction[];
   css?: boolean;                        // false: none of vindu's styles, the host's own only
   panes?: Record<string, PaneDrawer>;   // the host's own panes, by kind: "terminal", "browser" (vindu/renderer/terminal, …/browser)
+  /** The schemes the host serves pictures from besides http(s), e.g. ['media:']: each lowercase and ending in ':', never
+   *  javascript: or data: (a picture's data stays an image's own, in base64). The blocks draw a picture from them: a
+   *  photo with marks, a gallery's tiles, a signature. Sound and video still come from http(s). */
+  sources?: readonly string[];
 };
 /** One CSS value and nothing more: no other declaration or rule (; { }), no markup, no comment or backslash escape that
  *  could hide one, no string left open, and nothing that loads (url(), image-set(), …): a skin draws, and fetches nothing. */

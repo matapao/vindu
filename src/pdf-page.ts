@@ -6,6 +6,7 @@
 // from /lib (worker-src 'self'), which the frame's sandbox allows, as it keeps the page host's origin; where a worker
 // cannot start, pdf.js parses on the page itself, from the same file. How far the person has read it goes to the window
 // (task.read), never to the model. A file in the working folder is read again when it changes, at the page shown.
+import { BLOCK_WORDS, type PdfWords } from './block-words.js';
 import { escapeText, scriptJson } from './escape.js';
 
 /** The largest PDF a pdf panel shows. */
@@ -13,9 +14,12 @@ export const PDF_MAX = 50_000_000;
 /** What the page is given: where the PDF is on the process's origin, its name, and for a file in the working folder,
  *  its path there, to follow it as it changes. */
 export type PdfSpec = { url: string; name: string; path?: string };
+/** How the page says where the person is and why a PDF is not shown: the view's words, and the locale its numbers are
+ *  written in (English and en-GB by default). */
+type PdfSaying = { words?: PdfWords; locale?: string };
 
 /** The page for a pdf panel. Everything it needs is in the page or on the process's own origin. */
-export function pdfPage(spec: PdfSpec): string {
+export function pdfPage(spec: PdfSpec, { words = BLOCK_WORDS.pdf, locale = 'en-GB' }: PdfSaying = {}): string {
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="color-scheme" content="light dark"><title>${escapeText(spec.name)}</title>
 <style>
 html,body{margin:0;background:#e6e6e6;color:#1f1f1f;font:13px/1.4 system-ui,sans-serif}
@@ -25,17 +29,21 @@ html,body{margin:0;background:#e6e6e6;color:#1f1f1f;font:13px/1.4 system-ui,sans
 .page{position:relative;margin:0 auto 8px;background:#fff;box-shadow:0 1px 3px #0003}
 .page canvas{position:absolute;inset:0;width:100%;height:100%}
 </style></head>
-<body><div id="at" role="status">Loading the PDF…</div><div id="pages"></div>
+<body><div id="at" role="status">${escapeText(words.loading)}</div><div id="pages"></div>
 <script>task.read(0); // the page says how far it is read itself, once its pages are laid out, and not its scroll before</script>
 <script type="module">
 import { getDocument, GlobalWorkerOptions, PasswordException } from '/lib/pdfjs-dist/build/pdf.min.mjs';
 const spec = ${scriptJson(spec)};
+const words = ${scriptJson(words)}, locale = ${scriptJson(locale)};
 const lib = new URL('/lib/pdfjs-dist/', location.href).href;
 GlobalWorkerOptions.workerSrc = lib + 'build/pdf.worker.min.mjs';
 const at = document.getElementById('at'), list = document.getElementById('pages');
 let doc, boxes = [], first = null, width = 0, shown = 0;
 const drawing = new Map(); // a page drawn, or being drawn: its render task and the width it is drawn at
 const say = text => { at.textContent = text; };
+// the view's words, a slot's value put in it; a page's number as the locale writes it
+const word = (w, values) => w.replace(/[{](\\w+)[}]/g, (slot, name) => values[name] ?? slot);
+const count = new Intl.NumberFormat(locale), pageOf = (n, of) => word(words.page, { at: count.format(n), of: count.format(of) });
 
 // a page is drawn once it comes near the view, at the width of the pane, and again when that width changes
 const near = new IntersectionObserver(entries => { for (const e of entries) if (e.isIntersecting) draw(boxes.indexOf(e.target) + 1); }, { rootMargin: '100% 0px' });
@@ -67,7 +75,7 @@ function place() {
   if (!boxes.length) return;
   const middle = innerHeight / 2;
   shown = Math.max(1, boxes.findIndex(b => b.getBoundingClientRect().bottom > middle) + 1 || boxes.length);
-  say('page ' + shown + ' of ' + boxes.length);
+  say(pageOf(shown, boxes.length));
   const r = list.getBoundingClientRect(), view = innerHeight - at.offsetHeight;
   if (r.height <= view + 1) { // all of it in view: read once it has been in view 2.5 s
     fitTimer ??= setTimeout(() => { fitTimer = undefined; if (list.getBoundingClientRect().height <= innerHeight - at.offsetHeight + 1 && document.visibilityState === 'visible') task.read(1); }, 2500);
@@ -84,7 +92,7 @@ async function open(keep) {
   try {
     next = await getDocument({ url: spec.url, cMapUrl: lib + 'cmaps/', cMapPacked: true, standardFontDataUrl: lib + 'standard_fonts/', wasmUrl: lib + 'wasm/', iccUrl: lib + 'iccs/', enableXfa: false }).promise;
   } catch (e) {
-    say(e instanceof PasswordException ? 'This PDF is protected by a password, so it is not shown.' : 'This PDF could not be read: ' + String(e?.message || e));
+    say(e instanceof PasswordException ? words.locked : word(words.unreadable, { why: String(e?.message || e) }));
     document.body.dataset.ready = 'failed';
     return;
   }
@@ -93,7 +101,8 @@ async function open(keep) {
   drawing.clear(); near.disconnect();
   boxes = Array.from({ length: doc.numPages }, (_, i) => {
     const box = document.createElement('div'); box.className = 'page';
-    box.setAttribute('role', 'img'); box.setAttribute('aria-label', 'Page ' + (i + 1) + ' of ' + doc.numPages);
+    const named = pageOf(i + 1, doc.numPages);
+    box.setAttribute('role', 'img'); box.setAttribute('aria-label', named.charAt(0).toUpperCase() + named.slice(1));
     box.style.aspectRatio = first.width + ' / ' + first.height; near.observe(box); return box;
   });
   list.replaceChildren(...boxes);

@@ -63,7 +63,9 @@ export const BLOCKS_CSS = `
 .vindu-theme table{border-collapse:collapse;width:100%} .vindu-theme .vb-lines th,.vindu-theme .vb-sheet th{font-weight:600;font-size:${captionSize(11.5)};color:var(--v-muted);text-align:left;border-bottom:1px solid var(--v-line);padding:${rhythm(3)} ${space(6)}}
 .vindu-theme .vb-lines td,.vindu-theme .vb-sheet td{padding:${rhythm(4)} ${space(6)};border-bottom:1px solid var(--v-hair)} .vindu-theme .vb-num{text-align:right;font-variant-numeric:tabular-nums}
 .vindu-theme .vb-total{font-weight:600;font-size:${headingSize(14)};border-bottom:0!important}
-.vindu-theme .vb-big{font-size:${headingSize(26)};font-weight:600;letter-spacing:-.01em}
+.vindu-theme .vb-big{font-size:${headingSize(26)};font-weight:600;letter-spacing:-.01em;white-space:nowrap}
+.vindu-theme :is(.vb-money,.vb-pay,.vb-sheet,.vb-slot){overflow-wrap:normal;word-break:normal;line-break:auto;hyphens:manual}
+.vindu-theme :is(.vb-lines,.vb-sheet) .vb-num{white-space:nowrap} .vindu-theme .vb-scroll{overflow-x:auto} .vindu-theme .vb-sum{text-align:right}
 .vindu-theme .vb-file .vb-icon,.vindu-theme .vb-sign .vb-icon{font:600 ${captionSize(9.5)} var(--v-mono);border:1px solid var(--v-line);border-radius:3px;padding:${rhythm(1)} ${space(3)};color:var(--v-ink-2);min-width:30px;text-align:center}
 .vindu-theme .vb-file .vb-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .vindu-theme .vb-map svg{width:100%;height:auto;display:block;border:1px solid var(--v-hair);border-radius:6px} .vindu-theme .vb-sea{fill:var(--v-wash)}
@@ -105,7 +107,7 @@ export const BLOCKS_CSS = `
 .vindu-theme .vb-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:0 ${space(12)}}
 .vindu-theme .vb-stage img,.vindu-theme .vb-stage video{display:block;max-width:100%;max-height:100%;object-fit:contain}
 .vindu-theme .vb-viewer .vb-nav{justify-content:center;margin:0;padding:${rhythm(8)} ${space(12)}}
-.vindu-theme .vb-chart{position:relative;display:block;max-width:100%} .vindu-theme .vb-chart img{display:block;max-width:100%;height:auto}
+.vindu-theme .vb-chart{position:relative;display:block;width:100%;max-width:100%} .vindu-theme .vb-chart img{display:block;max-width:100%;height:auto}
 .vindu-theme .vb-strips{position:absolute;top:0;bottom:0;display:flex} .vindu-theme .vb-strip{flex:1 1 0} .vindu-theme .vb-strip[data-opens]{cursor:pointer}
 .vindu-theme .vb-strip:hover{background:rgba(42,120,214,.07)} .vindu-theme .vb-strip:focus-visible{outline:2px solid var(--v-accent);outline-offset:-2px} .vindu-theme .vb-strip.vb-picked{background:rgba(42,120,214,.16);outline:2px solid var(--v-accent)}
 .vindu-theme .vb-draft{display:flex;flex-direction:column;gap:${rhythm(8)} 0;max-width:80ch}

@@ -1,6 +1,7 @@
 import { html, nothing } from 'lit';
 import { asText, cellIn, whenIn } from '../../format.js';
 import { defineComponent, type VinduComponent } from '../define.js';
+import { localeHere } from '../locale-here.js';
 
 export type BlockRow = Record<string, unknown>;
 export type BlockProps = {
@@ -53,11 +54,15 @@ const displayName = (x: unknown): string => {
 /** The people or things a field names: a list of them, or one alone (a sender, an owner). */
 export const displayNames = (v: unknown): string[] =>
   Array.isArray(v) ? v.map(displayName) : v === null || v === undefined || v === '' ? [] : [displayName(v)];
-/** An address a block draws media from: http or https, or a data: URL of the kinds given (images, base64); '' otherwise. */
-export function imageSource(v: unknown, data: RegExp = /^data:image\/(png|jpeg|gif|webp|svg\+xml);base64,/): string {
+/** An address a block draws media from: http or https, a scheme the host serves pictures from (schemes, for a picture:
+ *  picture-sources.ts), or a data: URL of the kinds given (images, base64); '' otherwise. */
+export function imageSource(v: unknown, data: RegExp = /^data:image\/(png|jpeg|gif|webp|svg\+xml);base64,/, schemes: readonly string[] = []): string {
   const s = typeof v === 'string' ? v.trim() : '';
   if (data.test(s)) return s;
-  try { return /^https?:$/.test(new URL(s).protocol) ? s : ''; } catch { return ''; }
+  try {
+    const scheme = new URL(s).protocol;
+    return /^https?:$/.test(scheme) || schemes.includes(scheme) ? s : '';
+  } catch { return ''; }
 }
 export const emptyMessage = (what: string) => html`<p class="vb-muted">${what}</p>`;
 export const defineBlock = (
@@ -71,7 +76,8 @@ export const defineBlock = (
     tag,
     props: { ...ROW_PROPS, ...props },
     render: (x: Record<string, unknown>, element) => {
-      const props = x as BlockProps;
+      // its values written in a locale the window has (locale-here.ts)
+      const props = (typeof x.locale === 'string' ? { ...x, locale: localeHere(x.locale) } : x) as BlockProps;
       return props.rows ? render(props as RowBlockProps, element) : nothing;
     },
   });

@@ -4,10 +4,10 @@ import { forget } from './view-state.js';
 import { asText } from '../format.js';
 
 export const clock = (session: Session, iso: string) =>
-  new Date(iso).toLocaleTimeString(session.runtime.format.locale, {
+  new Date(iso).toLocaleTimeString(session.format.locale, {
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: session.runtime.format.timeZone,
+    timeZone: session.format.timeZone,
   });
 const own = (o: Record<string, unknown>, k: string) => (Object.hasOwn(o, k) ? o[k] : undefined);
 /** Each field where what went is not what was approved: field, before (approved) and after (went), a few levels in. */

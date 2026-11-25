@@ -3,6 +3,7 @@ import { changedFields } from '../../changes.js';
 import { fieldValue, formatCell, formatTime, rowContainer, displayNames, defineBlock } from './shared.js';
 import { sendBlockAction } from '../dom.js';
 import { asText } from '../../format.js';
+import { BLOCK_WORDS, wordsGiven, wordWith } from '../../block-words.js';
 import { VIEW_WORDS } from '../../view-words.js';
 
 const ON = /^(on|true|yes|enabled|running|active|open|1)$/i;
@@ -55,22 +56,20 @@ export const VDevices = defineBlock(
   },
 );
 
-export const VBatch = defineBlock('VBatch', 'vindu-batch', {}, (props) => {
+/** A batch: how many calls went how, of all of them, then a row per call: its outcome and what it was about (the
+ *  system's label from its input, never its result id), and why it failed. */
+export const VBatch = defineBlock('VBatch', 'vindu-batch', { words: 'value' }, (props) => {
   const rows = props.rows;
+  const words = wordsGiven(props.words, BLOCK_WORDS.batch);
   const countOutcome = (o: string) => rows.filter((row) => row.outcome === o).length;
-  return html`<div class="vb-batch"><div class="vb-meta"><b>${countOutcome('ok')} ok</b>${
+  const counted = (word: string, n: number) => wordWith(word, { count: formatCell(props, n) });
+  return html`<div class="vb-batch"><div class="vb-meta"><b>${counted(words.ok, countOutcome('ok'))}</b>${
     countOutcome('failed')
-      ? html` · <span class="vb-warn">${
-          countOutcome('failed')
-        } failed</span>`
+      ? html` · <span class="vb-warn">${counted(words.failed, countOutcome('failed'))}</span>`
       : nothing
   }${
-    countOutcome('missing')
-      ? html` · ${
-          countOutcome('missing')
-        } missing`
-      : nothing
-  } <span class="vb-muted">of ${rows.length}</span></div><div class="vb-list">${
+    countOutcome('missing') ? html` · ${counted(words.missing, countOutcome('missing'))}` : nothing
+  } <span class="vb-muted">${counted(words.of, rows.length)}</span></div><div class="vb-list">${
     rows.map((row, index) =>
       rowContainer(
         props,
@@ -80,7 +79,7 @@ export const VBatch = defineBlock('VBatch', 'vindu-batch', {}, (props) => {
           `vb-mark ${row.outcome === 'ok' ? '' : 'vb-warn'}`
         }>${
           row.outcome === 'ok' ? '✓' : row.outcome === 'failed' ? '✗' : '?'
-        }</span><span class="vb-anchor">${row.id}</span><span>${row.for || row.call}</span><span class="vb-muted">${row.detail}</span>`,
+        }</span><span class="vb-name">${asText(row.for ?? '')}</span><span class="vb-muted">${row.detail}</span>`,
       ),
     )
   }</div></div>`;

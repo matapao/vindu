@@ -142,7 +142,7 @@ test('the chart card: the palette in fixed order, one axis with round ticks, a l
   assert.match(two, /\.f0\{fill:#2a78d6\}\.l0\{stroke:#2a78d6\}\.f1\{fill:#eb6834\}/); // slots 1 and 2, light
   assert.match(two, /@media \(prefers-color-scheme: dark\)\{[^}]*\}?.*\.f0\{fill:#3987e5\}/); // and their dark steps
   assert.equal((two.match(/<rect class="f\d" x="[\d.]+" y="8" width="10" height="10" rx="2"\/>/g) ?? []).length, 2); // a legend for two series
-  assert.match(two, />20K<\/text>/); // ticks compact once the axis reaches 10,000
+  assert.match(two, />20k<\/text>/); // ticks compact once the axis reaches 10,000, as the view's locale (en-GB) writes them
   const widths = [...two.matchAll(/<path class="f\d" d="M([\d.]+),[\d.]+V[\d.]+Q[\d.]+,[\d.]+ [\d.]+,[\d.]+H[\d.]+Q([\d.]+),/g)].map(m => Number(m[2]) - Number(m[1]));
   assert.ok(widths.length === 4 && widths.every(x => x <= 24), JSON.stringify(widths)); // bars at most 24 wide, with a rounded end (the Q curves)
   await call('show_view', { name: 'c2', title: 'Chart', panels: [{ card: 'bar-chart', rows: [{ m: 'Jan', a: 1200 }, { m: 'Feb', a: 1800 }], x: 'm', y: 'a' }] });

@@ -115,8 +115,8 @@ export const setRem = (
       refusal: `you have set ${perDay} reminders in the last day, the most a day: say in the chat what to come back to`,
     };
   const w = whenOf(String(x.when), {
-    timeZone: session.runtime.format.timeZone,
-    locale: session.runtime.format.locale,
+    timeZone: session.format.timeZone,
+    locale: session.format.locale,
     holidays: session.runtime.options.holidays,
     read: (ref) => {
       const r = readRef(session.results, ref);
@@ -127,14 +127,14 @@ export const setRem = (
   const now = Date.now();
   if (w.ms <= now)
     return {
-      refusal: `that is not to come: ${w.how}; it is ${sayTime(now, session.runtime.format.locale, session.runtime.format.timeZone)} now`,
+      refusal: `that is not to come: ${w.how}; it is ${sayTime(now, session.format.locale, session.format.timeZone)} now`,
     };
   if (w.ms > now + 5 * 366 * 86_400_000) return { refusal: `that is more than five years ahead: ${w.how}` };
   const r: Reminder = {
     id: `m${Math.max(0, ...session.reminders.map((y) => Number(y.id.slice(1)) || 0)) + 1}`,
     what,
     at: new Date(w.ms).toISOString(),
-    said: sayTime(w.ms, session.runtime.format.locale, session.runtime.format.timeZone),
+    said: sayTime(w.ms, session.format.locale, session.format.timeZone),
     how: w.how,
     by,
     ...(who && who !== 'the person' ? { who } : {}),
@@ -171,20 +171,20 @@ export const doRem = (
     r.done_at = new Date(now).toISOString();
     r.done_by = by;
   } else if (d === 'hour' || d === 'tomorrow') {
-    const own = localOf(Date.parse(r.at), session.runtime.format.timeZone).hm;
+    const own = localOf(Date.parse(r.at), session.format.timeZone).hm;
     const ms =
       d === 'hour'
         ? now + 3_600_000
         : instantOf(
-            addTime(localOf(now, session.runtime.format.timeZone).day, { sign: 1, n: 1, unit: 'day' }),
+            addTime(localOf(now, session.format.timeZone).day, { sign: 1, n: 1, unit: 'day' }),
             own,
-            session.runtime.format.timeZone,
+            session.format.timeZone,
           );
     r.at = new Date(ms).toISOString();
-    r.said = sayTime(ms, session.runtime.format.locale, session.runtime.format.timeZone);
+    r.said = sayTime(ms, session.format.locale, session.format.timeZone);
     r.state = 'set';
     delete r.due_at;
-    r.how = `put off at ${sayTime(now, session.runtime.format.locale, session.runtime.format.timeZone)}: ${d === 'hour' ? 'an hour' : `to tomorrow at ${own}, its own time of day`}`;
+    r.how = `put off at ${sayTime(now, session.format.locale, session.format.timeZone)}: ${d === 'hour' ? 'an hour' : `to tomorrow at ${own}, its own time of day`}`;
   } else return { refusal: `no "${d}": done, drop, hour or tomorrow` };
   keepRem(session, r);
   log(session, { reminder: { id: r.id, [d]: true, by } });
@@ -199,7 +199,7 @@ export const doRem = (
 };
 /** The person's own new reminder: what, and when, with a date-time input; a time that cannot be comes back to them. */
 export const askRem = (session: Session, error?: string, values?: Record<string, unknown>) => {
-  const now = localOf(Date.now(), session.runtime.format.timeZone);
+  const now = localOf(Date.now(), session.format.timeZone);
   const p = openAsk(
     session,
     'operation',

@@ -1,9 +1,39 @@
 // A view's own words in Norwegian: Bokmål (nb) and Nynorsk (nn), each a whole set (view-words.ts). Numbers a hook
-// looks at are written with a decimal comma.
+// looks at are written with a decimal comma; the blocks' numbers and dates are the view's locale's (block-words.ts).
+import type { BlockWords } from './block-words.js';
 import { lineIn, type ViewWords } from './view-words.js';
 
 const decimalComma = (n: number) => String(n).replace('.', ',');
 const line = { above: 'over', or: 'eller', below: 'under' };
+
+const BLOCK_WORDS_NB: BlockWords = {
+  money: {
+    number: 'Nummer', customer: 'Kunde', date: 'Dato', due: 'Forfall', currency: 'Valuta',
+    description: 'Beskrivelse', quantity: 'Antall', price: 'Pris', amount: 'Beløp',
+    lines: 'Sum linjer', vat: 'Mva.', total: 'Totalt',
+    agrees: 'dokumentets egen totalsum, {stated}, stemmer med summen av linjene',
+    differs: 'dokumentet oppgir {stated}, men linjene blir til sammen {total}',
+  },
+  events: { free: 'ledig {time}', hours: '{hours} t', minutes: '{minutes} min', none: 'Ingen avtaler.', noFree: 'Ingen ledig tid av den lengden i dette tidsrommet.' },
+  batch: { ok: '{count} ok', failed: '{count} feilet', missing: '{count} mangler', of: 'av {count}' },
+  map: { drawn: 'Posisjonene er tegnet av systemet, uten kartfliser.' },
+  tasks: { due: 'frist {date}' },
+  pdf: { page: 'side {at} av {of}', loading: 'Laster inn PDF-en…', locked: 'Denne PDF-en er beskyttet med passord, så den vises ikke.', unreadable: 'Denne PDF-en kunne ikke leses: {why}' },
+};
+const BLOCK_WORDS_NN: BlockWords = {
+  money: {
+    number: 'Nummer', customer: 'Kunde', date: 'Dato', due: 'Forfall', currency: 'Valuta',
+    description: 'Skildring', quantity: 'Antal', price: 'Pris', amount: 'Beløp',
+    lines: 'Sum linjer', vat: 'Mva.', total: 'Totalt',
+    agrees: 'dokumentet sin eigen totalsum, {stated}, stemmer med summen av linjene',
+    differs: 'dokumentet oppgir {stated}, men linjene blir til saman {total}',
+  },
+  events: { free: 'ledig {time}', hours: '{hours} t', minutes: '{minutes} min', none: 'Ingen avtalar.', noFree: 'Inga ledig tid av den lengda i dette tidsrommet.' },
+  batch: { ok: '{count} ok', failed: '{count} feila', missing: '{count} manglar', of: 'av {count}' },
+  map: { drawn: 'Posisjonane er teikna av systemet, utan kartfliser.' },
+  tasks: { due: 'frist {date}' },
+  pdf: { page: 'side {at} av {of}', loading: 'Lastar inn PDF-en…', locked: 'Denne PDF-en er verna med passord og blir difor ikkje vist.', unreadable: 'Denne PDF-en kunne ikkje lesast: {why}' },
+};
 
 export const VIEW_WORDS_NB: ViewWords = {
   classified: label => `${label} · klassifisert av appen`,
@@ -60,6 +90,7 @@ export const VIEW_WORDS_NB: ViewWords = {
     copy: 'Kopier',
     copied: 'Kopiert',
   },
+  ...BLOCK_WORDS_NB,
 };
 
 export const VIEW_WORDS_NN: ViewWords = {
@@ -117,4 +148,5 @@ export const VIEW_WORDS_NN: ViewWords = {
     copy: 'Kopier',
     copied: 'Kopiert',
   },
+  ...BLOCK_WORDS_NN,
 };

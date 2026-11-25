@@ -204,6 +204,11 @@ export type OpenMore = {
   /** The words drawn on this window's views, word by word over the provider's (viewWords there); setViewWords changes
    *  them while it runs. */
   viewWords?: PartialViewWords;
+  /** How this window's views write numbers and dates, in place of the provider's (locale and timeZone there): a BCP 47
+   *  tag ('nb-NO') and an IANA time zone ('Europe/Oslo'). Each account says the one its view is drawn in, and
+   *  setViewWords changes them while it runs. One that is none is refused as the window opens (a RangeError). */
+  locale?: string;
+  timeZone?: string;
   /** A source kept fresh (a slot's source with every): the host reads it again every so many seconds, from the result
    *  it starts from (after), and says each new result's id when what it read changed. Returns a stop. */
   watch?: (

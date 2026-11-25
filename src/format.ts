@@ -1,6 +1,11 @@
 // How a value is written for the person, the same in every card and block, in Node and in the window (no imports).
-// fields whose whole numbers are names, not amounts: a year, an id, a code; written as they are, never grouped
+// fields whose whole numbers are names, not amounts: a year, an id, a code; written as they are, never grouped. An
+// English name ends in one as a word of its own (invoice_no); a Norwegian one as the end of a compound too (byggeår,
+// varenr), as Norwegian writes them
 const AS_IS = /(^|_)(year|yr|id|no|nr|number|code|zip|postcode|phone|ext|version|port)$/i;
+const AS_IS_NORWEGIAN = /(år|nr|nummer|kode|postnr|orgnr|kid|konto|telefon|versjon)$/i;
+/** Whether a field's whole numbers are written as they are: a year, an id, a code, by its name. */
+const asIs = (field: string) => { const name = field.normalize('NFC'); return AS_IS.test(name) || AS_IS_NORWEGIAN.test(name); };
 /** A list of plain values: none of them an object or a list. */
 export const plainList = (v: unknown): v is unknown[] => Array.isArray(v) && v.every(x => x === null || typeof x !== 'object');
 /** A value as String writes it, but an object, or a list that holds one, as JSON: never "[object Object]". */
@@ -10,12 +15,12 @@ export const asText = (v: unknown): string =>
  *  nothing as raw JSON unless it is one. The rule the account states, so the model knows how each value went in. */
 export const cellIn = (v: unknown, field?: string, locale = 'en-GB'): string =>
   v === null || v === undefined ? '' :
-  typeof v === 'number' ? (field && Number.isInteger(v) && AS_IS.test(field) ? String(v) : v.toLocaleString(locale, { maximumFractionDigits: 2 })) :
+  typeof v === 'number' ? (field && Number.isInteger(v) && asIs(field) ? String(v) : v.toLocaleString(locale, { maximumFractionDigits: 2 })) :
   plainList(v) ? v.map(x => cellIn(x, field, locale)).join(', ') :
   asText(v);
 /** The cell rule in en-GB, as it always was. */
 export const cell = (v: unknown, field?: string): string => cellIn(v, field);
-export const CELL_RULE = 'numbers grouped as the locale writes them, at most 2 decimals; whole numbers in fields named year, id, no, number, code, zip, phone, version or port as written; empty for null; lists of plain values joined with ", "';
+export const CELL_RULE = 'numbers grouped as the locale writes them, at most 2 decimals; whole numbers in fields named year, id, no, number, code, zip, phone, version or port, or whose names end in år, nr, nummer, kode, postnr, orgnr, kid, konto, telefon or versjon (byggeår, varenr), as written; empty for null; lists of plain values joined with ", "';
 
 /** Whether YYYY-MM-DD is a day of the calendar: 2026-02-30 is not, and is never rolled over into March. */
 export const isCalendarDay = (day: string): boolean => { const d = new Date(`${day}T00:00:00Z`); return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === day; };

@@ -7,9 +7,10 @@
 // (blocks: [names]), or none (blocks: false); the model is told only of those offered.
 import { z } from 'zod';
 import { block, needOne, type Roles } from './block-kit.js';
+import { BATCH } from './block-batch.js';
 import { draftShaped } from './block-drafts.js';
 import { EVENTS } from './block-events.js';
-import { countIds, panelOption, resultIds, resultRef, rowFields, type CardDef } from './cards.js';
+import { panelOption, resultRef, rowFields, type CardDef } from './cards.js';
 import { changedFields } from './changes.js';
 import { addFields, num, parse as parseExpr, setValue } from './compute.js';
 import { MARKDOWN_FILE, isMarkdownSection, markdownAccount } from './markdown-document.js';
@@ -86,6 +87,7 @@ export const TASKS = block({
   layouts: ['checklist', 'board', 'steps'],
   fields: { order: panelOption(z.array(z.string()).optional().describe('tasks, layout board: the columns (states) in order')) },
   check: (rows, _p, m) => needOne(m, ['title'], 'a task', rows),
+  words: w => ({ ...w.tasks }),
   account: (rows, p, m) => ({ tasks: rows.length, ...(m.state ? { by_state: Object.fromEntries(rows.reduce((a, r) => a.set(asText(r[m.state] ?? ''), (a.get(asText(r[m.state] ?? '')) ?? 0) + 1), new Map<string, number>())) } : {}), ...(p.layout === 'board' && p.order ? { columns: p.order } : {}) }),
 });
 
@@ -117,6 +119,7 @@ export const MONEY_BLOCK = block({
   },
   props: p => ({ currency: p.currency ?? '', head: p.head ?? {}, totals: {} }),
   allFields: p => p.layout === 'payment', // one payment: every field of it
+  words: w => ({ ...w.money }),
 });
 const q = (f: string) => (/^[A-Za-z_]\w*$/.test(f) ? f : `"${f}"`);
 
@@ -152,7 +155,7 @@ export const MAP_BLOCK = block({
       return { ...r, __shape: { kind, points: shapes[i].map(([lon, lat]) => at(lon, lat)) } };
     }), props: { frame: { width: W, height: H, bounds: [x0, y0, x1, y1] } } };
   },
-  props: () => ({ frame: { width: 640, height: 320 } }), derived: ['__shape'],
+  props: () => ({ frame: { width: 640, height: 320 } }), derived: ['__shape'], words: w => ({ ...w.map }),
   account: rows => ({ places: rows.length, drawn: 'positions computed by the system (Web Mercator, fitted to the places); no map tiles' }),
 });
 
@@ -249,37 +252,7 @@ export const DEVICES = block({
   account: rows => ({ devices: rows.length }),
 });
 
-// ── many at once: a result per call of a batch; a set of changes, each row's before and after ───────────────────
-const failed = (v: unknown): string | null => {
-  if (!v || typeof v !== 'object') return null;
-  const o = v as Row;
-  if (o.isError === true || o.ok === false || o.success === false) return asText(o.error ?? o.message ?? 'failed');
-  if (typeof o.status === 'string' && /^(fail|error|rejected|bounced)/i.test(o.status)) return asText(o.error ?? o.status);
-  if (typeof o.error === 'string' && o.error) return o.error;
-  return null;
-};
-export const BATCH = block({
-  name: 'batch', component: 'VBatch', about: 'a result per call, for many calls at once (40 replies sent, 12 refunds): one row each, ok or failed, from the calls\' own results; give results (ids) instead of from',
-  roles: {},
-  fields: { results: resultRef(z.array(z.string()).optional().describe('batch: the result ids of the calls, e.g. ["r5", "r6"], or ["r5-r44"] for a run of them')) },
-  derived: ['id', 'call', 'for', 'outcome', 'detail'],
-  source: (p, read) => {
-    const list = (p.results ?? []) as string[], n = countIds(list); // counted before any run is written out
-    if (!n) throw new Error('a batch needs results: the result ids of its calls');
-    if (n > 500) throw new Error(`${n} calls: show at most 500 in one batch`);
-    const ids = resultIds(list, 500);
-    return ids.map(id => {
-      const e = read(id);
-      if (!e || e.kind !== 'result') return { id, call: '', outcome: 'missing', detail: `no result ${id}` };
-      const input = (e.input && typeof e.input === 'object' ? e.input : {}) as Row;
-      const who = ['to', 'recipient', 'email', 'customer', 'order', 'id', 'name'].map(k => input[k]).find(v => v !== undefined && v !== null && typeof v !== 'object');
-      const why = failed(e.value ?? e.rows) ?? (/^(error|failed)\b/i.test(e.text) ? e.text.slice(0, 120) : null);
-      return { id, call: `${e.server}.${e.tool}`, for: who === undefined ? '' : asText(who), outcome: why ? 'failed' : 'ok', detail: why ?? '' };
-    });
-  },
-  check: rows => (rows.length ? null : 'no calls in this batch'),
-  account: rows => ({ calls: rows.length, ok: rows.filter(r => r.outcome === 'ok').length, failed: rows.filter(r => r.outcome === 'failed').map(r => r.id), missing: rows.filter(r => r.outcome === 'missing').map(r => r.id), outcome: 'read by the system from each call\'s own result' }),
-});
+// ── many at once: a result per call of a batch (block-batch.ts); a set of changes, each row's before and after ────
 export const CHANGES = block({
   name: 'changes', component: 'VChanges', about: 'a set of changes to rows: each row\'s key, and its fields before and after (before/after objects, or field, before and after columns)',
   roles: { key: /^(key|id|number|no|order|row)$/i, field: /^(field|column|attribute)$/i, before: /^(before|old|was|from)$/i, after: /^(after|new|now|to)$/i },

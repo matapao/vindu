@@ -9,14 +9,16 @@ import {
   defineBlock,
 } from './shared.js';
 import { sendBlockAction } from '../dom.js';
+import { BLOCK_WORDS, wordsGiven, wordWith } from '../../block-words.js';
 import { asText } from '../../format.js';
 
 /** What a dragged task carries: its own type, so an event dropped on a task is not taken for one. */
 const TASK_ROW = 'text/x-vindu-task';
 
 const DONE = /^(done|completed?|closed|resolved|true|yes|✓|ferdig|finished)$/i;
-export const VTasks = defineBlock('VTasks', 'vindu-tasks', { order: 'value' }, (props) => {
+export const VTasks = defineBlock('VTasks', 'vindu-tasks', { order: 'value', words: 'value' }, (props) => {
   const rows = props.rows;
+  const words = wordsGiven(props.words, BLOCK_WORDS.tasks);
   const stateOf = (row: BlockRow) => asText(fieldValue(props, row, 'state') ?? '');
   const meta = (row: BlockRow) =>
     html`${
@@ -27,8 +29,8 @@ export const VTasks = defineBlock('VTasks', 'vindu-tasks', { order: 'value' }, (
         : nothing
     }${
       fieldValue(props, row, 'due') !== undefined
-        ? html`<span class="vb-muted"> · due ${
-            formatTime(props, fieldValue(props, row, 'due'), false)
+        ? html`<span class="vb-muted"> · ${
+            wordWith(words.due, { date: formatTime(props, fieldValue(props, row, 'due'), false) })
           }</span>`
         : nothing
     }${

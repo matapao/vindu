@@ -55,12 +55,12 @@ export function tinyPdf(pages: number): Uint8Array {
 }
 
 /** The fixtures' shell (test/fixtures/shell.html, and the app bundled beside the compiled tests in out/test) served on
- *  loopback, as a host's window loads it. */
-export async function shellServer(compiled: string): Promise<{ url: string; close: () => void }> {
+ *  loopback, as a host's window loads it; or its page of one view (page: 'app.html'). */
+export async function shellServer(compiled: string, page: 'shell.html' | 'app.html' = 'shell.html'): Promise<{ url: string; close: () => void }> {
   const app = http.createServer((req, res) => {
-    const f = req.url === '/app.bundle.js' ? path.join(compiled, 'fixtures', 'app.bundle.js') : path.join(compiled, '..', '..', 'test', 'fixtures', 'shell.html');
+    const f = req.url === '/app.bundle.js' ? path.join(compiled, 'fixtures', 'app.bundle.js') : path.join(compiled, '..', '..', 'test', 'fixtures', page);
     res.writeHead(200, { 'Content-Type': f.endsWith('.js') ? 'text/javascript' : 'text/html' }).end(fs.readFileSync(f));
   });
   await new Promise<void>(r => app.listen(0, '127.0.0.1', r));
-  return { url: `http://127.0.0.1:${(app.address() as { port: number }).port}/shell.html`, close: () => app.close() };
+  return { url: `http://127.0.0.1:${(app.address() as { port: number }).port}/${page}`, close: () => app.close() };
 }

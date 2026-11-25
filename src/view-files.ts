@@ -150,7 +150,7 @@ export function pdfOf(p: PanelSpec, view: ViewSpec, ctx: ViewContext): Resolved 
   } catch { throw new Refusal(`panel ${p.id}: ${at.name} could not be read`); }
   if (size > PDF_MAX) throw new Refusal(`panel ${p.id}: ${at.name} is ${(size / 1e6).toFixed(1)} MB; a pdf panel shows PDFs up to ${PDF_MAX / 1e6} MB`);
   if (!head.includes('%PDF-')) throw new Refusal(`panel ${p.id}: ${at.name} is not a PDF: it does not begin with "%PDF-"`);
-  const file = pages.writeView(pageName(view.name, p.id), pdfPage(at.spec));
+  const file = pages.writeView(pageName(view.name, p.id), pdfPage(at.spec, { words: ctx.words?.pdf, locale: ctx.format?.locale })); // in the view's words
   return { page: { url: pageUrl(`${pages.base}/view/${file}`, '', []), label: at.from, uses: [], height: heightOf(p) }, pdf: { name: at.name, bytes: size } };
 }
 

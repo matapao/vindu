@@ -12,6 +12,7 @@ import { renderSnapshot, releaseSurface } from './surface-runtime.js';
 import { VINDU_CATALOG } from '../catalog-id.js';
 import { useTheme, useMetricStyles } from './theme.js';
 import { setMetrics, type ViewMetrics } from './metrics.js';
+import { setPictureSources } from './picture-sources.js';
 
 export { VINDU_CATALOG };
 export type { Surface };
@@ -97,11 +98,14 @@ export function withKnown(surface: Surface, known: Set<string>, say: (component:
   });
 }
 
-type DrawOptions = { onAction?: (a: unknown) => void; components?: VinduComponent[]; head?: boolean; missing?: (component: string) => string };
+/** How a view is drawn. sources: the schemes the host serves pictures from besides http(s), e.g. ['media:'], each
+ *  lowercase and ending in ':' (never javascript: or data:; picture-sources.ts): the blocks draw a picture from them. */
+type DrawOptions = { onAction?: (a: unknown) => void; components?: VinduComponent[]; head?: boolean; missing?: (component: string) => string; sources?: readonly string[] };
 
 /** Apply a complete view snapshot. Returns true when the component tree may have changed. */
 export function updateSurface(host: HTMLElement, view: View, which: 'wide' | 'compact', o: DrawOptions): boolean {
   guardA2uiArrays();
+  if (o.sources) setPictureSources(host, o.sources);
   const surface = view[which];
   if (!withinSurfaceLimits(surface)) {
     releaseSurface(host);
@@ -122,7 +126,8 @@ export function drawSurface(host: HTMLElement, view: View, which: 'wide' | 'comp
 
 /** Draw a view in the layout the host's width fits. A2UI has no breakpoints, so both surfaces are kept and switched.
  *  theme: dress it in vindu's theme (the shell always is). */
-export function mountView(host: HTMLElement, view: View, o: { onAction?: (a: unknown) => void; components?: VinduComponent[]; compactBelow?: number; theme?: boolean; metrics?: ViewMetrics; missing?: (component: string) => string } = {}): () => void {
+export function mountView(host: HTMLElement, view: View, o: { onAction?: (a: unknown) => void; components?: VinduComponent[]; compactBelow?: number; theme?: boolean; metrics?: ViewMetrics; missing?: (component: string) => string; sources?: readonly string[] } = {}): () => void {
+  setPictureSources(host, o.sources); // checked before anything is drawn
   let current: 'wide' | 'compact' | null = null;
   const addedTheme = o.theme && !host.classList.contains('vindu-theme');
   if (o.theme) { useTheme(host.ownerDocument); host.classList.add('vindu-theme'); }
@@ -141,6 +146,7 @@ export function mountView(host: HTMLElement, view: View, o: { onAction?: (a: unk
     watch.disconnect();
     releaseSurface(host);
     resetMetrics?.();
+    setPictureSources(host); // the next view drawn here names its own
     if (addedTheme) host.classList.remove('vindu-theme');
   };
 }

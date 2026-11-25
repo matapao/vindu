@@ -171,7 +171,7 @@ const ctxFor = (
   results: session.results,
   cards: session.runtime.cards,
   kinds: session.runtime.kinds,
-  format: session.runtime.format,
+  format: session.format,
   words: session.viewWords,
   marks: session.runtime.options.marks,
   classify: session.runtime.options.classify,

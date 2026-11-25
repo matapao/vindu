@@ -1,5 +1,6 @@
 import { html, svg, nothing } from 'lit';
-import { asText, moneyIn, bytesIn } from '../../format.js';
+import { BLOCK_WORDS, wordsGiven } from '../../block-words.js';
+import { asText, bytesIn } from '../../format.js';
 import { SERIES } from '../../series.js';
 import {
   type BlockRow,
@@ -10,99 +11,6 @@ import {
   displayNames,
   defineBlock,
 } from './shared.js';
-
-export const VMoney = defineBlock(
-  'VMoney',
-  'vindu-money',
-  { currency: 'string', head: 'value', totals: 'value' },
-  (props) => {
-    const rows = props.rows;
-    const currencyOf = (row?: BlockRow) =>
-      asText((row && fieldValue(props, row, 'currency')) || props.currency || '') || undefined;
-    const money = (v: unknown, row?: BlockRow) => moneyIn(v, currencyOf(row), props.locale);
-    const header = Object.entries((props.head ?? {}) as BlockRow).filter(([k]) => !/^total$/i.test(k));
-    const totals = (props.totals ?? {}) as BlockRow;
-    if (props.layout === 'payment') {
-      const row = rows[0];
-      if (!row) return nothing; // no payment to show
-      return rowContainer(
-        props,
-        0,
-        'vb-pay',
-        html`<div class="vb-big">${money(fieldValue(props, row, 'amount'), row)}</div>${Object.entries(row)
-          .filter(([k]) => k !== props.map?.amount && !k.startsWith('__'))
-          .map(
-            ([k, v]) =>
-              html`<div class="vb-kv"><span>${k}</span><span>${formatCell(props, v, k)}</span></div>`,
-          )}`,
-      );
-    }
-    return html`<div class="vb-money">${
-      header.length
-        ? html`<div class="vb-head">${
-            header.map(
-              ([k, v]) =>
-                html`<div class="vb-kv"><span>${k}</span><span>${
-                  /date|due/i.test(k) ? formatTime(props, v, false) : formatCell(props, v, k)
-                }</span></div>`,
-            )
-          }</div>`
-        : nothing
-    }
-<table class="vb-lines"><thead><tr><th>${props.map?.description ?? 'item'}</th>${
-      props.map?.quantity
-        ? html`<th class="vb-num">${
-            props.map.quantity
-          }</th>`
-        : nothing
-    }${
-      props.map?.price
-        ? html`<th class="vb-num">${
-            props.map.price
-          }</th>`
-        : nothing
-    }<th class="vb-num">${props.map?.amount ?? 'amount'}</th></tr></thead>
-<tbody>${
-      rows.map(
-        (row, index) =>
-          html`<tr data-panel=${props.panel ?? ''} data-row=${String(index)}><td>${
-            formatCell(props, fieldValue(props, row, 'description'))
-          }</td>${
-            props.map?.quantity
-              ? html`<td class="vb-num">${
-                  formatCell(props, fieldValue(props, row, 'quantity'))
-                }</td>`
-              : nothing
-          }${
-            props.map?.price
-              ? html`<td class="vb-num">${
-                  money(fieldValue(props, row, 'price'), row)
-                }</td>`
-              : nothing
-          }<td class="vb-num">${
-            money(fieldValue(props, row, 'amount'), row)
-          }</td></tr>`,
-      )
-    }</tbody>
-<tfoot>${
-      totals.vat !== undefined
-        ? html`<tr><td colspan="9" class="vb-num">Lines ${money(totals.lines)} · VAT ${
-            money(totals.vat)
-          }</td></tr>`
-        : nothing
-    }<tr><td colspan="9" class="vb-num vb-total">Total ${money(totals.total)}</td></tr>${
-      totals.stated !== undefined
-        ? html`<tr><td colspan="9" class="vb-num ${
-            totals.agrees ? 'vb-muted' : 'vb-warn'
-          }">${
-            totals.agrees
-              ? `✓ the document's own total, ${money(totals.stated)}, is what its lines add up to`
-              : `⚠ the document says ${money(totals.stated)}; its lines add up to ${money(totals.total)}`
-          }</td></tr>`
-        : nothing
-    }</tfoot></table></div>`;
-  },
-);
 
 const ICON: [RegExp, string][] = [
   [/pdf/i, 'PDF'],
@@ -145,7 +53,8 @@ export const VFiles = defineBlock(
     })}</div>`,
 );
 
-export const VMap = defineBlock('VMap', 'vindu-map', { frame: 'value' }, (props) => {
+export const VMap = defineBlock('VMap', 'vindu-map', { frame: 'value', words: 'value' }, (props) => {
+  const words = wordsGiven(props.words, BLOCK_WORDS.map);
   const frame = (props.frame ?? { width: 640, height: 320 }) as { width: number; height: number };
   const groups = [...new Set(props.rows.map((row) => asText(fieldValue(props, row, 'group') ?? '')))];
   const color = (row: BlockRow) =>
@@ -186,7 +95,7 @@ ${
         )
       }</div>`
     : nothing
-}<div class="vb-muted vb-small">Positions drawn by the system; no map tiles.</div></div>`;
+}<div class="vb-muted vb-small">${words.drawn}</div></div>`;
 });
 
 export const VContacts = defineBlock(

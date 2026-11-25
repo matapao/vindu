@@ -6,6 +6,7 @@ import { html, nothing } from 'lit';
 import { keyed } from 'lit/directives/keyed.js';
 import { VIEW_WORDS } from '../../view-words.js';
 import { defineComponent } from '../define.js';
+import { pictureSchemes } from '../picture-sources.js';
 import { imageSource } from './shared.js';
 
 type Item = { name?: unknown; kind?: unknown; url?: unknown; at?: unknown };
@@ -23,8 +24,10 @@ function wordsOf(given: unknown): Words {
   return { previous: word('previous'), next: word('next'), close: word('close') };
 }
 const nameOf = (item: Item) => (typeof item.name === 'string' ? item.name : '');
-/** Where an item loads from: http or https, and for a picture an image's data: URL too (imageSource). */
-const sourceOf = (item: Item) => imageSource(item.url, item.kind === 'video' ? /^$/ : undefined);
+/** Where an item loads from: http or https, and for a picture the host's own schemes and an image's data: URL too
+ *  (imageSource). */
+const sourceOf = (item: Item, schemes: readonly string[]) =>
+  item.kind === 'video' ? imageSource(item.url, /^$/) : imageSource(item.url, undefined, schemes);
 const dialogOf = (element: HTMLElement) => element.querySelector<HTMLDialogElement>('dialog.vb-viewer');
 
 /** The dialog over the pane the gallery is in, or over the whole window outside a shell's pane. */
@@ -122,14 +125,14 @@ function onKey(element: GalleryElement, e: KeyboardEvent, count: number) {
 }
 
 /** A tile's picture: an image that loads as it comes near sight, or a video's first frame, muted and still. */
-const thumbOf = (item: Item) =>
+const thumbOf = (item: Item, schemes: readonly string[]) =>
   item.kind === 'video'
-    ? html`<span class="vb-thumb"><video src=${sourceOf(item)} muted .muted=${true} preload="metadata" playsinline tabindex="-1" aria-hidden="true"></video><span class="vb-play" aria-hidden="true">▶</span></span>`
-    : html`<span class="vb-thumb"><img src=${sourceOf(item)} alt="" loading="lazy" decoding="async"></span>`;
+    ? html`<span class="vb-thumb"><video src=${sourceOf(item, schemes)} muted .muted=${true} preload="metadata" playsinline tabindex="-1" aria-hidden="true"></video><span class="vb-play" aria-hidden="true">▶</span></span>`
+    : html`<span class="vb-thumb"><img src=${sourceOf(item, schemes)} alt="" loading="lazy" decoding="async"></span>`;
 
 /** The item shown large: where it is of how many, its name and the way back; it, marked as its tile is; and the steps. */
 function viewer(element: GalleryElement, item: Item, at: number, count: number, words: Words, panel: string) {
-  const src = sourceOf(item), name = nameOf(item);
+  const src = sourceOf(item, pictureSchemes(element)), name = nameOf(item);
   const close = (e: Event) => {
     const dialog = (e.currentTarget as HTMLElement).closest('dialog');
     if (dialog) shut(element, dialog);
@@ -156,10 +159,11 @@ export const VGallery = defineComponent({
     if (!items.length) return nothing;
     const host = element as GalleryElement, words = wordsOf(props.words), panel = typeof props.panel === 'string' ? props.panel : '';
     const at = shownAt.get(host), index = at === undefined ? undefined : Math.min(at, items.length - 1);
+    const schemes = pictureSchemes(host);
     const tile = (item: Item, i: number) =>
       html`<li><button type="button" class="vb-tile" data-panel=${panel} data-row=${String(i)} @click=${(e: MouseEvent) => {
         if (!e.altKey) void open(host, i); // Alt and a click marks it, as any row: pointing's, not an opening
-      }}>${thumbOf(item)}<span class="vb-tilename">${nameOf(item)}</span></button></li>`;
+      }}>${thumbOf(item, schemes)}<span class="vb-tilename">${nameOf(item)}</span></button></li>`;
     return html`<ul class="vb-gallery">${items.map(tile)}</ul><dialog class="vb-viewer" aria-label=${index === undefined ? nothing : nameOf(items[index])}
       @keydown=${(e: KeyboardEvent) => onKey(host, e, items.length)} @close=${(e: Event) => closed(host, e.currentTarget as HTMLDialogElement)}
       @click=${(e: MouseEvent) => { if (e.target === e.currentTarget) shut(host, e.currentTarget as HTMLDialogElement); }}>${

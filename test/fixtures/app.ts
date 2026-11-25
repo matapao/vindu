@@ -45,7 +45,7 @@ const events: unknown[] = [], asked: string[] = [];
   metrics(value: Parameters<ShellHandle['metrics']>[0]) { shell!.metrics(value); },
   width(px: number) { document.getElementById('view')!.style.width = `${px}px`; },
   // the shell: what the person's window would be; its events are kept for the test to hand to the UI server
-  shell(theme?: 'light' | 'dark' | 'auto', progress = false, metrics?: Parameters<ShellHandle['metrics']>[0], locale?: string) { shell?.destroy(); shell = mountShell(document.getElementById('shell')!, { components: progress ? [Heat, Progress] : [Heat], theme, metrics, locale, onEvent: e => events.push(e), panes: { terminal: terminalPane } }); },
+  shell(theme?: 'light' | 'dark' | 'auto', progress = false, metrics?: Parameters<ShellHandle['metrics']>[0], locale?: string, sources?: string[]) { shell?.destroy(); shell = mountShell(document.getElementById('shell')!, { components: progress ? [Heat, Progress] : [Heat], theme, metrics, locale, sources, onEvent: e => events.push(e), panes: { terminal: terminalPane } }); },
   hosted() { return { boxes: hosted.splice(0), destroyed }; },
   // a shell with a browser pane, and what a host may give it: its look, and an action's icon (its markup, as given)
   hostShell(o: { tokens?: ShellSkin; icon?: string } = {}) {

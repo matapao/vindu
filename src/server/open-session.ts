@@ -37,7 +37,7 @@ import { holdResults, letGoResults, sessionFolder } from './session-folder.js';
 import type { Session } from './state.js';
 import { templateControls } from './templates.js';
 import { layoutServerFor, serverFor } from './tool-server.js';
-import { sessionWords, setViewWords } from './view-words.js';
+import { formatOver, sessionWords, setViewWords, type ViewFormat } from './view-words.js';
 import { dispatchEvent } from './window-events.js';
 
 export function openSession(
@@ -50,6 +50,7 @@ export function openSession(
   more: OpenMore = {},
 ) {
   const { host, options: o } = runtime;
+  const format = formatOver(runtime.format, { locale: more.locale, timeZone: more.timeZone }); // refused before anything is made
   const token = randomBytes(16).toString('hex');
   const own: AnswerEntry[] = [];
   const results = withOwn(proc.results, { all: () => own });
@@ -79,6 +80,7 @@ export function openSession(
     waiting: new Map(),
     more,
     viewWords: sessionWords(runtime, more.viewWords),
+    format,
     jobs: more.jobs !== false && !!more.onJob,
     added: [],
     told: 0,
@@ -270,9 +272,12 @@ export function openSession(
       );
       arrived(session, session.results.get(id));
     },
-    /** The words drawn on this window's views, in place of those it opened with (over the provider's): every view shown
-     *  is drawn again in them at once, where it is. What the model is told stays in English. */
-    setViewWords: (words?: PartialViewWords) => setViewWords(session, words),
+    /** The words drawn on this window's views, in place of those it opened with (over the provider's), and with them,
+     *  where given, the locale and time zone its numbers and dates are written in (each one given in place of the one it
+     *  had): every view shown is drawn again in them at once, where it is. What the model is told stays in English; the
+     *  account of a view says the locale it is drawn in. A locale or time zone that is none is refused (a RangeError),
+     *  and nothing changes. */
+    setViewWords: (words?: PartialViewWords, format?: Partial<ViewFormat>) => setViewWords(session, words, format),
     /** The host's messageSending says something else now (a mail connection made, or gone): every mail drafted for the
      *  person is drawn again, with Send, or the host's own action in its place. */
     messagesChanged: () => messagesChanged(session),

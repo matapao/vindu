@@ -1,6 +1,7 @@
 // Node provider for a web backend or Electron main process. The window entry is @matapao/vindu/renderer.
 export { startVindu, type Vindu, type VinduSession, type VinduOptions, type VinduProcess, type VinduSessionOptions, type UiEndpoint } from './provider.js';
 export { NOTE, type HeadText, type TemplateStart, type Shown, type OpenMore, type ReadProgress, type ViewCheckpoint, type ResultPointer, type KeptAnswer, type ViewSnapshot, type MessageDraft } from './server.js';
+export type { ViewFormat } from './server/view-words.js'; // a window's locale and time zone: open's locale and timeZone, setViewWords' second argument
 export { DRAFT_LIMITS, type SendResult } from './message-draft.js'; // a mail drafted for the person to send: what it takes at most, and how its send went
 export { type ViewPresentation, type PanelPresentation } from './presentation.js';
 export { applyAction, ACTIONS, type ViewAction } from './actions.js';
@@ -9,6 +10,8 @@ export { addDates, addTime, dayOf, parseDateExpr, today, type DateExpr } from '.
 export { whenOf, instantOf, localOf, sayTime, remindersSurface, REMINDER_WORDS, DEFAULT_TIME, type Reminder, type ReminderWords } from './reminders.js';
 export { FieldSchema, formBinding, readAnswer, fieldsOf, checkValue, checkDigits, FORMATS, CHECKS, permissionDetails, lineDiff, confirms, HINTS, WORDS, type Format, type Check, type Operation, type Effect, type Field, type Form, type Detail, type Ask, type Binding, type Words } from './operations.js';
 export { VIEW_WORDS, type ViewWords, type HookWords, type MessageWords, type PartialViewWords } from './view-words.js';
+export { BLOCK_WORDS, wordWith, type BlockWords, type MoneyWords, type EventWords, type BatchWords, type MapWords, type TaskWords, type PdfWords } from './block-words.js';
+export { readableName } from './field-names.js';
 export { VIEW_WORDS_NB, VIEW_WORDS_NN } from './view-words-norwegian.js';
 export { fromApp, appHtml, resultFor, textOnly, appsOn, anyAppsOn, resourceOf, toolResourceUri, toolVisibleTo, type AppsProvider, type AppsSwitch, type AppPanel, type AppSubmission } from './apps.js';
 export { memoryResults, brief, shapeOf, amountsOf, fileOf, readRef, refOf, dataOf, withOwn, type ResultSource, type Entry, type ResultEntry, type AttachmentEntry, type AnswerEntry, type Row } from './results.js';
@@ -22,7 +25,8 @@ export { BASIC_CATALOG, VINDU_CATALOG } from './catalog-id.js';
 export { account, type Account } from './account.js';
 export { checkTemplate, fitSlot, pinTemplate, templateNote, withInputs, layoutNames, TemplateSchema, type Template, type Slot } from './templates.js';
 export { previewOf, changeSet, changeSetForm, acceptedRows, describeChange, decisionOperation, type PreviewPanel, type PreviewRule } from './frames.js';
-export { BLOCKS, MESSAGE, DOCUMENT, TASKS, MONEY_BLOCK, FILES, MAP_BLOCK, CONTACTS, SHEET, SLIDES, SIGNATURE, DIAGRAM, DEVICES, BATCH, CHANGES, DECISION, wordDiff, layered } from './blocks.js';
+export { BLOCKS, MESSAGE, DOCUMENT, TASKS, MONEY_BLOCK, FILES, MAP_BLOCK, CONTACTS, SHEET, SLIDES, SIGNATURE, DIAGRAM, DEVICES, CHANGES, DECISION, wordDiff, layered } from './blocks.js';
+export { BATCH, callLabel } from './block-batch.js';
 export { EVENTS, freeSlots } from './block-events.js';
 export { rolesOf } from './block-kit.js';
 export { parse, rowValue, setValue, addFields, computedName, computedName as computeName, round, makeCompute, EXPRESSIONS, type Expr } from './compute.js';

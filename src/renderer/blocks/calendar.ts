@@ -1,5 +1,8 @@
 import { html, nothing } from 'lit';
+import { BLOCK_WORDS, wordsGiven, wordWith, type EventWords } from '../../block-words.js';
 import { dayOf } from '../../dates.js';
+import { asText } from '../../format.js';
+import { fitted } from './fit-words.js';
 import {
   type BlockProps,
   type RowBlockProps,
@@ -43,18 +46,24 @@ const hourOf = (props: BlockProps, v: unknown) => {
     .map(Number);
   return h + m / 60;
 };
-export const VEvents = defineBlock('VEvents', 'vindu-events', {}, (props) => {
+export const VEvents = defineBlock('VEvents', 'vindu-events', { words: 'value' }, (props) => {
   const rows = props.rows;
-  if (!rows.length)
-    return emptyMessage(
-      props.layout === 'free' ? 'No free time of that length in that range.' : 'No events.',
-    );
-  if (props.layout === 'free') return freeTime(props);
+  const words = wordsGiven(props.words, BLOCK_WORDS.events);
+  if (!rows.length) return emptyMessage(props.layout === 'free' ? words.noFree : words.none);
+  if (props.layout === 'free') return freeTime(props, words);
   if (props.layout === 'week') return weekCalendar(props);
   return agenda(props);
 });
 
-function freeTime(props: RowBlockProps) {
+/** A length of time in hours and minutes, in the view's words, its numbers as the locale writes them. */
+function lengthOf(props: RowBlockProps, words: EventWords, minutes: number): string {
+  const hours = Math.floor(minutes / 60), rest = minutes % 60;
+  const h = hours ? wordWith(words.hours, { hours: formatCell(props, hours) }) : '';
+  const m = rest || !hours ? wordWith(words.minutes, { minutes: formatCell(props, rest) }) : '';
+  return [h, m].filter(Boolean).join(' ');
+}
+
+function freeTime(props: RowBlockProps, words: EventWords) {
   const rows = props.rows;
   return html`<div class="vb-list">${rows.map((row, index) => {
     const minutes = (Date.parse(String(row.end)) - Date.parse(String(row.start))) / 60000;
@@ -62,8 +71,8 @@ function freeTime(props: RowBlockProps) {
       props,
       index,
       'vb-item vb-ev',
-      html`<span class="vb-time">${formatTime(props, row.start)} – ${clock(props, row.end)}</span><span class="vb-free">free ${
-        minutes >= 60 ? `${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60} min` : ''}` : `${minutes} min`
+      html`<span class="vb-time">${formatTime(props, row.start)} – ${clock(props, row.end)}</span><span class="vb-free">${
+        wordWith(words.free, { time: lengthOf(props, words, minutes) })
       }</span>`,
     );
   })}</div>`;
@@ -158,24 +167,19 @@ function weekCalendar(props: RowBlockProps) {
           if (!Number.isFinite(startHour)) return nothing;
           const moved = row.planned_from !== undefined,
             clash = Array.isArray(row.clashes) && row.clashes.length > 0;
+          const overlaps = clash ? `; overlaps ${(row.clashes as unknown[]).map((c) => asText(c)).join(', ')}` : '';
+          const note = moved ? `moved from ${clock(props, row.planned_from)}${overlaps}` : '';
+          // its title and place cut at a word's end to fit the slot; the whole title is its name and its tooltip
+          const title = formatCell(props, fieldValue(props, row, 'title')),
+            where = fieldValue(props, row, 'where') !== undefined ? ` · ${formatCell(props, fieldValue(props, row, 'where'))}` : '';
           return html`<div class=${
             `vb-slot${moved ? ' vb-moved' : ''}${clash ? ' vb-clash' : ''}`
-          } title=${
-            moved
-              ? `moved from ${clock(props, row.planned_from)}${clash ? `; overlaps ${(row.clashes as string[]).join(', ')}` : ''}`
-              : ''
-          } data-panel=${props.panel ?? ''} data-row=${String(index)} draggable="true" tabindex="0" role="group" aria-roledescription="event you can move" @dragstart=${grab(index)} @keydown=${keys(index)} style=${
+          } title=${[title, note].filter(Boolean).join('\n')} aria-label=${title} aria-description=${note || nothing} data-panel=${props.panel ?? ''} data-row=${String(index)} draggable="true" tabindex="0" role="group" aria-roledescription="event you can move" @dragstart=${grab(index)} @keydown=${keys(index)} style=${
             `top:calc(var(--vb-hour,30px) * ${startHour - firstHour});height:max(calc(var(--vb-hour,30px) * .6),calc(var(--vb-hour,30px) * ${Math.max(endHour - startHour, 0.25)} - 2px))`
-          }><b>${
+          } ${fitted()}><b>${
             clock(props, fieldValue(props, row, 'start'))
-          }</b> ${
-            formatCell(props, fieldValue(props, row, 'title'))
-          }${
-            fieldValue(props, row, 'where') !== undefined
-              ? html`<span class="vb-muted"> · ${
-                  formatCell(props, fieldValue(props, row, 'where'))
-                }</span>`
-              : nothing
+          }</b> <span class="vb-slottitle" data-full=${title} .textContent=${title}></span>${
+            where ? html`<span class="vb-muted" data-full=${where} .textContent=${where}></span>` : nothing
           }</div>`;
         })
       }</div></div>`;

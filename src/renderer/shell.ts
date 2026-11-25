@@ -38,6 +38,7 @@ import { mountDocking } from './shell-docking.js';
 import { mountDividers } from './shell-dividers.js';
 import { mountStacks } from './shell-stacks.js';
 import { guardA2uiArrays } from './a2ui-limits.js';
+import { checkedSources, setPictureSources } from './picture-sources.js';
 
 export { moveLine } from './shell-dividers.js';
 export * from './shell-options.js';
@@ -56,13 +57,14 @@ let skins = 0, paneIds = 0;
  *  and in which nothing is installed. Give it what the UI server shows (handle.view, handle.state). */
 export function mountShell(host: HTMLElement, o: ShellOptions = {}): ShellHandle {
   guardA2uiArrays();
+  const sources = checkedSources(o.sources ?? []); // checked before anything is drawn
   const doc = host.ownerDocument;
   if (o.css !== false) useTheme(doc);
   const L: ShellLabels = { ...SHELL_LABELS, ...o.labels };
   const paneActs = (o.actions ?? []).filter(a => a.where === 'pane'), barActs = (o.actions ?? []).filter(a => a.where === 'bar');
   const make = elementsOf(doc);
   const root = make('div', 'vindu-shell vindu-theme'); root.tabIndex = -1; root.style.outline = 'none';
-  const skinId = `s${++skins}`; root.dataset.vinduSkin = skinId;
+  const skinId = `s${++skins}`; root.dataset.vinduSkin = skinId; setPictureSources(root, sources);
   const skin = make('style'); skin.dataset.vindu = 'skin';
   const tokens = (t: ShellSkin = {}) => { skin.textContent = skinCss(`.vindu-shell.vindu-theme[data-vindu-skin="${skinId}"]`, t); };
   tokens(o.tokens); doc.head.append(skin);

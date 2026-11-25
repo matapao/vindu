@@ -11,6 +11,7 @@ import type { AnswerEntry, ResultSource } from '../results.js';
 import { Shell } from '../shell.js';
 import type { Template } from '../templates.js';
 import type { ViewWords } from '../view-words.js';
+import type { ViewFormat } from './view-words.js';
 import { Views } from '../views/views.js';
 import type { OpenMore, ResultPointer, Shown, UiProcess } from './contracts.js';
 import type { KeptDraft, SavedDraft } from './message-drafts.js';
@@ -92,6 +93,7 @@ export type Session = {
   waiting: Map<string, Set<(v?: unknown) => void>>; // who waits for the window to read a view back, by view
   more: OpenMore;
   viewWords: ViewWords; // the words its views are drawn in: the session's own over the provider's (view-words.ts)
+  format: ViewFormat; // how its views write values: its own locale and time zone over the provider's (view-words.ts)
   jobs: boolean; // whether a hook's job may start here: the host starts jobs (onJob), and this is not a job's own process
   added: Operation[];
   told: number;

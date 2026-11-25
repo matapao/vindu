@@ -1,7 +1,9 @@
 // The words Vindu draws on a view's own surface, besides what the model wrote: what a panel says of itself, the way
-// back and through steps and a gallery, the system's own suggestions, each hook's line with its switch, and a mail
-// drafted for the person to send. English by default; a host gives its own, whole or word by word
-// (view-words-norwegian.ts has Bokmål and Nynorsk). What the model is told stays in English, whatever the person reads.
+// back and through steps and a gallery, the system's own suggestions, each hook's line with its switch, a mail
+// drafted for the person to send, and what the blocks say of their rows (block-words.ts). English by default; a host
+// gives its own, whole or word by word (view-words-norwegian.ts has Bokmål and Nynorsk). What the model is told stays
+// in English, whatever the person reads.
+import { BLOCK_WORDS, type BlockWords } from './block-words.js';
 
 /** A hook's line, as the person reads it: when it runs, then each thing it does; and why it is off where it cannot be
  *  turned on. Panels come by their titles, an operation by its name with spaces. */
@@ -67,9 +69,12 @@ export type ViewWords = {
   turnOff: string;
   hook: HookWords;
   message: MessageWords;
-};
+} & BlockWords;
+/** The groups of words, each merged word by word. */
+const GROUPS = ['hook', 'message', 'money', 'events', 'batch', 'map', 'tasks', 'pdf'] as const satisfies readonly (keyof ViewWords)[];
+type Group = (typeof GROUPS)[number];
 /** Words a host gives: any of them; each one it leaves out is the one under it. */
-export type PartialViewWords = Partial<Omit<ViewWords, 'hook' | 'message'>> & { hook?: Partial<HookWords>; message?: Partial<MessageWords> };
+export type PartialViewWords = Partial<Omit<ViewWords, Group>> & { [G in Group]?: Partial<ViewWords[G]> };
 
 /** The line a crosses hook looks at, in the words given: "above 50000 or below 100". */
 export const lineIn = (
@@ -135,11 +140,15 @@ export const VIEW_WORDS: ViewWords = {
     copy: 'Copy',
     copied: 'Copied',
   },
+  ...BLOCK_WORDS,
 };
 
 /** The words given, without those left undefined. */
 const given = <T extends object>(words: T | undefined): Partial<T> =>
   Object.fromEntries(Object.entries(words ?? {}).filter(([, word]) => word !== undefined)) as Partial<T>;
-/** Words over others, word by word: each one given in place of the one under it. */
-export const viewWordsOver = (under: ViewWords, words?: PartialViewWords): ViewWords =>
-  ({ ...under, ...given(words), hook: { ...under.hook, ...given(words?.hook) }, message: { ...under.message, ...given(words?.message) } });
+/** Words over others, word by word: each one given in place of the one under it, in every group. */
+export const viewWordsOver = (under: ViewWords, words?: PartialViewWords): ViewWords => {
+  const over: Record<string, unknown> = { ...under, ...given(words) };
+  for (const group of GROUPS) over[group] = { ...under[group], ...given(words?.[group]) };
+  return over as ViewWords;
+};
