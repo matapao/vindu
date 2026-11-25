@@ -89,7 +89,7 @@ export async function startUiServer(options: UiServerOptions = {}) {
     ) {
       return openSession(runtime, endpoints, port, proc, onShow, onShell, more);
     },
-    /** The page host's port, on loopback: a window elsewhere (a phone's) passes media through from it. */
+    /** The page host's port, on loopback: where the pages and media the window shows come from (pageFrameSource). */
     pagesPort: host.port,
     close: async () => {
       await handler.close();
