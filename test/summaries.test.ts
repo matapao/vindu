@@ -141,3 +141,29 @@ test('who changed a view last: the model as it shows it, then the person acting 
     assert.deepEqual(sizes, { totals: 'small', customer: 'small', warnings: 'notice' });
   } finally { await en.mcp.close(); en.ui.close(); }
 });
+
+test('an hours sheet says the total it declares, never its hourly rates added up; a computed amount outranks a given one, and rates alone give no total', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'summaries-hours-')), results = memoryResults(dir);
+  // 24 days: 12 at 650 an hour (94 hours) and 12 at 850 (76 hours), so the rates add up to 18 000 and the hours to 125 700
+  const hoursAt = (rate: number, hours: number[]) => hours.map((timer, i) => ({ dato: `2026-11-${String(i + 2).padStart(2, '0')}`, ansatt: rate === 650 ? 'Lærling' : 'Snekker', prosjekt: 'Tilbygg', aktivitet: 'Arbeid', timer, timepris: rate }));
+  const hours = results.add({ server: 'work', tool: 'hours', value: [...hoursAt(650, [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 7, 7]), ...hoursAt(850, [7, 7, 7, 7, 6, 6, 6, 6, 6, 6, 6, 6])] }).id;
+  const prices = results.add({ server: 'shop', tool: 'prices', value: [{ vare: 'Takstein', enhetspris: 32, unit_price: 32, rate: 1 }, { vare: 'Lekter', enhetspris: 18, unit_price: 18, rate: 1 }] }).id;
+  const given = results.add({ server: 'shop', tool: 'orders', value: [{ vare: 'Takstein', antall: 10, pris: 32, beløp: 320 }, { vare: 'Lekter', antall: 5, pris: 18, beløp: 90 }] }).id;
+  const presented = new Map<string, ViewPresentation>();
+  const ui = vindu.open({ results, dir }, { locale: 'nb-NO', timeZone: ZONE, viewWords: VIEW_WORDS_NB, onPresentation: v => presented.set(v.name, v) });
+  const { mcp, json } = await mcpClient(ui.url);
+  try {
+    const show = (name: string, panel: Record<string, unknown>) => json('show_view', { name, title: name, panels: [panel] });
+    await show('sheet', { card: 'sheet', title: 'Timer', from: hours, compute: { sum: 'timer * timepris' }, totals: { Sum: 'sum(sum)' } });
+    await show('computed', { card: 'table', from: hours, compute: { sum: 'timer * timepris' } });
+    await show('raw', { card: 'table', from: hours });
+    await show('rates', { card: 'table', from: prices });
+    await show('given', { card: 'table', from: given, compute: { kostnad: 'antall * pris * 1.25' } });
+    const line = (view: string) => presented.get(view)!.panels[0].summary.line.replace(/[  ]/g, ' ');
+    assert.equal(line('sheet'), '24 rader · Sum 125 700', 'the total the sheet declares, as it labels it');
+    assert.equal(line('computed'), '24 rader · sum 125 700,00', 'the amount the panel computes');
+    assert.equal(line('raw'), '24 rader', 'hours and an hourly rate: nothing that adds up as money');
+    assert.equal(line('rates'), '2 rader', 'prices per unit and rates are never added up');
+    assert.equal(line('given'), '2 rader · sum 512,50', 'a computed amount before the one given');
+  } finally { await mcp.close(); ui.close(); }
+});

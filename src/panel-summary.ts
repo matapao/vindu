@@ -1,5 +1,6 @@
 // What a panel holds, in one line, for a window that shows views as cards (the shell's own, or a host's): a kpi's value,
-// a table's rows and the total of its money column, a record's name or number, a mail's To and subject, a calendar's
+// a table's rows and what they add up to (the totals the panel declares, else its amounts: a column it computes before
+// one it was given, and never a rate or a price per unit), a record's name or number, a mail's To and subject, a calendar's
 // next event and how many there are, a list of tasks' open ones and the next due, an invoice's total due, a chart's
 // last value and its direction, a forecast's next day, the most severe of some warnings, a PDF's pages once known.
 // Written in the view's words and its locale, as its cards are drawn; worked out by the system from what the panel shows.
@@ -20,7 +21,13 @@ export type SummaryKit = { locale: string; timeZone: string; words: ViewWords; t
 type Line = (p: PanelSpec, d: Resolved, kit: SummaryKit) => string | undefined;
 
 const DONE = /^(done|completed?|closed|resolved|true|yes|ferdig|finished)$/i;
-const MONEY = /(amount|total|sum|balance|cost|price|paid|bel[øo]p|saldo|kostnad|pris|betalt)/i;
+/** A field of amounts, which add up: amount, total, sum, balance, cost, paid, beløp, saldo, kostnad, betalt. */
+const AMOUNT = /(amount|total|sum(?![a-z])|balance|cost|paid|bel[øo]p|saldo|kostnad|betalt)/i;
+/** A field of rates or prices per unit, which never add up (a price alone is not an amount either): rate, sats, per_…,
+ *  unit price, enhetspris, timepris, timesats. */
+const RATE = /(rate|sats|(^|_)per(_|$)|unit|enhet|time(pris|sats))/i;
+const RATE_CAMEL = /Per([A-Z]|$)/;
+const isAmount = (field: string) => AMOUNT.test(field) && !RATE.test(field) && !RATE_CAMEL.test(field);
 const CURRENCY = /^(currency|ccy|valuta)$/i;
 const SUFFIX = /_(nok|sek|dkk|eur|usd|gbp|chf|jpy|isk|pln|cad|aud)$/i;
 const NAME = /(^|_)(name|title|navn|tittel|subject|label)$/i;
@@ -64,20 +71,34 @@ function currencyOf(rows: Row[], field: string): string | undefined {
   if (given.size === 1) { const [c] = given; if (/^[A-Z]{3}$/.test(c)) return c; }
   return SUFFIX.exec(field)?.[1].toUpperCase();
 }
-/** A table's money column added up, with its currency: the first field named as an amount whose values are numbers. */
-function moneyTotal(rows: Row[], kit: SummaryKit): string | undefined {
-  const fields = [...new Set(rows.flatMap(r => Object.keys(r)))];
-  const field = fields.find(f => MONEY.test(f) && rows.some(r => typeof r[f] === 'number') && rows.every(r => r[f] === undefined || r[f] === null || typeof r[f] === 'number'));
+/** A table's amounts added up, with their currency: the first field named as an amount whose values are numbers, one
+ *  the panel computes before one it was given. */
+function moneyTotal(rows: Row[], p: PanelSpec, kit: SummaryKit): string | undefined {
+  const computed = Object.keys(p.compute ?? {});
+  const fields = [...new Set([...computed, ...rows.flatMap(r => Object.keys(r))])];
+  const field = fields.find(f => isAmount(f) && rows.some(r => typeof r[f] === 'number') && rows.every(r => r[f] === undefined || r[f] === null || typeof r[f] === 'number'));
   if (!field) return undefined;
   const sum = Number(rows.reduce((a, r) => a + (typeof r[field] === 'number' ? r[field] : 0), 0).toPrecision(15));
   return wordWith(kit.words.summary.total, { amount: moneyIn(sum, currencyOf(rows, field), kit.locale) });
 }
-/** Rows: a forecast, some warnings, or how many there are and the total of their money column. */
-function rowsLine(rows: Row[], kit: SummaryKit): string {
+type DeclaredTotal = { label: string; values: { scenario: string | null; value: unknown }[] };
+/** The first total a panel declares (a sheet's totals), as it labels it: its value, or each scenario's. */
+function declaredTotal(d: Resolved, kit: SummaryKit): string | undefined {
+  const totals = (d.shaped?.props?.sheet as { totals?: DeclaredTotal[] } | undefined)?.totals ?? [];
+  const first = totals.find(t => t.values.some(v => typeof v.value === 'number'));
+  if (!first) return undefined;
+  const each = first.values
+    .filter(v => typeof v.value === 'number')
+    .map(v => [v.scenario, cellIn(v.value, first.label, kit.locale)].filter(Boolean).join(' '));
+  return `${first.label} ${each.join(' / ')}`;
+}
+/** Rows: a forecast, some warnings, or how many there are and what they add up to: the totals the panel declares, else
+ *  its amounts. */
+function rowsLine(rows: Row[], p: PanelSpec, d: Resolved, kit: SummaryKit): string {
   const told = forecastLine(rows, kit) ?? warningLine(rows, kit);
   if (told) return told;
   const w = kit.words.summary;
-  return [counted(kit, rows.length, w.rows, w.row), moneyTotal(rows, kit)].filter(Boolean).join(' · ');
+  return [counted(kit, rows.length, w.rows, w.row), declaredTotal(d, kit) ?? moneyTotal(rows, p, kit)].filter(Boolean).join(' · ');
 }
 /** A record's name, else its number, else its first value. */
 function recordLine(record: Row, kit: SummaryKit): string {
@@ -161,7 +182,7 @@ function lineOf(p: PanelSpec, d: Resolved, kit: SummaryKit): string {
   if (d.waiting) return w.waiting;
   const own = Object.hasOwn(LINES, p.card) ? LINES[p.card](p, d, kit) : undefined;
   if (own !== undefined) return own;
-  if (d.rows) return rowsLine(d.rows, kit);
+  if (d.rows) return rowsLine(d.rows, p, d, kit);
   if (d.record) return recordLine(d.record, kit);
   if (d.text !== undefined) return firstLine(d.text);
   if (d.value !== undefined) return cellIn(d.value, undefined, kit.locale);
