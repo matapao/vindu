@@ -1,6 +1,6 @@
 {
   "name": "@matapao/vindu",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "license": "MIT",
   "type": "module",
   "description": "UI SDK for browser and Electron. Render task data and expose views, inputs and interactions to an app-owned MCP client.",
