@@ -1,9 +1,12 @@
 name: Security
-# Every push and pull request: the checks that give the same answer for the same code. Daily, and before a release
-# (publish.yml calls it with live: true), also the advisory databases, the registry and the actions as they are now.
+# Every push to main, pull request and merge queue entry: the checks that give the same answer for the same code. Daily,
+# and before a release (publish.yml calls it with live: true), also the advisory databases, the registry and the actions
+# as they are now.
 on:
   push:
+    branches: [main]
   pull_request:
+  merge_group:
   workflow_dispatch:
     inputs:
       live:
@@ -22,7 +25,7 @@ permissions:
 
 jobs:
   security:
-    name: Security checks
+    name: Security
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -30,10 +33,10 @@ jobs:
         with:
           fetch-depth: 0 # every commit, for the secrets scan
           persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '24.22.3'
-      - run: corepack enable pnpm
+          node-version-file: .nvmrc
       # pnpm audit signatures and the licence check read the installed packages.
       - run: pnpm install --frozen-lockfile
 

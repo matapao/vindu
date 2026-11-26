@@ -1,5 +1,15 @@
 name: Checks
-on: [push, pull_request, workflow_dispatch, workflow_call]
+# Every push to main, pull request and merge queue entry, and before a release (publish.yml calls it): `pnpm check
+# --coverage` (the one gate, as anyone runs it) on the toolchain in .nvmrc, the packed SDK as consumers install it, the
+# provider on the oldest Node the SDK supports and on Electron 45's Node, and the SDK on Linux. The last job, Checks, is
+# the one required check: it passes only when every required job did, whatever the matrix.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  merge_group:
+  workflow_call:
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
@@ -7,44 +17,79 @@ concurrency:
   cancel-in-progress: ${{ github.event_name != 'workflow_call' }}
 
 jobs:
-  sdk:
-    name: SDK tests on ${{ matrix.toolchain }} / runtime ${{ matrix.runtime }}
+  check:
+    name: pnpm check on macOS
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install chromium
+      - run: pnpm check --coverage
+
+  # What consumers install: the tarball, packed once, in an independent browser consumer (test:package), and checked
+  # with publint and are-the-types-wrong (check:package).
+  package:
+    name: The packed SDK
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install chromium
+      - run: pnpm test:package
+      - run: pnpm check:package
+
+  # The SDK is built with the toolchain, then run on the Node its consumers run: the oldest it supports (engines.node),
+  # and Electron 45's (Node 24.22.3), which an Electron host's main process runs, where the whole suite runs too.
+  runtime:
+    name: The provider on Node ${{ matrix.runtime }}
     runs-on: macos-15
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         include:
-          # pnpm and Vitest need a later Node 22 patch than consumers of the SDK.
-          - toolchain: '22.23.5'
-            runtime: '22.0.0'
-          - toolchain: '24.22.3'
-            runtime: '24.22.3'
+          - runtime: '22.0.0'
+            suite: false
+          - runtime: '24.22.3'
+            suite: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: ${{ matrix.toolchain }}
-      - run: corepack enable pnpm
+          node-version-file: .nvmrc
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
       - run: pnpm exec playwright install chromium
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm test:package
-      - run: pnpm check:package
-      - name: Switch to the minimum supported runtime
-        if: matrix.runtime != matrix.toolchain
+        if: matrix.suite
+      - run: pnpm build:test
+      - name: Switch to Node ${{ matrix.runtime }}
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ matrix.runtime }}
       - run: node --test scripts/test-runtime.mjs
+      - name: The SDK's tests on Node ${{ matrix.runtime }}
+        if: matrix.suite
+        run: node node_modules/vitest/vitest.mjs run
 
   # Linux: terminals (node-pty), shells and file watching differ there. Not yet required: it tells, and turns required
   # once it has passed.
-  sdk-linux:
+  linux:
     name: SDK tests on Linux (not yet required)
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -53,33 +98,28 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install -y zsh
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '24.22.3'
-      - run: sudo apt-get update && sudo apt-get install -y zsh
-      - run: corepack enable pnpm
+          node-version-file: .nvmrc
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm typecheck
-      - run: pnpm test
+      - run: pnpm check
       - run: pnpm test:package
       - run: node --test scripts/test-runtime.mjs
 
-  # The owner's style (Prettier at 120 columns, no nested ternaries, no explicit any) reports here until the code is
-  # changed to it; then it moves into pnpm lint.
-  style:
-    name: Style (reports only)
+  checks:
+    name: Checks
+    if: always()
+    needs: [check, package, runtime, linux]
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    continue-on-error: true
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '24.22.3'
-      - run: corepack enable pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint:style
+      # Every job but linux, which is not yet required, must have succeeded.
+      - name: Every required job succeeded
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$NEEDS" | jq -e 'del(.linux) | to_entries | all(.value.result == "success")' > /dev/null

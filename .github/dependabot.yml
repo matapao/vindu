@@ -1,25 +1,30 @@
 version: 2
-# Weekly, grouped, and a week behind each release: the same wait as pnpm's minimumReleaseAge (pnpm-workspace.yaml).
-# Security updates come at once.
+# The same plan in every repository: weekly, grouped per ecosystem, and a week behind each release, the wait pnpm's
+# minimumReleaseAge keeps too (pnpm-workspace.yaml). Security updates come at once. One entry per ecosystem this
+# repository has (npm per folder with a lockfile, gomod per go.mod, docker per Dockerfile folder, gitsubmodule), and
+# github-actions always.
 updates:
   - package-ecosystem: npm # pnpm's lockfile
     directory: /
     schedule:
       interval: weekly
+      day: monday
     cooldown:
       default-days: 7
+    open-pull-requests-limit: 5
     groups:
       npm:
         patterns: ['*']
         update-types: [minor, patch]
     ignore:
-      # The types follow the Node versions the SDK supports (22 and 24), not the newest Node.
+      # The types follow the Node versions the SDK's consumers run (22 and 24), not the newest Node.
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+      day: monday
     cooldown:
       default-days: 7
     groups:

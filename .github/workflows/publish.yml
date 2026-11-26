@@ -2,8 +2,9 @@ name: Publish
 # A version tag (v0.2.0) publishes that version to npm once every check has passed. The checks run with read access
 # only; the one job that can write runs no tests and installs nothing it did not check. It packs the package once,
 # attests that tarball (GitHub artifact attestations), publishes exactly that file to npm by trusted publishing (the
-# job's OIDC identity, so no token is stored, and npm signs its provenance), and attaches it with its SBOM to the tag's
-# GitHub release. npm trusts this workflow for @matapao/vindu: its settings name matapao/vindu and publish.yml.
+# job's OIDC identity, so no token is stored, and npm signs its provenance), and attaches it to the tag's GitHub release
+# with its attestation (<tgz>.sigstore.json, the Sigstore bundle, and <tgz>.intoto.jsonl, its signed envelope) and its
+# SBOM (<tgz>.cdx.json). npm trusts this workflow for @matapao/vindu: its settings name matapao/vindu and publish.yml.
 # Consumers verify with: gh attestation verify <tarball> --repo matapao/vindu
 on:
   push:
@@ -32,11 +33,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '24.22.3'
+          node-version-file: .nvmrc # its npm (11.5.1 or later) does trusted publishing
           package-manager-cache: false # nothing cached may reach what is published
-      - run: corepack enable pnpm
       - name: The tag names the version in package.json
         run: |
           version="v$(node -p "require('./package.json').version")"
@@ -45,20 +46,35 @@ jobs:
           fi
       - run: pnpm install --frozen-lockfile
       - name: Pack once, and its SBOM
+        id: pack
         run: |
           mkdir release
           pnpm pack --pack-destination release
-          pnpm sbom --sbom-format cyclonedx --prod --out release/sbom.cdx.json
+          tgz="$(find release -name '*.tgz' -print -quit)"
+          pnpm sbom --sbom-format cyclonedx --prod --out "$tgz.cdx.json"
+          echo "tgz=$tgz" >> "$GITHUB_OUTPUT"
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        id: attest
         with:
           subject-path: release/*.tgz
-      # pnpm exchanges the job's OIDC token for a publish token for this package alone; --provenance makes a publish
+      - name: The attestation as release assets
+        env:
+          TGZ: ${{ steps.pack.outputs.tgz }}
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          cp "$BUNDLE" "$TGZ.sigstore.json"
+          jq -c .dsseEnvelope "$BUNDLE" > "$TGZ.intoto.jsonl"
+      # npm exchanges the job's OIDC token for a publish token for this package alone; --provenance makes a publish
       # that cannot sign its provenance fail rather than go out without it.
       - name: Publish the attested tarball to npm
-        run: pnpm publish release/*.tgz --no-git-checks --registry https://registry.npmjs.org/ --access public --provenance
-      - name: The release, with the tarball and its SBOM
+        env:
+          TGZ: ${{ steps.pack.outputs.tgz }}
+        run: npm publish "$TGZ" --ignore-scripts --registry https://registry.npmjs.org/ --access public --provenance
+      - name: The release, with the tarball, its attestation and its SBOM
         env:
           GH_TOKEN: ${{ github.token }}
+          TGZ: ${{ steps.pack.outputs.tgz }}
         run: |
-          gh release create "$GITHUB_REF_NAME" release/*.tgz release/sbom.cdx.json --verify-tag --title "$GITHUB_REF_NAME" \
+          gh release create "$GITHUB_REF_NAME" "$TGZ" "$TGZ.sigstore.json" "$TGZ.intoto.jsonl" "$TGZ.cdx.json" \
+            --verify-tag --title "$GITHUB_REF_NAME" \
             --notes "@matapao/vindu $GITHUB_REF_NAME, as on npm. Verify the tarball with: gh attestation verify <tarball> --repo $GITHUB_REPOSITORY"
