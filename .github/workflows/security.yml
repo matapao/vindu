@@ -74,3 +74,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           MODE: ${{ (github.event_name == 'schedule' || inputs.live) && '--live' || '' }}
         run: pnpm check:security --strict ${MODE:+"$MODE"}
+      # zizmor's stricter auditor persona on every workflow, offline, on top of the shared script's default reading.
+      - name: zizmor, auditor persona
+        run: zizmor --offline --persona=auditor .github/workflows

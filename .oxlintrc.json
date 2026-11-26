@@ -1,14 +1,8 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["typescript", "unicorn", "oxc", "import", "node", "promise", "vitest"],
-  "categories": {
-    "correctness": "error"
-  },
-  "env": {
-    "browser": true,
-    "node": true,
-    "es2024": true
-  },
+  "categories": { "correctness": "error" },
+  "env": { "browser": true, "node": true, "es2024": true },
   "rules": {
     "eqeqeq": "error",
     "no-nested-ternary": "error",
@@ -29,19 +23,11 @@
     "typescript/prefer-promise-reject-errors": "error",
     "typescript/restrict-plus-operands": "error",
     "typescript/restrict-template-expressions": "error",
-    "typescript/switch-exhaustiveness-check": [
-      "error",
-      {
-        "considerDefaultExhaustiveForUnions": true
-      }
-    ],
+    "typescript/switch-exhaustiveness-check": ["error", { "considerDefaultExhaustiveForUnions": true }],
     "typescript/unbound-method": "error",
     "typescript/ban-ts-comment": [
       "error",
-      {
-        "ts-expect-error": "allow-with-description",
-        "minimumDescriptionLength": 10
-      }
+      { "ts-expect-error": "allow-with-description", "minimumDescriptionLength": 10 }
     ],
     "unicorn/require-post-message-target-origin": "error",
     "vitest/no-focused-tests": "error",
@@ -50,32 +36,21 @@
   "overrides": [
     {
       "files": ["*.config.{js,mjs,ts,mts}"],
-      "rules": {
-        "import/no-default-export": "off"
-      }
+      "rules": { "import/no-default-export": "off" }
     },
     {
       "files": ["test/**", "tests/**", "**/*.test.{ts,tsx,mts,mjs}"],
-      "rules": {
-        "typescript/no-floating-promises": "off"
-      }
+      "rules": { "typescript/no-floating-promises": "off" }
     },
     {
       "files": ["test/**"],
       "rules": {
-        "vitest/expect-expect": [
-          "error",
-          {
-            "assertFunctionNames": ["expect", "assert", "assert.*", "fc.assert"]
-          }
-        ]
+        "vitest/expect-expect": ["error", { "assertFunctionNames": ["expect", "assert", "assert.*", "fc.assert"] }]
       }
     },
     {
       "files": ["scripts/test-runtime.mjs"],
-      "rules": {
-        "typescript/no-floating-promises": "off"
-      }
+      "rules": { "typescript/no-floating-promises": "off" }
     }
   ],
   "ignorePatterns": ["dist/**", "coverage/**", "node_modules/**", "out/**"]
