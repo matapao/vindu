@@ -19,8 +19,9 @@ export function noWebRtc(w: Realm) {
       const refuse = function () { throw new x.DOMException('WebRTC is off in pages: it would reach the network', 'NotAllowedError'); };
       for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnection']) Object.defineProperty(x, name, { value: refuse, writable: false, configurable: false });
       for (const type of [x.HTMLIFrameElement, x.HTMLFrameElement, x.HTMLObjectElement]) for (const prop of ['contentWindow', 'contentDocument']) {
+        const d = type && Object.getOwnPropertyDescriptor(type.prototype, prop);
         // oxlint-disable-next-line typescript/unbound-method -- the original getter, called below with each element as this
-        const d = type && Object.getOwnPropertyDescriptor(type.prototype, prop), get = d?.get;
+        const get = d?.get;
         if (get) Object.defineProperty(type.prototype, prop, { ...d, get() { const v = get.call(this); off(prop === 'contentWindow' ? v : v?.defaultView); return v; } });
       }
     } catch { /* a frame of another origin: the page cannot reach into it either */ }
@@ -122,8 +123,17 @@ export function boot(data: Record<string, unknown>, live: boolean, at: { v: numb
     if (listening) return; listening = true;
     let bc: BroadcastChannel | undefined;
     try { bc = new BroadcastChannel('vindu-events'); bc.onmessage = () => { sync(false).catch(() => {}); }; } catch { bc = undefined; }
-    // oxlint-disable-next-line unicorn/require-post-message-target-origin -- a BroadcastChannel's postMessage takes no target: it reaches this origin's pages only
-    const poll = async () => { for (;;) { try { await sync(true); bc?.postMessage(1); } catch { await new Promise(r => setTimeout(r, 1000)); } } };
+    const poll = async () => {
+      for (;;) {
+        try {
+          await sync(true);
+          // oxlint-disable-next-line unicorn/require-post-message-target-origin -- a BroadcastChannel's postMessage takes no target: it reaches this origin's pages only
+          bc?.postMessage(1);
+        } catch {
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+    };
     const locks = navigator.locks as LockManager | undefined; // not in every browser
     if (locks && bc) void locks.request('vindu-events', poll); // held while this page is open; then the next page that listens polls
     else void poll();
@@ -185,8 +195,13 @@ export function boot(data: Record<string, unknown>, live: boolean, at: { v: numb
     value(rows: Record<string, unknown>[], expr = 'count()', inputs: Record<string, number> = {}) { const v = compute(rows, expr, inputs); keepComputed(v); return v; },
     group(rows: Record<string, unknown>[], field: string, expr = 'count()', inputs: Record<string, number> = {}) {
       const groups = new Map<string, Record<string, unknown>[]>();
-      // oxlint-disable-next-line typescript/no-base-to-string -- a page groups by any field: each value's own text names its group
-      for (const r of rows) { const k = String(r?.[field] ?? ''); const xs = groups.get(k); if (xs) xs.push(r); else groups.set(k, [r]); }
+      for (const r of rows) {
+        // oxlint-disable-next-line typescript/no-base-to-string -- a page groups by any field: each value's own text names its group
+        const k = String(r?.[field] ?? '');
+        const xs = groups.get(k);
+        if (xs) xs.push(r);
+        else groups.set(k, [r]);
+      }
       const name = C.computedName(expr);
       return [...groups].map(([k, rs]) => { const v = compute(rs, expr, inputs); keepComputed(v); return { [field]: k, [name]: v }; });
     },
