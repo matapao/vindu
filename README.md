@@ -6,8 +6,8 @@ and function says in its doc comment what it does.
 
 ## Install
 
-The SDK needs Node.js 22 or later on the server. To build it, use Node 24 and pnpm: `pnpm install --frozen-lockfile`,
-then `pnpm build`. A sibling app can depend on `@matapao/vindu` through `link:../vindu`; `pnpm pack` makes a tarball.
+`pnpm add @matapao/vindu` installs it from npm; the server needs Node.js 22 or later. To build it, use Node 24 and
+pnpm: `pnpm install --frozen-lockfile`, then `pnpm build`. A sibling app can depend on it through `link:../vindu`.
 
 ## Connect a task
 

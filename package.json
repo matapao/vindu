@@ -46,7 +46,8 @@
     "patches"
   ],
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
   },
   "scripts": {
     "lint": "pnpm run build && eslint . --max-warnings 0 && oxlint --type-aware --deny-warnings src test scripts examples && knip && node scripts/check-lines.mjs",

@@ -32,6 +32,10 @@ Run these checks from the repository root and report the results.
   licences, OSV-Scanner, secrets, Semgrep, zizmor and actionlint. CI runs it with `--strict`, and pnpm audit too.
 - `pnpm lint:style` reports the owner's style (Prettier, no nested ternaries, no explicit any) until the code follows it.
 
+A release is a commit that sets `version` in package.json, and its tag `v<version>`: the Publish workflow
+(`publish.yml`) publishes it to npm by trusted publishing, with provenance, and attaches the attested tarball to the
+tag's GitHub release.
+
 GitHub's CodeQL default setup scans the code, and CI runs OpenSSF Scorecard on public repositories. Dependabot
 proposes updates a week after release.
 Tests run without model calls. Leave pushes and merges to the person.
