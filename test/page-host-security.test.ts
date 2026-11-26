@@ -279,12 +279,16 @@ test('a page that stops waiting for events takes its timers with it', async () =
       .get({ host: '127.0.0.1', port: host.port, path: p, headers: { host: new URL(base).host } })
       .on('error', () => undefined),
   );
-  await sleep(200);
-  const during = timers();
+  // the timers as soon as they count as expected, or after 5 s: polled, as the requests arrive when they do
+  const settled = async (expected: (n: number) => boolean) => {
+    for (const end = Date.now() + 5000; !expected(timers()) && Date.now() < end;) await sleep(10);
+    return timers();
+  };
+  const during = await settled((n) => n >= before + 3);
   assert.ok(during >= before + 3, `${during} timers while they wait, ${before} before`);
   for (const r of requests) r.destroy();
-  await sleep(200);
-  assert.ok(timers() <= before, `${timers()} timers after they left, ${during} while they waited, ${before} before`);
+  const after = await settled((n) => n <= before);
+  assert.ok(after <= before, `${after} timers after they left, ${during} while they waited, ${before} before`);
 });
 
 test('the boot script comes before anything a page runs, whatever its markup says', () => {
