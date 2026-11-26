@@ -54,8 +54,8 @@ function groupStart(src: string, i: number): number {
 export function patternOf(src: string): RegExp | undefined {
   if (typeof src !== 'string' || src.length > LONGEST) return undefined;
   let re: RegExp;
-  // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp -- what this module is for: an untrusted pattern, bounded first (length, no backreferences, no nested quantifiers)
   try {
+    // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp -- what this module is for: an untrusted pattern, bounded first (length, no backreferences, no nested quantifiers)
     re = new RegExp(src, 'u');
   } catch {
     return undefined;

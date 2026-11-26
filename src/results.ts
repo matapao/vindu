@@ -179,10 +179,10 @@ export function readRef(
   if (!e) return { ok: false, why: `no entry ${m[1]}` };
   let v: unknown = dataOf(e);
   for (const t of (m[2] ?? '').split('/').slice(1).map(unescape)) {
-    // nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop -- it only reads, and only own values; nothing is written
-    if (v && typeof v === 'object' && Object.hasOwn(v, t))
+    if (v && typeof v === 'object' && Object.hasOwn(v, t)) {
+      // nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop -- it only reads, and only own values; nothing is written
       v = (v as Record<string, unknown>)[t]; // its own values: never what objects inherit
-    else return { ok: false, why: `${m[1]} has nothing at ${m[2]} (it stops before "${t}")` };
+    } else return { ok: false, why: `${m[1]} has nothing at ${m[2]} (it stops before "${t}")` };
   }
   return { ok: true, id: m[1], value: v };
 }

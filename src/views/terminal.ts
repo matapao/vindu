@@ -143,9 +143,9 @@ export class Terminals {
       : shellSetup(shell, this.o.dir, { login: this.o.login ?? process.platform === 'darwin', env });
     const cols = c.cols ?? 100,
       rows = c.rows ?? 30;
-    // nosemgrep: javascript.lang.security.audit.spawn-shell-true.spawn-shell-true -- a terminal is the person's own shell; the model's commands are refused with control characters (commandRefusal) and typed in, never spawned
     const proc: PtyLike = this.o.spawn
-      ? this.o.spawn({
+      ? // nosemgrep: javascript.lang.security.audit.spawn-shell-true.spawn-shell-true -- a terminal is the person's own shell; the model's commands are refused with control characters (commandRefusal) and typed in, never spawned
+        this.o.spawn({
           shell,
           args: setup.args,
           env: { ...setup.env, TERM_PROGRAM: 'vindu' },
