@@ -16,8 +16,7 @@ export type WindowChange = { kind: string; key?: string; text: string };
 export function resizeFromWindow(tree: LayoutNode | null, event: Record<string, unknown>) {
   const { path, sizes } = event;
   if (!Array.isArray(path) || !Array.isArray(sizes)) return null;
-  if (!path.every((index: unknown) => typeof index === 'number' && Number.isInteger(index) && index >= 0))
-    return null;
+  if (!path.every((index: unknown) => typeof index === 'number' && Number.isInteger(index) && index >= 0)) return null;
   const resized = resize(tree, path, sizes.map(Number));
   const split = resized && nodeAt(resized, path);
   if (!resized || !split || isPane(split)) return null;
@@ -25,7 +24,11 @@ export function resizeFromWindow(tree: LayoutNode | null, event: Record<string, 
   const sizesByPane = split.children.map(
     (child, i) => `${sides[i].map((view) => `"${view}"`).join(' + ')} ${Math.round(child.size * 100)} %`,
   );
-  const change: WindowChange = { kind: 'resize', key: JSON.stringify(sides), text: `resized: ${sizesByPane.join(', ')}` };
+  const change: WindowChange = {
+    kind: 'resize',
+    key: JSON.stringify(sides),
+    text: `resized: ${sizesByPane.join(', ')}`,
+  };
   return { tree: resized, change };
 }
 
@@ -38,18 +41,34 @@ export function recordResize(changes: WindowChange[], next: WindowChange) {
 
 /** The heights and sights the window measured, for the views that have a pane (inTree). */
 export function measuredFromWindow(views: unknown, inTree: (view: string) => boolean): [string, Measured][] {
-  const byView = (views && typeof views === 'object' ? views : {}) as Record<string, { content?: unknown; visible?: unknown; sight?: unknown }>;
-  const int = (n: unknown, min = 0) => (Number.isInteger(n) && (n as number) >= min && (n as number) < 1e7 ? (n as number) : undefined);
+  const byView = (views && typeof views === 'object' ? views : {}) as Record<
+    string,
+    { content?: unknown; visible?: unknown; sight?: unknown }
+  >;
+  const int = (n: unknown, min = 0) =>
+    Number.isInteger(n) && (n as number) >= min && (n as number) < 1e7 ? (n as number) : undefined;
   const read: [string, Measured][] = [];
   for (const [view, m] of Object.entries(byView)) {
-    const content = Number(m?.content), visible = Number(m?.visible);
+    const content = Number(m?.content),
+      visible = Number(m?.visible);
     if (!(inTree(view) && content >= 0 && visible >= 0 && Number.isFinite(content + visible))) continue;
     const sight: Record<string, Sight> = Object.create(null); // keyed by what the window says: a panel named __proto__ is a panel
     const said = m?.sight && typeof m.sight === 'object' ? (m.sight as Record<string, Record<string, unknown>>) : {};
     for (const [panel, s] of Object.entries(said).slice(0, 50)) {
-      const first = int(s?.first, -1), last = int(s?.last, -1), n = int(s?.n), of = int(s?.of);
+      const first = int(s?.first, -1),
+        last = int(s?.last, -1),
+        n = int(s?.n),
+        of = int(s?.of);
       const nodes = s?.nodes === undefined ? undefined : int(s.nodes);
-      if (panel.length <= 80 && first !== undefined && last !== undefined && n !== undefined && of !== undefined && last >= first && n <= of)
+      if (
+        panel.length <= 80 &&
+        first !== undefined &&
+        last !== undefined &&
+        n !== undefined &&
+        of !== undefined &&
+        last >= first &&
+        n <= of
+      )
         sight[panel] = { first, last, n, of, ...(nodes !== undefined ? { nodes } : {}) };
     }
     read.push([view, { content, visible, ...(Object.keys(sight).length ? { sight } : {}) }]);

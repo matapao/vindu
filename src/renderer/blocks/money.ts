@@ -13,7 +13,10 @@ import { type BlockRow, defineBlock, fieldValue, formatCell, formatTime, rowCont
 
 /** The usual fields of a document's head, by their names, each labelled with its word. */
 const HEAD: [keyof MoneyWords, RegExp][] = [
-  ['number', /^(number|no|nr|num|id|ref|reference|(invoice|receipt|order)_?(number|no|nr|id)?|nummer|fakturan(umme)?r)$/i],
+  [
+    'number',
+    /^(number|no|nr|num|id|ref|reference|(invoice|receipt|order)_?(number|no|nr|id)?|nummer|fakturan(umme)?r)$/i,
+  ],
   ['customer', /^(customer|customer_?name|client|buyer|to|bill_?to|recipient|kunde|kundenavn)$/i],
   ['date', /^(date|invoice_?date|issued|issue_?date|issued_?at|dato|fakturadato)$/i],
   ['due', /^(due|due_?date|due_?at|payment_?due|forfall|forfallsdato)$/i],
@@ -32,7 +35,8 @@ function labelOf(field: string, words: MoneyWords, usualFields = HEAD): string {
   return readable.charAt(0).toUpperCase() + readable.slice(1);
 }
 /** A pair of a label and its value, as the head and a payment draw each field. */
-const pair = (label: string, value: unknown) => html`<div class="vb-kv"><span>${label}</span><span>${value}</span></div>`;
+const pair = (label: string, value: unknown) =>
+  html`<div class="vb-kv"><span>${label}</span><span>${value}</span></div>`;
 
 export const VMoney = defineBlock(
   'VMoney',
@@ -44,7 +48,8 @@ export const VMoney = defineBlock(
     const currencyOf = (row?: BlockRow) =>
       asText((row && fieldValue(props, row, 'currency')) || props.currency || '') || undefined;
     const money = (v: unknown, row?: BlockRow) => moneyIn(v, currencyOf(row), props.locale);
-    const valueOf = (field: string, v: unknown) => (DATED.test(field) ? formatTime(props, v, false) : unbroken(formatCell(props, v, field)));
+    const valueOf = (field: string, v: unknown) =>
+      DATED.test(field) ? formatTime(props, v, false) : unbroken(formatCell(props, v, field));
     const header = Object.entries((props.head ?? {}) as BlockRow).filter(([k]) => !/^total$/i.test(k));
     const totals = (props.totals ?? {}) as BlockRow;
     if (props.layout === 'payment') {
@@ -59,7 +64,8 @@ export const VMoney = defineBlock(
           .map(([k, v]) => pair(labelOf(k, words, PAYMENT), valueOf(k, v)))}`,
       );
     }
-    const quantity = !!props.map?.quantity, price = !!props.map?.price;
+    const quantity = !!props.map?.quantity,
+      price = !!props.map?.price;
     const line = (row: BlockRow, index: number) =>
       html`<tr data-panel=${props.panel ?? ''} data-row=${String(index)}><td>${unbroken(formatCell(props, fieldValue(props, row, 'description')))}</td>${
         quantity ? html`<td class="vb-num">${formatCell(props, fieldValue(props, row, 'quantity'))}</td>` : nothing
@@ -69,7 +75,9 @@ export const VMoney = defineBlock(
         ? `✓ ${wordWith(words.agrees, { stated: money(totals.stated) })}`
         : `⚠ ${wordWith(words.differs, { stated: money(totals.stated), total: money(totals.total) })}`;
     return html`<div class="vb-money">${
-      header.length ? html`<div class="vb-head">${header.map(([k, v]) => pair(labelOf(k, words), valueOf(k, v)))}</div>` : nothing
+      header.length
+        ? html`<div class="vb-head">${header.map(([k, v]) => pair(labelOf(k, words), valueOf(k, v)))}</div>`
+        : nothing
     }<div class="vb-scroll"><table class="vb-lines"><thead><tr><th>${words.description}</th>${
       quantity ? html`<th class="vb-num">${words.quantity}</th>` : nothing
     }${price ? html`<th class="vb-num">${words.price}</th>` : nothing}<th class="vb-num">${words.amount}</th></tr></thead>

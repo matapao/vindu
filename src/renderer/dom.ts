@@ -2,7 +2,11 @@
 // one, and the view a drawn element is in, read from its pane.
 
 /** Makes an element of the document's: its tag, its class and its text. */
-export type ElementMaker = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string) => HTMLElementTagNameMap[K];
+export type ElementMaker = <K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  cls?: string,
+  text?: string,
+) => HTMLElementTagNameMap[K];
 
 export function elementsOf(doc: Document): ElementMaker {
   return (tag, cls, text) => {
@@ -15,7 +19,8 @@ export function elementsOf(doc: Document): ElementMaker {
 
 /** A host's pane's switch for whether the model may read it: a labelled checkbox, as a terminal and a browser show it. */
 export function shareToggle(make: ElementMaker, text: string): { label: HTMLLabelElement; box: HTMLInputElement } {
-  const label = make('label', 'vindu-share'), box = make('input');
+  const label = make('label', 'vindu-share'),
+    box = make('input');
   box.type = 'checkbox';
   label.append(box, ` ${text}`);
   return { label, box };
@@ -42,8 +47,25 @@ export function framesLeaving(from: Element): void {
 
 const SVG = 'http://www.w3.org/2000/svg';
 /** What an icon may draw with: shapes, groups, gradients and masks. Never a script, a foreign object, a link or an image. */
-const DRAWING = new Set(['svg', 'g', 'path', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'rect', 'title', 'desc',
-  'defs', 'linearGradient', 'radialGradient', 'stop', 'clipPath', 'mask']);
+const DRAWING = new Set([
+  'svg',
+  'g',
+  'path',
+  'circle',
+  'ellipse',
+  'line',
+  'polyline',
+  'polygon',
+  'rect',
+  'title',
+  'desc',
+  'defs',
+  'linearGradient',
+  'radialGradient',
+  'stop',
+  'clipPath',
+  'mask',
+]);
 /** A value that loads something: a url() that is not a fragment of the icon's own. */
 const LOADS = /url\s*\(\s*['"]?\s*[^#\s'")]/i;
 
@@ -58,11 +80,13 @@ export function iconOf(doc: Document, markup: string): SVGSVGElement | null {
   const keep = (element: Element) => {
     // oxlint-disable-next-line unicorn/no-useless-spread -- a copy: children is live, and a child removed from it would skip the next
     for (const child of [...element.children]) {
-      if (child.namespaceURI === SVG && DRAWING.has(child.localName)) keep(child); else child.remove();
+      if (child.namespaceURI === SVG && DRAWING.has(child.localName)) keep(child);
+      else child.remove();
     }
     // oxlint-disable-next-line unicorn/no-useless-spread -- a copy: attributes is live, and one removed from it would skip the next
     for (const { name, value } of [...element.attributes]) {
-      if (/^on/i.test(name) || /href$/i.test(name) || name === 'style' || LOADS.test(value)) element.removeAttribute(name);
+      if (/^on/i.test(name) || /href$/i.test(name) || name === 'style' || LOADS.test(value))
+        element.removeAttribute(name);
     }
   };
   keep(icon);

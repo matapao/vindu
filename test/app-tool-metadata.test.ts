@@ -23,9 +23,13 @@ it('reads current and legacy MCP App resource declarations and rejects malformed
 
 it('honors declared MCP audiences and denies malformed or empty declarations for both discovery and submission', () => {
   for (const [visibility, model, app] of [
-    [undefined, true, true], [['app', 'model'], true, true],
-    [['model'], true, false], [['app'], false, true],
-    [[], false, false], ['app', false, false], [null, false, false],
+    [undefined, true, true],
+    [['app', 'model'], true, true],
+    [['model'], true, false],
+    [['app'], false, true],
+    [[], false, false],
+    ['app', false, false],
+    [null, false, false],
     [['app', 'other'], false, false],
   ] as const) {
     const lookup = tool({ ui: { resourceUri: uri, visibility } });

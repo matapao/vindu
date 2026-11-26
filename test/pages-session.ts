@@ -11,7 +11,12 @@ import { chromium, mcpClient } from './helpers.js';
 
 export const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 export const workOf = (pages: string) => pages.replace('http://', 'http://work-'); // where pages from the working folder run
-export const write = (root: string, files: Record<string, string>) => { for (const [f, s] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(root, f)), { recursive: true }); fs.writeFileSync(path.join(root, f), s); } };
+export const write = (root: string, files: Record<string, string>) => {
+  for (const [f, s] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(root, f)), { recursive: true });
+    fs.writeFileSync(path.join(root, f), s);
+  }
+};
 
 export const invoices = [
   { id: 'INV-2026-0241', customer: 'Vik Data', amount_nok: 31050, status: 'overdue' },
@@ -21,14 +26,19 @@ export const invoices = [
 ];
 export const work = tmp('work-');
 write(work, {
-  'index.html': '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Fjord Cabins</title><link rel="stylesheet" href="style.css"></head><body><header><h1>Fjord Cabins</h1><nav><a href="about.html">About</a></nav></header><main><img src="img/cabin.svg" alt="cabin"><p id="status">Loading</p></main><script src="app.js"></script></body></html>',
-  'style.css': 'body { font-family: sans-serif; margin: 0; background: rgb(255, 255, 255); } main { padding: 16px; } img { max-width: 100%; }',
+  'index.html':
+    '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Fjord Cabins</title><link rel="stylesheet" href="style.css"></head><body><header><h1>Fjord Cabins</h1><nav><a href="about.html">About</a></nav></header><main><img src="img/cabin.svg" alt="cabin"><p id="status">Loading</p></main><script src="app.js"></script></body></html>',
+  'style.css':
+    'body { font-family: sans-serif; margin: 0; background: rgb(255, 255, 255); } main { padding: 16px; } img { max-width: 100%; }',
   'app.js': 'document.getElementById("status").textContent = "Open all year";',
-  'img/cabin.svg': '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160"><rect width="320" height="160" fill="#7a5"/></svg>',
+  'img/cabin.svg':
+    '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160"><rect width="320" height="160" fill="#7a5"/></svg>',
   'about.html': '<!doctype html><title>About</title><p>Since 1998.</p>',
-  'wide.html': '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Wide</title></head><body><div style="width:1200px">A fixed-width layout</div></body></html>',
+  'wide.html':
+    '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Wide</title></head><body><div style="width:1200px">A fixed-width layout</div></body></html>',
   '.env': 'SECRET=never-served',
-  'a11y.html': '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Booking</title></head><body><main><h1>Book a cabin</h1><img src="img/cabin.svg"><button></button><p style="color:#bbb;background:#fff">Light grey on white</p><label>Name <input id="who"></label></main></body></html>',
+  'a11y.html':
+    '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Booking</title></head><body><main><h1>Book a cabin</h1><img src="img/cabin.svg"><button></button><p style="color:#bbb;background:#fff">Light grey on white</p><label>Name <input id="who"></label></main></body></html>',
   'menu.html': `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Menu</title>
 <style>#toggle { display: none } #nav { display: flex } @media (max-width: 600px) { #toggle { display: block } #nav { display: none } #nav.open { display: block } }</style></head>
 <body><button id="toggle" onclick="document.getElementById('nav').classList.toggle('open')">Menu</button><nav id="nav">
@@ -72,11 +82,16 @@ r.render(scene, new THREE.PerspectiveCamera());
 </script></body></html>`,
 });
 // links: one to a dotfile, one to a dot folder, one out of the folder; none of them is served
-fs.mkdirSync(path.join(work, '.git')); fs.writeFileSync(path.join(work, '.git', 'config'), '[core]');
-fs.symlinkSync('.env', path.join(work, 'notes.txt')); fs.symlinkSync('.git', path.join(work, 'gitlink'));
-const outsideFile = path.join(tmp('outside-'), 'secret.txt'); fs.writeFileSync(outsideFile, 'outside'); fs.symlinkSync(outsideFile, path.join(work, 'outside.txt'));
+fs.mkdirSync(path.join(work, '.git'));
+fs.writeFileSync(path.join(work, '.git', 'config'), '[core]');
+fs.symlinkSync('.env', path.join(work, 'notes.txt'));
+fs.symlinkSync('.git', path.join(work, 'gitlink'));
+const outsideFile = path.join(tmp('outside-'), 'secret.txt');
+fs.writeFileSync(outsideFile, 'outside');
+fs.symlinkSync(outsideFile, path.join(work, 'outside.txt'));
 // a library the host adds, served offline like the built-in ones
-const tinyDir = tmp('tiny-'); fs.writeFileSync(path.join(tinyDir, 'tiny.js'), "export const greet = n => 'hello ' + n;");
+const tinyDir = tmp('tiny-');
+fs.writeFileSync(path.join(tinyDir, 'tiny.js'), "export const greet = n => 'hello ' + n;");
 export const tiny = { name: 'tiny', version: '1.0.0', license: 'MIT', dir: tinyDir, imports: { tiny: 'tiny.js' } };
 
 const dir = tmp('task-');
@@ -87,11 +102,21 @@ export const browser = await chromium.launch();
 export const vindu = await startVindu({ driver: playwrightDriver(browser), libraries: [tiny] });
 export const ui = vindu.open({ results, dir, work });
 export const { mcp, call, json } = await mcpClient(ui.url);
-afterAll(async () => { await mcp.close(); ui.close(); await vindu.close(); await browser.close(); });
+afterAll(async () => {
+  await mcp.close();
+  ui.close();
+  await vindu.close();
+  await browser.close();
+});
 /** A page's check as show_view reports it (page-check.ts), each part the tests read taken as there: a test fails where it is not. */
 type Checked = Required<Omit<PageReport, 'text' | 'charts' | 'three' | 'canvases'>> & {
   text: Required<NonNullable<PageReport['text']>>;
-  charts: { library: string; type: string; series: { values: number[]; [field: string]: unknown }[]; [field: string]: unknown }[];
+  charts: {
+    library: string;
+    type: string;
+    series: { values: number[]; [field: string]: unknown }[];
+    [field: string]: unknown;
+  }[];
   three: { frames: number; [field: string]: unknown }[];
   canvases: { context: string; draw_calls: number; [field: string]: unknown }[];
 };

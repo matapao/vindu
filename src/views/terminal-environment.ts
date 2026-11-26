@@ -5,14 +5,57 @@
 // rest, as in any terminal they open.
 
 const NAMES = new Set([
-  'HOME', 'USER', 'LOGNAME', 'SHELL', 'PATH', 'TERM', 'COLORTERM', 'LANG', 'LANGUAGE', 'TZ', 'TMPDIR', 'ZDOTDIR',
-  'DISPLAY', 'WAYLAND_DISPLAY', 'DBUS_SESSION_BUS_ADDRESS', 'SSH_AUTH_SOCK',
-  'HTTP_PROXY', 'HTTPS_PROXY', 'FTP_PROXY', 'ALL_PROXY', 'NO_PROXY',
+  'HOME',
+  'USER',
+  'LOGNAME',
+  'SHELL',
+  'PATH',
+  'TERM',
+  'COLORTERM',
+  'LANG',
+  'LANGUAGE',
+  'TZ',
+  'TMPDIR',
+  'ZDOTDIR',
+  'DISPLAY',
+  'WAYLAND_DISPLAY',
+  'DBUS_SESSION_BUS_ADDRESS',
+  'SSH_AUTH_SOCK',
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'FTP_PROXY',
+  'ALL_PROXY',
+  'NO_PROXY',
   // Windows: no startup file sets these; the system gives them to each program it starts
-  'SYSTEMROOT', 'SYSTEMDRIVE', 'WINDIR', 'COMSPEC', 'PATHEXT', 'USERPROFILE', 'USERNAME', 'USERDOMAIN', 'HOMEDRIVE', 'HOMEPATH',
-  'APPDATA', 'LOCALAPPDATA', 'PROGRAMDATA', 'ALLUSERSPROFILE', 'PUBLIC', 'PROGRAMFILES', 'PROGRAMFILES(X86)', 'PROGRAMW6432',
-  'COMMONPROGRAMFILES', 'COMMONPROGRAMFILES(X86)', 'COMMONPROGRAMW6432', 'TEMP', 'TMP', 'OS', 'COMPUTERNAME',
-  'PROCESSOR_ARCHITECTURE', 'PROCESSOR_IDENTIFIER', 'NUMBER_OF_PROCESSORS', 'PSMODULEPATH',
+  'SYSTEMROOT',
+  'SYSTEMDRIVE',
+  'WINDIR',
+  'COMSPEC',
+  'PATHEXT',
+  'USERPROFILE',
+  'USERNAME',
+  'USERDOMAIN',
+  'HOMEDRIVE',
+  'HOMEPATH',
+  'APPDATA',
+  'LOCALAPPDATA',
+  'PROGRAMDATA',
+  'ALLUSERSPROFILE',
+  'PUBLIC',
+  'PROGRAMFILES',
+  'PROGRAMFILES(X86)',
+  'PROGRAMW6432',
+  'COMMONPROGRAMFILES',
+  'COMMONPROGRAMFILES(X86)',
+  'COMMONPROGRAMW6432',
+  'TEMP',
+  'TMP',
+  'OS',
+  'COMPUTERNAME',
+  'PROCESSOR_ARCHITECTURE',
+  'PROCESSOR_IDENTIFIER',
+  'NUMBER_OF_PROCESSORS',
+  'PSMODULEPATH',
 ]);
 const PREFIXES = ['LC_', 'XDG_'];
 
@@ -22,7 +65,8 @@ export function terminalEnvironment(source: NodeJS.ProcessEnv = process.env): Re
   const kept: Record<string, string> = {};
   for (const [name, value] of Object.entries(source)) {
     const upper = name.toUpperCase();
-    if (value !== undefined && (NAMES.has(upper) || PREFIXES.some(prefix => upper.startsWith(prefix)))) kept[name] = value;
+    if (value !== undefined && (NAMES.has(upper) || PREFIXES.some((prefix) => upper.startsWith(prefix))))
+      kept[name] = value;
   }
   return kept;
 }

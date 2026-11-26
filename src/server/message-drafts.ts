@@ -10,7 +10,15 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 import fs from 'node:fs';
 import path from 'node:path';
 import { filesProblem, type DraftLook, type LookedFile, type ModelDraft } from '../block-drafts.js';
-import { checkDraftEdit, draftProblems, fieldsWithin, type DraftFields, type DraftSending, type DraftState as DraftWhere, type SendResult } from '../message-draft.js';
+import {
+  checkDraftEdit,
+  draftProblems,
+  fieldsWithin,
+  type DraftFields,
+  type DraftSending,
+  type DraftState as DraftWhere,
+  type SendResult,
+} from '../message-draft.js';
 import type { MessageDraft } from './contracts.js';
 import { forModelOf, toldSent, toldSettled } from './draft-told.js';
 import { log, stableJson, whoOf } from './records.js';
@@ -22,8 +30,16 @@ import { asText } from '../format.js';
  *  it failed), how many times that changed (the window's own "Sending…" waits for the next), and when the window's last
  *  edits came. */
 export type KeptDraft = {
-  view: string; panel: string; id: string; token: string; model: ModelDraft;
-  edited?: DraftFields; state: DraftWhere; reason?: string; rev: number; edits: number[];
+  view: string;
+  panel: string;
+  id: string;
+  token: string;
+  model: ModelDraft;
+  edited?: DraftFields;
+  state: DraftWhere;
+  reason?: string;
+  rev: number;
+  edits: number[];
 };
 /** A draft as a checkpoint keeps it: the person's fields where they changed them and how its send went, and which mail
  *  the model drafted (of: a digest of it), never the mail itself, which may be what a result held. A send under way is
@@ -31,14 +47,30 @@ export type KeptDraft = {
 export type SavedDraft = Pick<KeptDraft, 'view' | 'panel' | 'id' | 'edited' | 'state' | 'reason'> & { of: string };
 
 const keyOf = (view: string, panel: string) => `${view}/${panel}`;
-const newDraft = (view: string, panel: string, model: ModelDraft): KeptDraft =>
-  ({ view, panel, id: randomUUID(), token: randomBytes(16).toString('hex'), model, state: 'draft', rev: 0, edits: [] });
+const newDraft = (view: string, panel: string, model: ModelDraft): KeptDraft => ({
+  view,
+  panel,
+  id: randomUUID(),
+  token: randomBytes(16).toString('hex'),
+  model,
+  state: 'draft',
+  rev: 0,
+  edits: [],
+});
 /** Which mail the model drafted, as a checkpoint names it: the same draft is always the same digest. */
 export const digestOf = (model: ModelDraft): string => createHash('sha256').update(stableJson(model)).digest('hex');
 /** A draft a checkpoint kept, of the mail drawn now: as the person left it, with a token of this window's. */
 const fromSaved = (s: SavedDraft, model: ModelDraft): KeptDraft => ({
-  view: s.view, panel: s.panel, id: s.id, token: randomBytes(16).toString('hex'), model,
-  ...(s.edited ? { edited: structuredClone(s.edited) } : {}), state: s.state, ...(s.reason ? { reason: s.reason } : {}), rev: 0, edits: [],
+  view: s.view,
+  panel: s.panel,
+  id: s.id,
+  token: randomBytes(16).toString('hex'),
+  model,
+  ...(s.edited ? { edited: structuredClone(s.edited) } : {}),
+  state: s.state,
+  ...(s.reason ? { reason: s.reason } : {}),
+  rev: 0,
+  edits: [],
 });
 
 /** The files a draft attaches, by their paths in the working folder: each one's name and size, read now through the
@@ -49,7 +81,13 @@ function filesOf(session: Session, paths: readonly string[]): (LookedFile & { re
     try {
       const found = session.process.work ? session.runtime.host.workPath(session.key, given) : null;
       const folder = !!found && path.posix.basename(found.rel) === 'index.html' && name !== 'index.html'; // a folder's page
-      if (found && !folder) return { path: given, rel: found.rel, name: path.posix.basename(found.rel), size: fs.statSync(found.file).size };
+      if (found && !folder)
+        return {
+          path: given,
+          rel: found.rel,
+          name: path.posix.basename(found.rel),
+          size: fs.statSync(found.file).size,
+        };
     } catch {
       // gone while it was read, or not readable: missing, as any file that is not there
     }
@@ -77,8 +115,16 @@ function sendingOf(session: Session): DraftSending {
 /** The person's draft of a panel, for a drawing of it: the one kept, while the model's draft is the same and this is
  *  not the model's showing anew, or a new one; with the files it attaches as read now. A new draft whose files are not
  *  all there, or too large together, is refused. mounts: where a showing keeps it, once it has passed its checks. */
-export function draftLook(session: Session, view: string, panel: string, model: ModelDraft, anew: boolean, mounts?: (() => void)[]): DraftLook {
-  const had = session.drafts.get(keyOf(view, panel)), saved = session.savedDrafts.get(keyOf(view, panel));
+export function draftLook(
+  session: Session,
+  view: string,
+  panel: string,
+  model: ModelDraft,
+  anew: boolean,
+  mounts?: (() => void)[],
+): DraftLook {
+  const had = session.drafts.get(keyOf(view, panel)),
+    saved = session.savedDrafts.get(keyOf(view, panel));
   let kept: KeptDraft | undefined;
   if (!anew && had && stableJson(had.model) === stableJson(model)) kept = had;
   else if (!anew && saved && saved.of === digestOf(model)) kept = fromSaved(saved, model); // a checkpoint's, drawn again
@@ -88,7 +134,15 @@ export function draftLook(session: Session, view: string, panel: string, model: 
   if (refused) throw new Error(refused);
   mounts?.push(() => session.drafts.set(keyOf(view, panel), d));
   const theirs = d.edited ? { fields: d.edited, modelFiles: filesOf(session, model.fields.attachments) } : {}; // the model's account is of its own draft
-  return { token: d.token, state: d.state, rev: d.rev, ...(d.reason ? { reason: d.reason } : {}), ...theirs, files, sending: sendingOf(session) };
+  return {
+    token: d.token,
+    state: d.state,
+    rev: d.rev,
+    ...(d.reason ? { reason: d.reason } : {}),
+    ...theirs,
+    files,
+    sending: sendingOf(session),
+  };
 }
 /** A view's drafts go: before a showing keeps those it draws, and with the view; a checkpoint's with them. */
 export const dropDrafts = (session: Session, view: string) => {
@@ -100,7 +154,9 @@ export const dropDrafts = (session: Session, view: string) => {
 const redraw = (session: Session, view: string) => {
   const args = session.specs.get(view);
   if (args && !session.closed)
-    void session.present(args, true, true).catch((e) => log(session, { drafts: { redraw: view, failed: String((e as Error).message) } }));
+    void session
+      .present(args, true, true)
+      .catch((e) => log(session, { drafts: { redraw: view, failed: String((e as Error).message) } }));
 };
 /** Every view with a draft, drawn again: the host's messageSending says something else now. */
 export const messagesChanged = (session: Session) => {
@@ -109,7 +165,8 @@ export const messagesChanged = (session: Session) => {
 
 /** Whether an event carries the token of the draft it is about: only the window that draws the draft has it. */
 const fromWindow = (d: KeptDraft, token: unknown) => {
-  const given = Buffer.from(typeof token === 'string' ? token : ''), own = Buffer.from(d.token);
+  const given = Buffer.from(typeof token === 'string' ? token : ''),
+    own = Buffer.from(d.token);
   return given.length === own.length && timingSafeEqual(given, own);
 };
 /** What the window says of a draft: the person's edit, their Send, or their click on the host's own action. Only from
@@ -127,7 +184,8 @@ export function draftEvent(session: Session, x: Record<string, unknown>): boolea
  *  as often as the window may say (checkDraftEdit), with only the files the model attached. Never told to the model. */
 const edited = (d: KeptDraft, fields: unknown): boolean => {
   if (d.state === 'sending' || d.state === 'sent') return false;
-  const { recent, why } = checkDraftEdit(d.edits, fields), got = fieldsWithin(fields);
+  const { recent, why } = checkDraftEdit(d.edits, fields),
+    got = fieldsWithin(fields);
   if (why || !got || !got.attachments.every((p) => d.model.fields.attachments.includes(p))) return false;
   d.edits = [...recent, Date.now()];
   d.edited = got;
@@ -141,7 +199,10 @@ function sendFromWindow(session: Session, d: KeptDraft, x: Record<string, unknow
   const fields = fieldsWithin(x.fields);
   if (!fields || !fields.attachments.every((p) => d.model.fields.attachments.includes(p))) return false;
   const files = filesOf(session, fields.attachments);
-  const why = draftProblems(fields).map((p) => p.why).join('; ') || filesProblem(files);
+  const why =
+    draftProblems(fields)
+      .map((p) => p.why)
+      .join('; ') || filesProblem(files);
   d.edited = fields;
   d.rev++;
   if (why) {
@@ -156,8 +217,14 @@ function sendFromWindow(session: Session, d: KeptDraft, x: Record<string, unknow
   log(session, { person: { draft: d.id, view: d.view, panel: d.panel, send: true, by } });
   const { format, original } = d.model;
   const draft: MessageDraft = {
-    id: d.id, view: d.view, panel: d.panel, ...fields, format, ...(original ? { in_reply_to: original } : {}),
-    attachments: files.map((f) => ({ path: f.rel ?? f.path, name: f.name, size: f.size })), by,
+    id: d.id,
+    view: d.view,
+    panel: d.panel,
+    ...fields,
+    format,
+    ...(original ? { in_reply_to: original } : {}),
+    attachments: files.map((f) => ({ path: f.rel ?? f.path, name: f.name, size: f.size })),
+    by,
   };
   void sent(session, d, draft);
   return true;
@@ -169,7 +236,9 @@ const reasonOf = (said: unknown) => (typeof said === 'string' ? said.replace(/\s
  *  a throw, is unknown, as it may have gone. */
 const outcomeOf = (r: unknown): SendResult => {
   const o = (r && typeof r === 'object' ? r : {}) as { outcome?: unknown; reason?: unknown; forModel?: unknown };
-  const reason = reasonOf(o.reason), forModel = forModelOf(o.forModel), told = forModel ? { forModel } : {};
+  const reason = reasonOf(o.reason),
+    forModel = forModelOf(o.forModel),
+    told = forModel ? { forModel } : {};
   if (o.outcome === 'sent') return { outcome: 'sent', ...told };
   if (o.outcome === 'failed') return { outcome: 'failed', reason: reason || 'the host gave no reason', ...told };
   if (o.outcome === 'unknown') return { outcome: 'unknown', ...(reason ? { reason } : {}), ...told };
@@ -194,7 +263,13 @@ async function sent(session: Session, d: KeptDraft, draft: MessageDraft) {
  *  draft locks; or failed, with the person's reason, and they may change it and send it again. The draft is drawn
  *  again and the model told once, in Vindu's words and the host's forModel alone. Only for a draft drawn in this window
  *  whose last send ended unknown (or was under way when its task was kept); anything else is refused (false). */
-export function settleDraft(session: Session, id: unknown, outcome: unknown, reason?: unknown, forModel?: unknown): boolean {
+export function settleDraft(
+  session: Session,
+  id: unknown,
+  outcome: unknown,
+  reason?: unknown,
+  forModel?: unknown,
+): boolean {
   if (session.closed || (outcome !== 'sent' && outcome !== 'failed')) return false;
   const d = [...session.drafts.values()].find((x) => x.id === id);
   if (!d || d.state !== 'unknown') return false;
@@ -203,8 +278,13 @@ export function settleDraft(session: Session, id: unknown, outcome: unknown, rea
   delete d.reason;
   if ('reason' in result && result.reason) d.reason = result.reason;
   d.rev++;
-  const { format, original } = d.model, fields = d.edited ?? d.model.fields; // as it was last sent
-  toldSettled(session, { id: d.id, view: d.view, panel: d.panel, fields, format, ...(original ? { original } : {}) }, result);
+  const { format, original } = d.model,
+    fields = d.edited ?? d.model.fields; // as it was last sent
+  toldSettled(
+    session,
+    { id: d.id, view: d.view, panel: d.panel, fields, format, ...(original ? { original } : {}) },
+    result,
+  );
   redraw(session, d.view);
   return true;
 }
@@ -216,7 +296,9 @@ function hostAction(session: Session, d: KeptDraft, by: { name: string; window: 
   try {
     session.more.onMessageAction({ id: d.id, view: d.view, panel: d.panel, by });
   } catch (e) {
-    log(session, { drafts: { draft: d.id, action: sending.action, failed: String((e as Error).message).slice(0, 200) } });
+    log(session, {
+      drafts: { draft: d.id, action: sending.action, failed: String((e as Error).message).slice(0, 200) },
+    });
   }
   log(session, { person: { draft: d.id, view: d.view, action: sending.action, by } });
   return true;
@@ -225,8 +307,14 @@ function hostAction(session: Session, d: KeptDraft, by: { name: string; window: 
 /** The drafts, for a checkpoint: those drawn, and those a checkpoint kept that no view has drawn again. */
 export const savedDrafts = (session: Session): SavedDraft[] => [
   ...[...session.drafts.values()].map((d) => ({
-    view: d.view, panel: d.panel, id: d.id, of: digestOf(d.model), ...(d.edited ? { edited: d.edited } : {}),
-    ...(d.state === 'sending' ? { state: 'unknown' as const, reason: 'the task was kept while it was being sent' } : { state: d.state, ...(d.reason ? { reason: d.reason } : {}) }),
+    view: d.view,
+    panel: d.panel,
+    id: d.id,
+    of: digestOf(d.model),
+    ...(d.edited ? { edited: d.edited } : {}),
+    ...(d.state === 'sending'
+      ? { state: 'unknown' as const, reason: 'the task was kept while it was being sent' }
+      : { state: d.state, ...(d.reason ? { reason: d.reason } : {}) }),
   })),
   ...[...session.savedDrafts.values()].map((d) => structuredClone(d)),
 ];

@@ -64,7 +64,8 @@ export function openSession(
   const key = host.add({ ...inFolder, results });
   holdResults(proc.results);
   const session: Session = {
-    present: (args, redraw, restoring, committed, anew, by) => present(session, args, redraw, restoring, committed, anew, by),
+    present: (args, redraw, restoring, committed, anew, by) =>
+      present(session, args, redraw, restoring, committed, anew, by),
     fireHooks: (view, event, only) => fire(session, view, event, only),
     resumeWaiting: () => wake(session),
     runtime,
@@ -210,12 +211,7 @@ export function openSession(
         (session.mode
           ? templateNote(
               session.mode.template,
-              Object.fromEntries(
-                [...session.mode.fills].map(([n, f]) => [
-                  n,
-                  `filled by ${FILLED_BY[f.by]}`,
-                ]),
-              ),
+              Object.fromEntries([...session.mode.fills].map(([n, f]) => [n, `filled by ${FILLED_BY[f.by]}`])),
             )
           : '')
       );
@@ -235,15 +231,11 @@ export function openSession(
       const it = await session.live?.pointAt(view, ms);
       if (!it) return null;
       setPicked(session, [
-        ...session.picked.filter(
-          (x) => !(x.view === view && x.element !== undefined && x.element === it.element),
-        ),
+        ...session.picked.filter((x) => !(x.view === view && x.element !== undefined && x.element === it.element)),
         it,
       ]);
       log(session, { person: { points: session.picked.length } });
-      return (
-        resolved(session).find((x) => x.view === view && x.role === it.role && x.name === it.name) ?? null
-      );
+      return resolved(session).find((x) => x.view === view && x.role === it.role && x.name === it.name) ?? null;
     },
     stopPointing: (view: string) => session.live?.stopPointing(view),
     /** What goes with the next message: what the person points at (kept as their answer, then cleared) and the panes in the chat. */
@@ -288,7 +280,8 @@ export function openSession(
     /** How the window shows what the views hold now (auto, cards or content), and whether it is narrow: each one given
      *  in place of the one it had (open's presentation and narrow). The window draws it at once, and the model's look
      *  says it. One that is none is refused (a RangeError), and nothing changes. */
-    setPresentation: (as?: Presentation, o: { narrow?: boolean } = {}) => session.shell.setPresentation(presentationGiven(as, o)),
+    setPresentation: (as?: Presentation, o: { narrow?: boolean } = {}) =>
+      session.shell.setPresentation(presentationGiven(as, o)),
     /** The host's messageSending says something else now (a mail connection made, or gone): every mail drafted for the
      *  person is drawn again, with Send, or the host's own action in its place. */
     messagesChanged: () => messagesChanged(session),

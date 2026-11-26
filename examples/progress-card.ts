@@ -15,14 +15,19 @@ export const progress: CardDef = {
     done: z.string().optional().describe('progress: the field with how much is done'),
     total: z.string().optional().describe('progress: the field with the whole'),
   },
-  shows: p => [p.label, p.done, p.total].filter((f): f is string => typeof f === 'string'),
+  shows: (p) => [p.label, p.done, p.total].filter((f): f is string => typeof f === 'string'),
   check: (rows, p) => {
-    const need = (['label', 'done', 'total'] as const).filter(k => typeof p[k] !== 'string');
+    const need = (['label', 'done', 'total'] as const).filter((k) => typeof p[k] !== 'string');
     const { done, total } = p;
-    if (need.length || typeof done !== 'string' || typeof total !== 'string') return `progress needs ${need.join(' and ')}: the fields that name each row, say how much is done, and give the whole`;
-    const bad = rows.filter(r => !Number.isFinite(num(r[done])) || !(num(r[total]) > 0)).length;
-    return bad ? `"${done}" and "${total}" must be numbers, the whole above 0, in every row; ${bad} rows are not` : null;
+    if (need.length || typeof done !== 'string' || typeof total !== 'string')
+      return `progress needs ${need.join(' and ')}: the fields that name each row, say how much is done, and give the whole`;
+    const bad = rows.filter((r) => !Number.isFinite(num(r[done])) || !(num(r[total]) > 0)).length;
+    return bad
+      ? `"${done}" and "${total}" must be numbers, the whole above 0, in every row; ${bad} rows are not`
+      : null;
   },
-  props: p => ({ label: p.label, done: p.done, total: p.total }),
-  account: (rows, p) => ({ complete: rows.filter(r => num(r[p.done as string]) >= num(r[p.total as string])).length }),
+  props: (p) => ({ label: p.label, done: p.done, total: p.total }),
+  account: (rows, p) => ({
+    complete: rows.filter((r) => num(r[p.done as string]) >= num(r[p.total as string])).length,
+  }),
 };

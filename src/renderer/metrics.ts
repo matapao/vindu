@@ -19,7 +19,13 @@ export const typeSize = (px: number) => `calc(var(--v-font-size, 13px) * ${px} /
 export const headingSize = (px: number) => `calc(var(--v-heading-size, ${typeSize(22)}) * ${px} / 22)`;
 export const captionSize = (px: number) => `calc(var(--v-caption-size, ${typeSize(12)}) * ${px} / 12)`;
 
-const variables = { headingSize: '--v-heading-size', captionSize: '--v-caption-size', spacing: '--v-spacing', fontSize: '--v-font-size', density: '--v-density' } as const;
+const variables = {
+  headingSize: '--v-heading-size',
+  captionSize: '--v-caption-size',
+  spacing: '--v-spacing',
+  fontSize: '--v-font-size',
+  density: '--v-density',
+} as const;
 const keys = Object.keys(variables) as (keyof ViewMetrics)[];
 
 // Use CSSOM on this element. Preserve host-owned inline styles when a mount is reset or removed.
@@ -52,7 +58,11 @@ export function setMetrics(root: HTMLElement, metrics: ViewMetrics): () => void 
 }
 
 // MCP Apps interpret rem against their own document. Send the host's resolved pixel sizes instead.
-const appFonts = { fontSize: '--font-text-md-size', headingSize: '--font-heading-md-size', captionSize: '--font-text-sm-size' } as const;
+const appFonts = {
+  fontSize: '--font-text-md-size',
+  headingSize: '--font-heading-md-size',
+  captionSize: '--font-text-sm-size',
+} as const;
 export function appFontVariables(root: HTMLElement): Record<string, string> {
   const result: Record<string, string> = {};
   const enabled = root.dataset.vinduMetrics?.split(' ') ?? [];
@@ -60,7 +70,9 @@ export function appFontVariables(root: HTMLElement): Record<string, string> {
     if (!enabled.includes(key)) continue;
     const value = root.style.getPropertyValue(variables[key]).trim().toLowerCase();
     const view = root.ownerDocument.defaultView ?? window;
-    const unit = value.endsWith('rem') ? parseFloat(view.getComputedStyle(root.ownerDocument.documentElement).fontSize) : 1;
+    const unit = value.endsWith('rem')
+      ? parseFloat(view.getComputedStyle(root.ownerDocument.documentElement).fontSize)
+      : 1;
     const px = parseFloat(value) * unit;
     if (Number.isFinite(px)) result[appFonts[key]] = `${px}px`; // a variable the host cleared since says nothing
   }

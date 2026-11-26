@@ -84,7 +84,10 @@ export function registerShowTools(server: McpServer, session: Session, has: Has)
   server.registerTool(
     'show_view',
     {
-      description: showText(has) + (offersDrafts(session.runtime.cards) ? DRAFTS_TEXT : '') + (offersWeek(session.runtime.cards) ? WEEK_TEXT : ''),
+      description:
+        showText(has) +
+        (offersDrafts(session.runtime.cards) ? DRAFTS_TEXT : '') +
+        (offersWeek(session.runtime.cards) ? WEEK_TEXT : ''),
       inputSchema: has.pages ? session.runtime.showView : session.runtime.showViewPlain,
       annotations: HINTS.ui, // the boundary check; each card's own check runs after the data is resolved
     },
@@ -111,8 +114,7 @@ export function registerShowTools(server: McpServer, session: Session, has: Has)
           );
         const held = heldName(session, named);
         if (held) throw new Refusal(held);
-        if (!named || !(args as { title?: unknown }).title)
-          throw new Refusal('a view needs a name and a title');
+        if (!named || !(args as { title?: unknown }).title) throw new Refusal('a view needs a name and a title');
         const into = (args as { place?: Place }).place?.into;
         if (into && askPanes(session).includes(into))
           throw new Refusal(

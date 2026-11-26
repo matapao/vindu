@@ -74,5 +74,5 @@ all in TypeScript. This file is for the people and coding agents who change it.
 - Add Markdown besides README.md, AGENTS.md and `.github/SECURITY.md`, or a file over 500 lines.
 - Add a suppression without its reason (`-- <reason>`, `@ts-expect-error <reason>`).
 - Edit generated files: `pnpm-lock.yaml` (pnpm), `scripts/fixtures/pnpm-lock.yaml` (`pnpm test:package
-  --update-lockfile`), `patches/` (`pnpm patch-commit`), and nothing in `dist/` or `out/`.
+--update-lockfile`), `patches/` (`pnpm patch-commit`), and nothing in `dist/` or `out/`.
 - Call a model from a test, or reach the network beyond loopback.

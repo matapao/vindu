@@ -30,21 +30,35 @@ export const act = async (
       if (!last) return { refusal: `nothing to undo in "${title}"` };
       if (by === 'model' && last.by !== 'model')
         return { refusal: `the last change in "${title}" is the person's (${last.what}): only they undo it` };
-      const account = await session.present(last.args, true, false, () => {
-        if (h.at(-1) === last) h.pop();
-        done?.(`undid "${last.what}"`);
-      }, false, by);
+      const account = await session.present(
+        last.args,
+        true,
+        false,
+        () => {
+          if (h.at(-1) === last) h.pop();
+          done?.(`undid "${last.what}"`);
+        },
+        false,
+        by,
+      );
       const prev = h.at(-1);
       session.shell.mark(view, prev ? { text: markOf(prev.what), by: prev.by, undo: true } : undefined);
       return { what: `undid "${last.what}"`, account };
     }
     const r = applyAction(args, session.data.get(view), a, title, session.runtime.cards);
     if ('refusal' in r) return r;
-    const account = await session.present(r.args, true, false, () => {
-      h.push({ args, by, what: r.what });
-      session.vhistory.set(view, h.slice(-20));
-      done?.(r.what);
-    }, false, by); // its pane stays as it is
+    const account = await session.present(
+      r.args,
+      true,
+      false,
+      () => {
+        h.push({ args, by, what: r.what });
+        session.vhistory.set(view, h.slice(-20));
+        done?.(r.what);
+      },
+      false,
+      by,
+    ); // its pane stays as it is
     if (r.mark) session.shell.mark(view, { text: r.mark, by, undo: true }); // a row picked for linked panels is no change to mark
     if (a.action === 'select') {
       wakeWaiting(session); // what waited for a pick goes on
@@ -80,12 +94,11 @@ export const personAct = (
     .catch((e) => log(session, { person: { view, action: a, failed: String((e as Error).message) } }));
   return true;
 };
-export const viewAction = (x: Record<string, unknown>): ViewAction =>
-  ({
-    action: x.action as ViewAction['action'],
-    ...Object.fromEntries(
-      (['panel', 'field', 'dir', 'value', 'key', 'from', 'to', 'keys', 'start', 'end'] as const)
-        .filter((k) => x[k] !== undefined)
-        .map((k) => [k, x[k]]),
-    ),
-  });
+export const viewAction = (x: Record<string, unknown>): ViewAction => ({
+  action: x.action as ViewAction['action'],
+  ...Object.fromEntries(
+    (['panel', 'field', 'dir', 'value', 'key', 'from', 'to', 'keys', 'start', 'end'] as const)
+      .filter((k) => x[k] !== undefined)
+      .map((k) => [k, x[k]]),
+  ),
+});

@@ -14,10 +14,14 @@ export const sessionWords = (runtime: ServerRuntime, words?: PartialViewWords): 
  *  RangeError for a locale that is no language tag, or a time zone that is not one. */
 export function formatOver(under: ViewFormat, given: Partial<ViewFormat> = {}): ViewFormat {
   const { locale = under.locale, timeZone = under.timeZone } = given;
-  try { Intl.getCanonicalLocales(locale); } catch {
+  try {
+    Intl.getCanonicalLocales(locale);
+  } catch {
     throw new RangeError(`locale: "${locale}" is not a language tag (BCP 47), e.g. "nb-NO"`);
   }
-  try { new Intl.DateTimeFormat('en-GB', { timeZone }); } catch {
+  try {
+    new Intl.DateTimeFormat('en-GB', { timeZone });
+  } catch {
     throw new RangeError(`timeZone: "${timeZone}" is not a time zone (IANA), e.g. "Europe/Oslo"`);
   }
   return { locale, timeZone };
@@ -29,7 +33,11 @@ export function formatOver(under: ViewFormat, given: Partial<ViewFormat> = {}): 
  *  but how it reads, so it is painted again as a restored view is: no page is checked, no source read and no hook run
  *  again, and the model is told nothing, as what it is told is in English either way. The account of each view, as
  *  later read, says the locale it is drawn in. A locale or time zone that is none is refused before anything changes. */
-export const setViewWords = async (session: Session, words?: PartialViewWords, format?: Partial<ViewFormat>): Promise<void> => {
+export const setViewWords = async (
+  session: Session,
+  words?: PartialViewWords,
+  format?: Partial<ViewFormat>,
+): Promise<void> => {
   if (session.closed) return;
   const next = formatOver(session.format, format);
   session.viewWords = sessionWords(session.runtime, words);

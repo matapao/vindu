@@ -12,7 +12,9 @@ const NAMED_SECRET = /(?:^|[^a-z])(?:credentials?|secrets?)(?:[^a-z]|$)/i;
 const DATA_EXTENSION = /^(?:|json|ya?ml|toml|ini|txt|env|conf|cfg|xml|properties)$/i;
 export function secretName(name: string): boolean {
   if (KEY_FILE.test(name)) return true;
-  const dot = name.lastIndexOf('.'), stem = dot > 0 ? name.slice(0, dot) : name, extension = dot > 0 ? name.slice(dot + 1) : '';
+  const dot = name.lastIndexOf('.'),
+    stem = dot > 0 ? name.slice(0, dot) : name,
+    extension = dot > 0 ? name.slice(dot + 1) : '';
   return NAMED_SECRET.test(stem) && DATA_EXTENSION.test(extension);
 }
 /** A name nothing here reads: a dot name, or one that holds secrets by convention. */
@@ -29,19 +31,28 @@ export function inside(base: string, rel: string): string | null {
   const target = path.resolve(real, rel);
   if (!fs.existsSync(target)) return null;
   let t = fs.realpathSync(target);
-  if (fs.statSync(t).isDirectory()) { t = path.join(t, 'index.html'); if (!fs.existsSync(t)) return null; t = fs.realpathSync(t); }
+  if (fs.statSync(t).isDirectory()) {
+    t = path.join(t, 'index.html');
+    if (!fs.existsSync(t)) return null;
+    t = fs.realpathSync(t);
+  }
   return within(real, t, fs.statSync(t).isFile());
 }
 /** inside, without blocking: the page host shares its event loop with the MCP endpoint. root is base's real path,
  *  for a folder found once because it never moves; without it, base is found again. */
 export async function insideAsync(base: string, rel: string, root?: string): Promise<string | null> {
   try {
-    const real = root ?? await fsp.realpath(base);
+    const real = root ?? (await fsp.realpath(base));
     let t = await fsp.realpath(path.resolve(real, rel));
     let st = await fsp.stat(t);
-    if (st.isDirectory()) { t = await fsp.realpath(path.join(t, 'index.html')); st = await fsp.stat(t); }
+    if (st.isDirectory()) {
+      t = await fsp.realpath(path.join(t, 'index.html'));
+      st = await fsp.stat(t);
+    }
     return within(real, t, st.isFile());
-  } catch { return null; } // not there, or not readable: not served
+  } catch {
+    return null;
+  } // not there, or not readable: not served
 }
 /** A path under a folder as an address path: each part encoded. */
 export const href = (rel: string) => rel.split('/').map(encodeURIComponent).join('/');
@@ -51,12 +62,16 @@ export const STATIC_QUERY = 'static=1';
 /** Whether an address's query asks for a static page, wherever in it STATIC_QUERY is. */
 export const asksStatic = (query: URLSearchParams) => query.getAll('static').includes('1');
 /** A page in the working folder: an HTML file, or a folder with an index.html. */
-export const page = (work: string, rel: string) => { const f = inside(work, rel.replace(/^\/+/, '') || 'index.html'); return f && /\.html?$/i.test(f) ? f : null; };
+export const page = (work: string, rel: string) => {
+  const f = inside(work, rel.replace(/^\/+/, '') || 'index.html');
+  return f && /\.html?$/i.test(f) ? f : null;
+};
 export function pagesIn(root: string, dir = root, out: string[] = []): string[] {
   for (const d of fs.readdirSync(dir, { withFileTypes: true })) {
     if (out.length >= 40 || hidden(d.name) || d.name === 'node_modules') continue;
     const p = path.join(dir, d.name);
-    if (d.isDirectory()) pagesIn(root, p, out); else if (/\.html?$/i.test(d.name)) out.push(path.relative(root, p).split(path.sep).join('/'));
+    if (d.isDirectory()) pagesIn(root, p, out);
+    else if (/\.html?$/i.test(d.name)) out.push(path.relative(root, p).split(path.sep).join('/'));
   }
   return out;
 }
@@ -64,23 +79,43 @@ export function pagesIn(root: string, dir = root, out: string[] = []): string[] 
 /** Changes in a folder, debounced, without node_modules, dot names or files of secrets (a project can hold many thousands
  *  of those), and never through a link: a link to / or to a home folder would watch what is outside the folder. */
 export function watchFolder(root: string, onChange: (paths: string[]) => void, debounceMs = 100): () => void {
-  const watchers = new Map<string, fs.FSWatcher>(); let pending = new Set<string>(); let timer: NodeJS.Timeout | undefined;
+  const watchers = new Map<string, fs.FSWatcher>();
+  let pending = new Set<string>();
+  let timer: NodeJS.Timeout | undefined;
   const skip = (name: string) => name === 'node_modules' || hidden(name);
-  const flush = () => { const paths = [...pending]; pending = new Set(); if (paths.length) onChange(paths); };
+  const flush = () => {
+    const paths = [...pending];
+    pending = new Set();
+    if (paths.length) onChange(paths);
+  };
   const add = (dir: string) => {
     if (watchers.size >= 2000 || watchers.has(dir)) return;
     try {
       const w = fs.watch(dir, (_event, name) => {
         if (!name || skip(String(name))) return;
         const full = path.join(dir, String(name));
-        pending.add(path.relative(root, full).split(path.sep).join('/')); clearTimeout(timer); timer = setTimeout(flush, debounceMs);
-        fs.lstat(full, (err, st) => { if (!err && st.isDirectory()) add(full); }); // a link is not followed
+        pending.add(path.relative(root, full).split(path.sep).join('/'));
+        clearTimeout(timer);
+        timer = setTimeout(flush, debounceMs);
+        fs.lstat(full, (err, st) => {
+          if (!err && st.isDirectory()) add(full);
+        }); // a link is not followed
       });
-      w.on('error', () => { w.close(); watchers.delete(dir); });
+      w.on('error', () => {
+        w.close();
+        watchers.delete(dir);
+      });
       watchers.set(dir, w);
-      for (const d of fs.readdirSync(dir, { withFileTypes: true })) if (d.isDirectory() && !skip(d.name)) add(path.join(dir, d.name));
-    } catch { /* the folder went away */ }
+      for (const d of fs.readdirSync(dir, { withFileTypes: true }))
+        if (d.isDirectory() && !skip(d.name)) add(path.join(dir, d.name));
+    } catch {
+      /* the folder went away */
+    }
   };
   add(root);
-  return () => { clearTimeout(timer); for (const w of watchers.values()) w.close(); watchers.clear(); };
+  return () => {
+    clearTimeout(timer);
+    for (const w of watchers.values()) w.close();
+    watchers.clear();
+  };
 }

@@ -70,13 +70,7 @@ const operate = (
   unawaited(
     session,
     { preview: { ticket: p.ask.ticket } },
-    showPreview(
-      session,
-      p,
-      input,
-      previewFor(op, input),
-      op.name,
-    ),
+    showPreview(session, p, input, previewFor(op, input), op.name),
   );
   p.finished = p.outcome.then(async (r) => {
     if (r.action !== 'accept') {
@@ -102,12 +96,7 @@ const operate = (
 };
 
 export const operationInput = (op: Operation) => z.object(op.input ?? {});
-export const runFor = async (
-  session: Session,
-  op: Operation,
-  input: Record<string, unknown>,
-  signal?: AbortSignal,
-) => {
+export const runFor = async (session: Session, op: Operation, input: Record<string, unknown>, signal?: AbortSignal) => {
   const allowed = session.mode?.template.operations;
   if (allowed && !allowed.includes(op.name))
     return text(

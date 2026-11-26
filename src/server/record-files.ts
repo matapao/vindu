@@ -16,7 +16,7 @@ export const writeLine = (session: Session, file: RecordFile, line: string): voi
   let fd = session.files.get(file);
   if (fd === undefined) session.files.set(file, (fd = fs.openSync(at, 'a', 0o600)));
   const bytes = Buffer.from(`${line}\n`);
-  for (let written = 0; written < bytes.length; ) written += fs.writeSync(fd, bytes, written);
+  for (let written = 0; written < bytes.length;) written += fs.writeSync(fd, bytes, written);
 };
 /** The session's files, closed with it. */
 export const closeFiles = (session: Session): void => {
@@ -26,7 +26,8 @@ export const closeFiles = (session: Session): void => {
 
 // a local log of every view call and every answer, kept with the process (never sent anywhere)
 const logLine = (e: Record<string, unknown>) => JSON.stringify({ at: new Date().toISOString(), ...e });
-export const log = (session: Session, e: Record<string, unknown>): void => writeLine(session, 'ui-calls.jsonl', logLine(e));
+export const log = (session: Session, e: Record<string, unknown>): void =>
+  writeLine(session, 'ui-calls.jsonl', logLine(e));
 /** A JSON reply that the log keeps too, under key: it is written as JSON once, for both. */
 export const logged = (session: Session, e: Record<string, unknown>, key: string, reply: unknown): string => {
   const out = JSON.stringify(reply);

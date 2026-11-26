@@ -15,7 +15,11 @@ export type DrawnCells = { fields: string[]; rows: number };
  *  header) and the column, each from 0. */
 export type PlacedNote = { n: number; cell: string; note: string; row: number; column: number };
 
-const notesOf = (p: PanelSpec) => ((p.notes ?? []) as { cell?: unknown; note?: unknown }[]).map(x => ({ cell: asText(x?.cell ?? ''), note: asText(x?.note ?? '') }));
+const notesOf = (p: PanelSpec) =>
+  ((p.notes ?? []) as { cell?: unknown; note?: unknown }[]).map((x) => ({
+    cell: asText(x?.cell ?? ''),
+    note: asText(x?.note ?? ''),
+  }));
 /** How many characters a text has, as a person counts them. */
 const charactersIn = (text: string) => Array.from(new Intl.Segmenter().segment(text)).length;
 
@@ -24,11 +28,13 @@ export function notesProblem(p: PanelSpec, drawn: DrawnCells): string | null {
   const notes = notesOf(p);
   if (!notes.length) return null;
   if (notes.length > MAX_NOTES) return `notes: ${notes.length} notes; a ${p.card} takes at most ${MAX_NOTES}`;
-  const lastColumn = columnName(Math.max(0, drawn.fields.length - 1)), lastRow = drawn.rows + 1;
+  const lastColumn = columnName(Math.max(0, drawn.fields.length - 1)),
+    lastRow = drawn.rows + 1;
   const seen = new Set<string>();
   for (const { cell, note } of notes) {
     const at = cellAt(cell);
-    if (!at) return `notes: "${cell.slice(0, 20)}" is not a cell address: write the column's letters, then the row's number, as B3 (row 1 is the header row)`;
+    if (!at)
+      return `notes: "${cell.slice(0, 20)}" is not a cell address: write the column's letters, then the row's number, as B3 (row 1 is the header row)`;
     if (at.column >= drawn.fields.length || at.row > lastRow) {
       const columns = `${drawn.fields.slice(0, 8).join(', ')}${drawn.fields.length > 8 ? ', …' : ''}`;
       return `notes: there is no cell ${cell} here: the cells drawn are A1 to ${lastColumn}${lastRow} (row 1 is the header and ${drawn.rows} row${drawn.rows === 1 ? '' : 's'} follow it; columns A to ${lastColumn} are ${columns})`;
@@ -44,13 +50,23 @@ export function notesProblem(p: PanelSpec, drawn: DrawnCells): string | null {
 
 /** The notes placed, in the order given and numbered so: each where its address is. Only after notesProblem passes. */
 export const placedNotes = (p: PanelSpec): PlacedNote[] =>
-  notesOf(p).map(({ cell, note }, i) => { const at = cellAt(cell)!; return { n: i + 1, cell, note, row: at.row - 2, column: at.column }; });
+  notesOf(p).map(({ cell, note }, i) => {
+    const at = cellAt(cell)!;
+    return { n: i + 1, cell, note, row: at.row - 2, column: at.column };
+  });
 
 /** What the account says of the notes placed: each one's number and cell, the field it is in, and the value there as
  *  the rows hold it (a header: its field's name). */
 export function notesAccount(o: Record<string, unknown>, p: PanelSpec, d: Resolved, drawn: DrawnCells) {
   const placed = placedNotes(p);
   if (!placed.length) return;
-  o.notes = placed.map(x => { const field = drawn.fields[x.column];
-    return { n: x.n, cell: x.cell, field, ...(x.row < 0 ? { header: true } : { value: asText(d.rows![x.row]?.[field] ?? '') }) }; });
+  o.notes = placed.map((x) => {
+    const field = drawn.fields[x.column];
+    return {
+      n: x.n,
+      cell: x.cell,
+      field,
+      ...(x.row < 0 ? { header: true } : { value: asText(d.rows![x.row]?.[field] ?? '') }),
+    };
+  });
 }

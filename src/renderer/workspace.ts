@@ -103,8 +103,8 @@ export function mountWorkspace(host: HTMLElement, options: WorkspaceOptions = {}
   const existing = options.elements;
   const labels = options.labels ?? {};
   const views = existing?.views ?? doc.createElement('div');
-  const sidebar = options.sidebar === false ? undefined : existing?.sidebar ?? makeSidebar(doc, labels);
-  const form = options.composer === false ? undefined : existing?.composer ?? makeComposer(doc, labels);
+  const sidebar = options.sidebar === false ? undefined : (existing?.sidebar ?? makeSidebar(doc, labels));
+  const form = options.composer === false ? undefined : (existing?.composer ?? makeComposer(doc, labels));
   const abort = new AbortController();
   const listen = { signal: abort.signal };
   const originalParent = form?.element.parentNode;
@@ -147,7 +147,8 @@ export function mountWorkspace(host: HTMLElement, options: WorkspaceOptions = {}
   function showThread(title: string | null) {
     if (!sidebar) return;
     // what has the keyboard (Back, or something in the thread) is hidden with the thread: the keyboard goes to the list
-    const active = doc.activeElement, hiding = title === null && !!active && (active === sidebar.back || sidebar.thread.contains(active));
+    const active = doc.activeElement,
+      hiding = title === null && !!active && (active === sidebar.back || sidebar.thread.contains(active));
     sidebar.list.hidden = title !== null;
     sidebar.thread.hidden = sidebar.back.hidden = title === null;
     sidebar.title.textContent = title ?? activityTitle;
@@ -159,12 +160,22 @@ export function mountWorkspace(host: HTMLElement, options: WorkspaceOptions = {}
     options.onBack?.();
   }
   sidebar?.back.addEventListener('click', back, listen);
-  sidebar?.element.addEventListener('keydown', e => {
-    if (e.key !== 'Escape' || e.isComposing || e.defaultPrevented || sidebar.thread.hidden ||
-        (e.target as Element | null)?.closest('select')) return;
-    e.preventDefault();
-    back();
-  }, listen);
+  sidebar?.element.addEventListener(
+    'keydown',
+    (e) => {
+      if (
+        e.key !== 'Escape' ||
+        e.isComposing ||
+        e.defaultPrevented ||
+        sidebar.thread.hidden ||
+        (e.target as Element | null)?.closest('select')
+      )
+        return;
+      e.preventDefault();
+      back();
+    },
+    listen,
+  );
 
   let pending = false;
   let errorLine: HTMLElement | undefined;
@@ -174,8 +185,13 @@ export function mountWorkspace(host: HTMLElement, options: WorkspaceOptions = {}
     form.input.style.height = Math.min(form.input.scrollHeight, 168) + 'px';
   }
   function available() {
-    return !!form && !form.element.hidden && !pending && !!options.onSend &&
-      (options.canSend?.(form.input.value) ?? !!form.input.value.trim());
+    return (
+      !!form &&
+      !form.element.hidden &&
+      !pending &&
+      !!options.onSend &&
+      (options.canSend?.(form.input.value) ?? !!form.input.value.trim())
+    );
   }
   function refresh() {
     if (!form) return;
@@ -206,16 +222,31 @@ export function mountWorkspace(host: HTMLElement, options: WorkspaceOptions = {}
       if (!abort.signal.aborted) refresh();
     }
   }
-  form?.element.addEventListener('submit', e => { e.preventDefault(); void submit(); }, listen);
-  form?.input.addEventListener('input', () => {
-    options.onInput?.(form.input.value);
-    refresh();
-  }, listen);
-  form?.input.addEventListener('keydown', e => {
-    if (e.key !== 'Enter' || e.shiftKey || e.isComposing || e.keyCode === 229 || e.defaultPrevented) return;
-    e.preventDefault();
-    form.element.requestSubmit();
-  }, listen);
+  form?.element.addEventListener(
+    'submit',
+    (e) => {
+      e.preventDefault();
+      void submit();
+    },
+    listen,
+  );
+  form?.input.addEventListener(
+    'input',
+    () => {
+      options.onInput?.(form.input.value);
+      refresh();
+    },
+    listen,
+  );
+  form?.input.addEventListener(
+    'keydown',
+    (e) => {
+      if (e.key !== 'Enter' || e.shiftKey || e.isComposing || e.keyCode === 229 || e.defaultPrevented) return;
+      e.preventDefault();
+      form.element.requestSubmit();
+    },
+    listen,
+  );
 
   // Custom host layouts can carry stateful elements alongside these, so only move the
   // composer when its parent actually changes, and only while the sidebar is toggled.
@@ -227,7 +258,8 @@ export function mountWorkspace(host: HTMLElement, options: WorkspaceOptions = {}
         const destination = showSide ? sidebar.element : host;
         if (form.element.parentElement !== destination) {
           destination.append(form.element);
-          if (showForm !== false && active instanceof HTMLElement && form.element.contains(active)) active.focus({ preventScroll: true });
+          if (showForm !== false && active instanceof HTMLElement && form.element.contains(active))
+            active.focus({ preventScroll: true });
         }
       }
     }
@@ -236,35 +268,67 @@ export function mountWorkspace(host: HTMLElement, options: WorkspaceOptions = {}
   }
   refresh();
   return {
-    views, sidebar, composer: form && { ...form, resize, refresh },
-    showThread, setVisible,
+    views,
+    sidebar,
+    composer: form && { ...form, resize, refresh },
+    showThread,
+    setVisible,
     setTasks(tasks) {
       if (!sidebar) return;
       rendered.add(sidebar.list);
-      render(repeat(tasks, task => task.id, task => html`<button type="button" class="vindu-task" @click=${(event: MouseEvent) => {
-        selectedTask = event.currentTarget as HTMLButtonElement;
-        showThread(task.title);
-        sidebar.back.focus();
-        options.onSelectTask?.(task.id);
-      }}><span>${task.title}</span>${task.status ? html`<small>${task.status}</small>` : nothing}</button>`), sidebar.list);
+      render(
+        repeat(
+          tasks,
+          (task) => task.id,
+          (task) =>
+            html`<button type="button" class="vindu-task" @click=${(event: MouseEvent) => {
+              selectedTask = event.currentTarget as HTMLButtonElement;
+              showThread(task.title);
+              sidebar.back.focus();
+              options.onSelectTask?.(task.id);
+            }}><span>${task.title}</span>${task.status ? html`<small>${task.status}</small>` : nothing}</button>`,
+        ),
+        sidebar.list,
+      );
     },
     setMessages(messages) {
       if (!sidebar) return;
       rendered.add(sidebar.thread);
       const atEnd = sidebar.thread.scrollHeight - sidebar.thread.clientHeight - sidebar.thread.scrollTop < 80;
-      render(repeat(messages, message => message.id, message => html`<div class="vindu-message" role="article" data-role=${message.role}
-        aria-label=${message.role}>${message.text}</div>`), sidebar.thread);
+      render(
+        repeat(
+          messages,
+          (message) => message.id,
+          (message) => html`<div class="vindu-message" role="article" data-role=${message.role}
+        aria-label=${message.role}>${message.text}</div>`,
+        ),
+        sidebar.thread,
+      );
       if (atEnd) sidebar.thread.scrollTop = sidebar.thread.scrollHeight;
     },
     setContext(items) {
       if (!form?.context) return;
       rendered.add(form.context);
-      render(repeat(items, item => item.id, item => html`<span class="vindu-context-item">
-        ${item.label}${options.onRemoveContext ? html`<button type="button" aria-label=${'Remove ' + item.label}
-          @click=${() => options.onRemoveContext?.(item.id)}>×</button>` : nothing}</span>`), form.context);
+      render(
+        repeat(
+          items,
+          (item) => item.id,
+          (item) => html`<span class="vindu-context-item">
+        ${item.label}${
+          options.onRemoveContext
+            ? html`<button type="button" aria-label=${'Remove ' + item.label}
+          @click=${() => options.onRemoveContext?.(item.id)}>×</button>`
+            : nothing
+        }</span>`,
+        ),
+        form.context,
+      );
     },
     setDraft(value) {
-      if (form) { form.input.value = value; refresh(); }
+      if (form) {
+        form.input.value = value;
+        refresh();
+      }
     },
     destroy() {
       if (abort.signal.aborted) return;

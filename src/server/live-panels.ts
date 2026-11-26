@@ -94,8 +94,7 @@ const liveRead = async (session: Session, source: Live, id: string) => {
   for (const read of source.reads) session.fresh.set(read, id);
   const names = [...session.shown]
     .filter(
-      ([name, spec]) =>
-        session.specs.has(name) && panelsOf(spec).some((p) => p.from && source.reads.includes(p.from)),
+      ([name, spec]) => session.specs.has(name) && panelsOf(spec).some((p) => p.from && source.reads.includes(p.from)),
     )
     .map(([name]) => name);
   const extra = await drawAgain(session, names);

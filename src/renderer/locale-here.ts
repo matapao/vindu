@@ -11,11 +11,14 @@ export function localeHere(locale: string): string {
   let here = locale;
   try {
     if (!Intl.DateTimeFormat.supportedLocalesOf([locale]).length) {
-      const { language, region } = new Intl.Locale(locale), macro = MACROLANGUAGES[language];
+      const { language, region } = new Intl.Locale(locale),
+        macro = MACROLANGUAGES[language];
       const fallback = macro && (region ? `${macro}-${region}` : macro);
       if (fallback && Intl.DateTimeFormat.supportedLocalesOf([fallback]).length) here = fallback;
     }
-  } catch { /* not a language tag: Intl writes it in its own default, as before */ }
+  } catch {
+    /* not a language tag: Intl writes it in its own default, as before */
+  }
   resolved.set(locale, here);
   return here;
 }

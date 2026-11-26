@@ -10,10 +10,13 @@ const NEVER = new Set(['javascript:', 'vbscript:', 'data:']);
 
 /** The schemes, checked: each lowercase and ending in ":", and none that runs code or is data. Throws otherwise. */
 export function checkedSources(sources: readonly string[]): readonly string[] {
-  if (!Array.isArray(sources)) throw new TypeError('sources: a list of schemes the host serves pictures from, e.g. ["media:"]');
+  if (!Array.isArray(sources))
+    throw new TypeError('sources: a list of schemes the host serves pictures from, e.g. ["media:"]');
   for (const scheme of sources as unknown[]) {
     if (typeof scheme !== 'string' || !SCHEME.test(scheme))
-      throw new TypeError(`sources: ${JSON.stringify(scheme)} is not a scheme: lowercase, a letter then letters, digits, "+", "-" or ".", ending in ":", e.g. "media:"`);
+      throw new TypeError(
+        `sources: ${JSON.stringify(scheme)} is not a scheme: lowercase, a letter then letters, digits, "+", "-" or ".", ending in ":", e.g. "media:"`,
+      );
     if (NEVER.has(scheme)) throw new TypeError(`sources: ${scheme} is never a source of pictures`);
   }
   return Object.freeze([...new Set(sources)]);
@@ -27,7 +30,7 @@ export function setPictureSources(host: Element, sources?: readonly string[]): v
 
 /** The schemes a picture drawn in element may come from besides http(s): those of the host it is drawn in. */
 export function pictureSchemes(element: Element): readonly string[] {
-  for (let at: Element | null = element; at; at = at.parentElement ?? ((at.getRootNode() as ShadowRoot).host ?? null)) {
+  for (let at: Element | null = element; at; at = at.parentElement ?? (at.getRootNode() as ShadowRoot).host ?? null) {
     const sources = given.get(at);
     if (sources) return sources;
   }

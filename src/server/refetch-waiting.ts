@@ -64,7 +64,8 @@ function settle(session: Session, waiting: Waiting[], read: Map<string, ReadAgai
   for (const [key, gate] of waiting) {
     const came = read.get(key);
     if (!came || session.gates.get(key) !== gate) continue; // drawn anew meanwhile: this wait is gone
-    if (gate.got) filled.add(key); // the call came meanwhile and filled it, told as it came
+    if (gate.got)
+      filled.add(key); // the call came meanwhile and filled it, told as it came
     else if ('id' in came) {
       gate.got = came.id;
       delete gate.pointer;
@@ -109,7 +110,11 @@ async function readAgainNow(session: Session, waiting: Waiting[]): Promise<Refet
       .finally(() => {
         for (const [key] of fresh) session.rereading.delete(key);
       });
-    for (const [key] of fresh) session.rereading.set(key, reading.then((filled) => filled.has(key)));
+    for (const [key] of fresh)
+      session.rereading.set(
+        key,
+        reading.then((filled) => filled.has(key)),
+      );
   }
   const each = await Promise.all(waiting.map(([key]) => session.rereading.get(key) ?? Promise.resolve(false)));
   const filled = each.filter(Boolean).length;

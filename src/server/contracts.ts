@@ -140,12 +140,7 @@ export type OpenMore = {
   record?: (e: { tool: string; input: unknown; result: unknown }) => string | undefined;
   /** A template's source: the host reads it itself (kept as an exact result) and says its result id:
    *  a tool the server marks as read-only, or a resource. */
-  source?: (s: {
-    server: string;
-    tool?: string;
-    resource?: string;
-    args: Record<string, unknown>;
-  }) => Promise<string>;
+  source?: (s: { server: string; tool?: string; resource?: string; args: Record<string, unknown> }) => Promise<string>;
   /** A result or attachment a restored view points at, read again (restore): the host calls the tool again with the same
    *  input, or looks up its own ref, or attaches the person's file again; keeps what came as a new entry; and says its
    *  id. undefined, or a throw, when it cannot: the panels that showed it wait, saying why. Called once for each pointer

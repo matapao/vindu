@@ -3,8 +3,10 @@
 // .vindu-theme; the shell has it, and mountView adds it with { theme: true }. data-theme="light" or "dark" pins a mode;
 // without it the system's preference decides. Every token is a CSS variable (--v-accent, --v-font, …): a host changes
 // them with mountShell's tokens, or with its own CSS.
-const LIGHT = '--v-desk:#f1f0ec;--v-pane:#fcfcfb;--v-head:#f6f5f1;--v-line:#d6d5cf;--v-hair:#e7e6e0;--v-ink:#0b0b0b;--v-ink-2:#52514e;--v-muted:#898781;--v-accent:#2a78d6;--v-wash:rgba(11,11,11,.055);color-scheme:light;';
-const DARK = '--v-desk:#0d0d0d;--v-pane:#1a1a19;--v-head:#151514;--v-line:#353533;--v-hair:#2a2a28;--v-ink:#f0efec;--v-ink-2:#c3c2b7;--v-muted:#898781;--v-accent:#3987e5;--v-wash:rgba(255,255,255,.07);color-scheme:dark;';
+const LIGHT =
+  '--v-desk:#f1f0ec;--v-pane:#fcfcfb;--v-head:#f6f5f1;--v-line:#d6d5cf;--v-hair:#e7e6e0;--v-ink:#0b0b0b;--v-ink-2:#52514e;--v-muted:#898781;--v-accent:#2a78d6;--v-wash:rgba(11,11,11,.055);color-scheme:light;';
+const DARK =
+  '--v-desk:#0d0d0d;--v-pane:#1a1a19;--v-head:#151514;--v-line:#353533;--v-hair:#2a2a28;--v-ink:#f0efec;--v-ink-2:#c3c2b7;--v-muted:#898781;--v-accent:#3987e5;--v-wash:rgba(255,255,255,.07);color-scheme:dark;';
 
 import { captionSize, headingSize, rhythm, space, typeSize } from './metrics.js';
 import { PRIMITIVE_METRICS_CSS } from './primitive-metrics.js';

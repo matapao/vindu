@@ -14,7 +14,9 @@ export function readTextStart(file: string, most: number): TextStart | null {
     size = fs.fstatSync(fd).size;
     buf = Buffer.alloc(Math.min(size, most) + 1); // one byte more than shown: a file that grew since is cut too
     buf = buf.subarray(0, fs.readSync(fd, buf, 0, buf.length, 0));
-  } finally { fs.closeSync(fd); }
+  } finally {
+    fs.closeSync(fd);
+  }
   if (buf.subarray(0, 8000).includes(0)) return null;
   let end = buf.length;
   if (end > most) {

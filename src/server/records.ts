@@ -19,7 +19,8 @@ export const readLines = (file: string) => {
 export const whoOf = (x: Record<string, unknown>) => {
   const b = (x.by && typeof x.by === 'object' ? x.by : {}) as { name?: unknown; window?: unknown };
   const line = (v: unknown, none: string) =>
-    (v === undefined || v === null ? '' : asText(v)).normalize('NFKC').replace(/\s+/g, ' ').trim().slice(0, 120) || none;
+    (v === undefined || v === null ? '' : asText(v)).normalize('NFKC').replace(/\s+/g, ' ').trim().slice(0, 120) ||
+    none;
   return { name: line(b.name, 'the person'), window: line(b.window, 'main') };
 };
 /** A promise nothing waits for: a failure is kept in the log, never thrown where no one hears it. */

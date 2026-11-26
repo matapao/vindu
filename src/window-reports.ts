@@ -6,7 +6,15 @@
  *  first row's data path), the text Vindu put there, which panel and field it is, and the tab it is in (A2UI draws only
  *  the tab that is open, so the rest are read when the person opens them). Charts and media draw things no text check
  *  can read, so they have none; a page or an app has its frame read: its size, and whether it loaded. */
-export type Probe = { component: string; path?: string; expect: string; panel: string; field?: string; tab?: number; frame?: boolean };
+export type Probe = {
+  component: string;
+  path?: string;
+  expect: string;
+  panel: string;
+  field?: string;
+  tab?: number;
+  frame?: boolean;
+};
 
 /** What the window says was pointed at: a view, and inside it a panel (by id, or by its surface id pid) and a row, a
  *  node, a field, a span of text, a region; or a browser element, terminal lines, what a page or app reported. */

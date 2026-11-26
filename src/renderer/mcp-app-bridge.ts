@@ -7,14 +7,32 @@
 import type { ShellEvent } from '../shell.js';
 import { FRAMES_LEAVING, viewOf } from './dom.js';
 import { appFontVariables } from './metrics.js';
-import { APPS_PROTOCOL, LEGACY_APPS_PROTOCOL, appRpcOf, isDisplayMode, isInitializeParams, isResponseTo, type AppRpc, type RpcId } from './app-rpc.js';
+import {
+  APPS_PROTOCOL,
+  LEGACY_APPS_PROTOCOL,
+  appRpcOf,
+  isDisplayMode,
+  isInitializeParams,
+  isResponseTo,
+  type AppRpc,
+  type RpcId,
+} from './app-rpc.js';
 
 const hostInfo = { name: 'vindu', version: '0.3.0' };
 const hostCapabilities = {
-  serverTools: {}, serverResources: {}, logging: {}, updateModelContext: { text: {} }, message: { text: {} }, openLinks: {},
+  serverTools: {},
+  serverResources: {},
+  logging: {},
+  updateModelContext: { text: {} },
+  message: { text: {} },
+  openLinks: {},
 };
-const INITIALIZE = 'ui/initialize', INITIALIZED = 'ui/notifications/initialized', SIZE_CHANGED = 'ui/notifications/size-changed';
-const PING = 'ping', DISPLAY_MODE = 'ui/request-display-mode', HOST_CONTEXT_CHANGED = 'ui/notifications/host-context-changed';
+const INITIALIZE = 'ui/initialize',
+  INITIALIZED = 'ui/notifications/initialized',
+  SIZE_CHANGED = 'ui/notifications/size-changed';
+const PING = 'ping',
+  DISPLAY_MODE = 'ui/request-display-mode',
+  HOST_CONTEXT_CHANGED = 'ui/notifications/host-context-changed';
 const TEARDOWN = 'ui/resource-teardown';
 const localRequests = new Set([PING, DISPLAY_MODE]);
 const displayMethods = new Set([INITIALIZE, INITIALIZED, SIZE_CHANGED, ...localRequests]);
@@ -34,24 +52,39 @@ const postToApp = (frame: HTMLIFrameElement, message: unknown) => {
  *  not a tag. */
 function localeOf(tag: unknown): string | undefined {
   if (typeof tag !== 'string' || !tag) return undefined;
-  try { return Intl.getCanonicalLocales(tag)[0]; } catch { return undefined; }
+  try {
+    return Intl.getCanonicalLocales(tag)[0];
+  } catch {
+    return undefined;
+  }
 }
 
 /** What an app is told of its host, as MCP Apps' McpUiHostContext has it. */
 type HostContext = {
-  styles?: { variables: Record<string, string> }; theme: 'light' | 'dark'; displayMode: 'inline'; availableDisplayModes: ['inline'];
-  containerDimensions: { width: number; maxHeight: number }; locale?: string; timeZone: string; platform: 'desktop';
+  styles?: { variables: Record<string, string> };
+  theme: 'light' | 'dark';
+  displayMode: 'inline';
+  availableDisplayModes: ['inline'];
+  containerDimensions: { width: number; maxHeight: number };
+  locale?: string;
+  timeZone: string;
+  platform: 'desktop';
 };
 
 /** The app frames in root, as their MCP Apps bridge. locale: the window's language, a BCP 47 tag ('nb-NO'); without
  *  one, the browser's. */
-export function connectAppFrames(root: HTMLElement, emit: (event: ShellEvent) => void, options: { locale?: string } = {}) {
+export function connectAppFrames(
+  root: HTMLElement,
+  emit: (event: ShellEvent) => void,
+  options: { locale?: string } = {},
+) {
   const mounts = new Map<HTMLIFrameElement, ReturnType<typeof mountOf>>();
   const view = root.ownerDocument.defaultView;
   // What can change while an app runs: the theme (the shell's own, else the system's) and the language (the host's,
   // else the browser's). Its frame's width is the frame's own.
   const darkScheme = view?.matchMedia('(prefers-color-scheme: dark)');
-  let locale = localeOf(options.locale), teardowns = 0;
+  let locale = localeOf(options.locale),
+    teardowns = 0;
   const themeNow = (): HostContext['theme'] => {
     const dark = root.dataset.theme ? root.dataset.theme === 'dark' : !!darkScheme?.matches;
     return dark ? 'dark' : 'light';
@@ -66,13 +99,14 @@ export function connectAppFrames(root: HTMLElement, emit: (event: ShellEvent) =>
   const seen = new WeakMap<HTMLIFrameElement, { loads: number; claimed: number }>();
   const seenOf = (frame: HTMLIFrameElement) => {
     let frameSeen = seen.get(frame);
-    if (!frameSeen) seen.set(frame, frameSeen = { loads: 0, claimed: 0 });
+    if (!frameSeen) seen.set(frame, (frameSeen = { loads: 0, claimed: 0 }));
     return frameSeen;
   };
   const onLoad = (event: Event) => {
     const frame = event.target as HTMLIFrameElement;
     if (frame.localName !== 'iframe' || frame.dataset.appPanel === undefined) return;
-    const frameSeen = seenOf(frame), current = mounts.get(frame);
+    const frameSeen = seenOf(frame),
+      current = mounts.get(frame);
     frameSeen.loads++;
     if (current && frameSeen.loads === current.ownLoad) frameSeen.claimed = frameSeen.loads;
     else current?.close();
@@ -80,17 +114,24 @@ export function connectAppFrames(root: HTMLElement, emit: (event: ShellEvent) =>
   root.addEventListener('load', onLoad, true);
 
   function mountOf(frame: HTMLIFrameElement, requestedVersion: string) {
-    const token = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
-    const frameSeen = seenOf(frame), loadedFirst = frameSeen.loads > frameSeen.claimed;
+    const token = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) =>
+      byte.toString(16).padStart(2, '0'),
+    ).join('');
+    const frameSeen = seenOf(frame),
+      loadedFirst = frameSeen.loads > frameSeen.claimed;
     const ownLoad = loadedFirst ? frameSeen.loads : frameSeen.loads + 1;
     if (loadedFirst) frameSeen.claimed = ownLoad;
     const fonts = appFontVariables(root);
     // What the app was told last: at initialize, then as it changes.
     const hostContext: HostContext = {
       ...(Object.keys(fonts).length ? { styles: { variables: fonts } } : {}),
-      theme: themeNow(), displayMode: 'inline', availableDisplayModes: ['inline'],
-      containerDimensions: { width: frame.clientWidth, maxHeight: MAX_HEIGHT }, locale: localeNow(),
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, platform: 'desktop',
+      theme: themeNow(),
+      displayMode: 'inline',
+      availableDisplayModes: ['inline'],
+      containerDimensions: { width: frame.clientWidth, maxHeight: MAX_HEIGHT },
+      locale: localeNow(),
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      platform: 'desktop',
     };
     // Retain compatibility with deployed apps using the older inline display protocol.
     const protocolVersion = requestedVersion === LEGACY_APPS_PROTOCOL ? LEGACY_APPS_PROTOCOL : APPS_PROTOCOL;
@@ -103,7 +144,9 @@ export function connectAppFrames(root: HTMLElement, emit: (event: ShellEvent) =>
     // Its teardown: asked once, and over when it answers or its wait is.
     let tearingDown: Promise<void> | undefined, awaited: { id: string; over: () => void } | undefined;
     const mount = {
-      token, ownLoad, post,
+      token,
+      ownLoad,
+      post,
       close() {
         if (mounts.get(frame) !== mount) return;
         mounts.delete(frame);
@@ -114,23 +157,29 @@ export function connectAppFrames(root: HTMLElement, emit: (event: ShellEvent) =>
         if (id === undefined) {
           const { width, height } = params;
           if (method !== SIZE_CHANGED || !isSize(width) || !isSize(height)) return; // other notifications ask nothing of the display
-          if (active() && typeof height === 'number' && height > 0) frame.style.height = `${Math.min(MAX_HEIGHT, Math.max(80, height))}px`;
+          if (active() && typeof height === 'number' && height > 0)
+            frame.style.height = `${Math.min(MAX_HEIGHT, Math.max(80, height))}px`;
         } else if (method === INITIALIZE) reply(id, { protocolVersion, hostCapabilities, hostInfo, hostContext });
         else if (method === PING) reply(id, {});
         else if (method === DISPLAY_MODE) {
-          if (isDisplayMode(params.mode)) reply(id, { mode: hostContext.displayMode }); // inline is the only mode here
+          if (isDisplayMode(params.mode))
+            reply(id, { mode: hostContext.displayMode }); // inline is the only mode here
           else fail(id, -32602, 'Invalid params for ui/request-display-mode: mode: Invalid input');
         } else fail(id, -32601, 'Method not found'); // a notification's method, sent as a request
       },
-      setFonts: (variables: Record<string, string>) => post({ jsonrpc: '2.0', method: HOST_CONTEXT_CHANGED, params: { styles: { variables } } }),
+      setFonts: (variables: Record<string, string>) =>
+        post({ jsonrpc: '2.0', method: HOST_CONTEXT_CHANGED, params: { styles: { variables } } }),
       /** What has changed in its host context since it was told: those fields alone, in one notification. A frame out of
        *  sight has no width to tell; it tells its width again once it is back. */
       retell() {
         const changed: Partial<HostContext> = {};
-        const theme = themeNow(), language = localeNow(), width = frame.clientWidth;
+        const theme = themeNow(),
+          language = localeNow(),
+          width = frame.clientWidth;
         if (theme !== hostContext.theme) changed.theme = theme;
         if (language !== hostContext.locale) changed.locale = language;
-        if (width > 0 && width !== hostContext.containerDimensions.width) changed.containerDimensions = { width, maxHeight: MAX_HEIGHT };
+        if (width > 0 && width !== hostContext.containerDimensions.width)
+          changed.containerDimensions = { width, maxHeight: MAX_HEIGHT };
         if (!Object.keys(changed).length) return;
         Object.assign(hostContext, changed);
         post({ jsonrpc: '2.0', method: HOST_CONTEXT_CHANGED, params: changed });
@@ -138,9 +187,13 @@ export function connectAppFrames(root: HTMLElement, emit: (event: ShellEvent) =>
       /** Asks it to tear down: over once it answers, or once the wait is over; undefined when its frame has gone already. */
       tearDown(): Promise<void> | undefined {
         if (!active()) return undefined;
-        tearingDown ??= new Promise<void>(resolve => {
+        tearingDown ??= new Promise<void>((resolve) => {
           const timer = setTimeout(over, TEARDOWN_WAIT);
-          function over() { clearTimeout(timer); awaited = undefined; resolve(); }
+          function over() {
+            clearTimeout(timer);
+            awaited = undefined;
+            resolve();
+          }
           awaited = { id: `vindu-teardown-${++teardowns}`, over };
           post({ jsonrpc: '2.0', id: awaited.id, method: TEARDOWN, params: {} });
         });
@@ -165,7 +218,7 @@ export function connectAppFrames(root: HTMLElement, emit: (event: ShellEvent) =>
   // height alone tells the app nothing, as it is what the app asked for.
   const resized = new Set<HTMLIFrameElement>();
   let retelling = 0;
-  const widths = new ResizeObserver(entries => {
+  const widths = new ResizeObserver((entries) => {
     for (const entry of entries) resized.add(entry.target as HTMLIFrameElement);
     if (retelling) return;
     retelling = (view ?? window).requestAnimationFrame(() => {
@@ -188,8 +241,8 @@ export function connectAppFrames(root: HTMLElement, emit: (event: ShellEvent) =>
   const onLeaving = (event: Event) => void tearDownIn(event.target as Element);
   root.addEventListener(FRAMES_LEAVING, onLeaving);
 
-  const removals = new MutationObserver(records => {
-    if (!mounts.size || !records.some(record => record.removedNodes.length)) return;
+  const removals = new MutationObserver((records) => {
+    if (!mounts.size || !records.some((record) => record.removedNodes.length)) return;
     for (const [frame, connection] of mounts) if (!root.contains(frame)) connection.close();
   });
 
@@ -197,7 +250,9 @@ export function connectAppFrames(root: HTMLElement, emit: (event: ShellEvent) =>
     receive(event: MessageEvent) {
       // An app's frame has no same-origin rights, so its documents have an opaque origin; a message from any other is not an app's.
       if (event.origin !== 'null' || event.data?.jsonrpc !== '2.0') return;
-      const frame = [...root.querySelectorAll<HTMLIFrameElement>('iframe[data-app-panel]')].find(candidate => candidate.contentWindow === event.source);
+      const frame = [...root.querySelectorAll<HTMLIFrameElement>('iframe[data-app-panel]')].find(
+        (candidate) => candidate.contentWindow === event.source,
+      );
       const resource = frame?.dataset.appResource;
       if (!frame || !resource) return;
       if (mounts.get(frame)?.answered(event.data)) return; // its answer to the window's own request, which is the window's alone
@@ -205,10 +260,19 @@ export function connectAppFrames(root: HTMLElement, emit: (event: ShellEvent) =>
       if (!rpc) return;
       if (rpc.method === INITIALIZE && rpc.id !== undefined) {
         // Early embedded views may omit appInfo or capabilities when asking only for host context.
-        const params = { protocolVersion: APPS_PROTOCOL, appInfo: { name: 'app', version: 'unknown' }, appCapabilities: {}, ...rpc.params };
+        const params = {
+          protocolVersion: APPS_PROTOCOL,
+          appInfo: { name: 'app', version: 'unknown' },
+          appCapabilities: {},
+          ...rpc.params,
+        };
         rpc.params = params;
         if (!isInitializeParams(params)) {
-          postToApp(frame, { jsonrpc: '2.0', id: rpc.id, error: { code: -32602, message: 'Invalid app initialization parameters' } });
+          postToApp(frame, {
+            jsonrpc: '2.0',
+            id: rpc.id,
+            error: { code: -32602, message: 'Invalid app initialization parameters' },
+          });
           return;
         }
         mounts.get(frame)?.close();
@@ -220,8 +284,12 @@ export function connectAppFrames(root: HTMLElement, emit: (event: ShellEvent) =>
       if (displayMethods.has(rpc.method)) current.receive(rpc);
       if (localRequests.has(rpc.method)) return;
       emit({
-        type: 'app', view: viewOf(frame) ?? '',
-        panel: frame.dataset.appPanel ?? '', resource, mount: current.token, msg: rpc,
+        type: 'app',
+        view: viewOf(frame) ?? '',
+        panel: frame.dataset.appPanel ?? '',
+        resource,
+        mount: current.token,
+        msg: rpc,
       });
     },
     setFonts(variables: Record<string, string>) {
@@ -241,7 +309,13 @@ export function connectAppFrames(root: HTMLElement, emit: (event: ShellEvent) =>
       return waits.length ? Promise.all(waits) : undefined;
     },
     send(view: string, panel: string, message: unknown) {
-      if (!message || typeof message !== 'object' || !('vinduMount' in message) || typeof message.vinduMount !== 'string') return;
+      if (
+        !message ||
+        typeof message !== 'object' ||
+        !('vinduMount' in message) ||
+        typeof message.vinduMount !== 'string'
+      )
+        return;
       const { vinduMount, ...rpc } = message;
       for (const [frame, current] of mounts) {
         if (current.token === vinduMount && frame.dataset.appPanel === panel && viewOf(frame) === view) {

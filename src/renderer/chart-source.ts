@@ -12,8 +12,10 @@ function chartAtSize(source: string, size: number): string {
   try {
     const encoded = source.slice(SVG_IMAGE.length);
     if (!CHART_HEADER.test(atob(encoded.slice(0, 512)))) return source;
-    const svg = atob(encoded).replace(CHART_HEADER, (_, before: string, font: string, after: string) =>
-      before + Number(font) * size / 13 + after);
+    const svg = atob(encoded).replace(
+      CHART_HEADER,
+      (_, before: string, font: string, after: string) => before + (Number(font) * size) / 13 + after,
+    );
     return SVG_IMAGE + btoa(svg);
   } catch {
     return source;
@@ -27,7 +29,7 @@ export function chartFontGauge(source: string) {
   return html`<span aria-hidden="true" style=${`position:absolute;width:${captionSize(13)};height:0;visibility:hidden;pointer-events:none`}
     ${guard([source], () => {
       let observer: ResizeObserver | undefined;
-      return ref(gauge => {
+      return ref((gauge) => {
         observer?.disconnect();
         if (!gauge) return;
         observer = new ResizeObserver(([entry]) => {

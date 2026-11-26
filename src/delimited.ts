@@ -5,8 +5,15 @@
 /** The records of a delimited text, each its fields as written. Throws when a quoted field is never closed. */
 export function parseDelimited(text: string, separator: ',' | '\t'): string[][] {
   const records: string[][] = [];
-  let record: string[] = [], field = '', quoted = false, openedAt = 0, line = 1;
-  const endField = () => { record.push(field); field = ''; };
+  let record: string[] = [],
+    field = '',
+    quoted = false,
+    openedAt = 0,
+    line = 1;
+  const endField = () => {
+    record.push(field);
+    field = '';
+  };
   const endRecord = () => {
     endField();
     if (record.length > 1 || record[0] !== '') records.push(record);
@@ -16,14 +23,22 @@ export function parseDelimited(text: string, separator: ',' | '\t'): string[][] 
   for (let i = 0; i < body.length; i++) {
     const c = body[i];
     if (quoted) {
-      if (c === '"' && body[i + 1] === '"') { field += '"'; i++; }
-      else if (c === '"') quoted = false;
-      else { if (c === '\n') line++; field += c; }
-    } else if (c === '"' && field === '') { quoted = true; openedAt = line; }
-    else if (c === separator) endField();
+      if (c === '"' && body[i + 1] === '"') {
+        field += '"';
+        i++;
+      } else if (c === '"') quoted = false;
+      else {
+        if (c === '\n') line++;
+        field += c;
+      }
+    } else if (c === '"' && field === '') {
+      quoted = true;
+      openedAt = line;
+    } else if (c === separator) endField();
     else if (c === '\n' || c === '\r') {
       if (c === '\r' && body[i + 1] === '\n') i++;
-      line++; endRecord();
+      line++;
+      endRecord();
     } else field += c;
   }
   if (quoted) throw new Error(`a quoted field that starts on line ${openedAt} is never closed`);

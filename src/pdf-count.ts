@@ -15,12 +15,17 @@ export function pdfPages(file: string): number | undefined {
       const buffer = Buffer.alloc(Math.min(fs.fstatSync(fd).size, READ));
       fs.readSync(fd, buffer, 0, buffer.length, 0);
       text = buffer.toString('latin1');
-    } finally { fs.closeSync(fd); }
-  } catch { return undefined; }
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch {
+    return undefined;
+  }
   let most: number | undefined;
   for (const pages of text.matchAll(/\/Type\s*\/Pages\b/g)) {
     // the dictionary it is in: from the last << before it to the first >> after it
-    const start = text.lastIndexOf('<<', pages.index), end = text.indexOf('>>', pages.index);
+    const start = text.lastIndexOf('<<', pages.index),
+      end = text.indexOf('>>', pages.index);
     if (start < 0 || end < 0) continue;
     const count = /\/Count\s+(\d{1,6})\b/.exec(text.slice(start, end));
     if (count) most = Math.max(most ?? 0, Number(count[1]));

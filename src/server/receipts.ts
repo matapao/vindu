@@ -51,12 +51,7 @@ export const receiptFor = async (session: Session, p: Pending) => {
 };
 /** A receipt drawn in its pane, by the system: kept as drawn, and nothing done inside the pane before carries over.
  *  said: what is told of it, as soon as it is drawn (what the model is told never waits on the window's checks). */
-export const drawReceipt = async (
-  session: Session,
-  view: string,
-  args: Record<string, unknown>,
-  said?: () => void,
-) => {
+export const drawReceipt = async (session: Session, view: string, args: Record<string, unknown>, said?: () => void) => {
   await session.present(args, true, false, () => {
     session.drawn.set(view, args);
     forget(session, view);

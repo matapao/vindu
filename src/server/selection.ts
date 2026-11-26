@@ -27,9 +27,16 @@ export const setInputs = (session: Session, x: Record<string, unknown>): boolean
   session.inputs.set(key, { set: { ...had.set, ...vals }, defaults: had.defaults });
   let drawn = false;
   void session
-    .present(args, true, false, () => {
-      drawn = true;
-    }, false, 'person') // drawn again where it is, shown or hidden
+    .present(
+      args,
+      true,
+      false,
+      () => {
+        drawn = true;
+      },
+      false,
+      'person',
+    ) // drawn again where it is, shown or hidden
     .then((acc) => {
       const pa = acc.panels.find((q) => q.id === panel);
       const w = whoOf(x);
@@ -159,13 +166,20 @@ export const drillIn = async (session: Session, x: Record<string, unknown>): Pro
   };
   const stack = session.drills.get(view) ?? [];
   const path = [...((args.path as string[] | undefined) ?? [spec.title]), key];
-  await session.present({
-    name: view,
-    title: spec.title,
-    ...(spec.subtitle ? { subtitle: spec.subtitle } : {}),
-    panels: [inner],
-    path,
-  }, false, false, undefined, false, 'person');
+  await session.present(
+    {
+      name: view,
+      title: spec.title,
+      ...(spec.subtitle ? { subtitle: spec.subtitle } : {}),
+      panels: [inner],
+      path,
+    },
+    false,
+    false,
+    undefined,
+    false,
+    'person',
+  );
   session.drills.set(view, [...stack, args]);
   session.shell.tell(
     `opened ${key} in ${spec.title} (${p.title ?? p.id}): the ${data[p.id].behind?.get(key)?.length ?? 'rows'} rows behind it`,

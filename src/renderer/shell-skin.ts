@@ -7,11 +7,23 @@ import type { elementsOf } from './dom.js';
 
 /** The skin of one shell: its tokens (again with tokens), its metrics (again with metrics, which says the fonts its
  *  frames are to be told of when they changed, an empty value for one taken away), and its stylesheet removed. */
-export function shellSkin(d: { doc: Document; make: ReturnType<typeof elementsOf>; root: HTMLElement; skinId: string; css: boolean; tokens?: ShellSkin; metrics: ViewMetrics }) {
+export function shellSkin(d: {
+  doc: Document;
+  make: ReturnType<typeof elementsOf>;
+  root: HTMLElement;
+  skinId: string;
+  css: boolean;
+  tokens?: ShellSkin;
+  metrics: ViewMetrics;
+}) {
   const { doc, make, root, skinId } = d;
-  const skin = make('style'); skin.dataset.vindu = 'skin';
-  const tokens = (t: ShellSkin = {}) => { skin.textContent = skinCss(`.vindu-shell.vindu-theme[data-vindu-skin="${skinId}"]`, t); };
-  tokens(d.tokens); doc.head.append(skin);
+  const skin = make('style');
+  skin.dataset.vindu = 'skin';
+  const tokens = (t: ShellSkin = {}) => {
+    skin.textContent = skinCss(`.vindu-shell.vindu-theme[data-vindu-skin="${skinId}"]`, t);
+  };
+  tokens(d.tokens);
+  doc.head.append(skin);
   const applyMetrics = (value: ViewMetrics) => {
     const reset = setMetrics(root, value);
     if (root.dataset.vinduMetrics && d.css) useMetricStyles(doc);
@@ -27,7 +39,7 @@ export function shellSkin(d: { doc: Document; make: ReturnType<typeof elementsOf
       const variables = appFontVariables(root);
       // An empty CSS value removes an override from an already initialized frame.
       for (const key of Object.keys(previous)) if (!(key in variables)) variables[key] = '';
-      return Object.keys(variables).some(key => variables[key] !== previous[key]) ? variables : undefined;
+      return Object.keys(variables).some((key) => variables[key] !== previous[key]) ? variables : undefined;
     },
     remove: () => skin.remove(),
   };

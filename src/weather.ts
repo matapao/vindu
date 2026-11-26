@@ -7,7 +7,15 @@
 import { dayOf } from './dates.js';
 
 /** One instant of a forecast. */
-export type Instant = { time: string; temperature?: number; min?: number; max?: number; precipitation?: number; wind?: number; symbol?: string };
+export type Instant = {
+  time: string;
+  temperature?: number;
+  min?: number;
+  max?: number;
+  precipitation?: number;
+  wind?: number;
+  symbol?: string;
+};
 /** A warning's level, from the least to the most severe. */
 export type WarningLevel = 'yellow' | 'orange' | 'red';
 const LEVELS: readonly WarningLevel[] = ['yellow', 'orange', 'red'];
@@ -52,7 +60,8 @@ function fieldsOf(item: unknown, depth = 4): [string, unknown][] {
   }
   return out;
 }
-const found = (fields: [string, unknown][], role: RegExp) => fields.find(([k, v]) => role.test(k) && v !== null && v !== undefined && v !== '')?.[1];
+const found = (fields: [string, unknown][], role: RegExp) =>
+  fields.find(([k, v]) => role.test(k) && v !== null && v !== undefined && v !== '')?.[1];
 /** A number, or one written as text (a decimal comma read as a point). */
 function numberOf(v: unknown): number | undefined {
   if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
@@ -74,7 +83,10 @@ export function listsIn(value: unknown, depth = 5): unknown[][] {
   for (let d = 0; d < depth && level.length; d++) {
     const next: unknown[] = [];
     for (const v of level) {
-      if (Array.isArray(v)) { out.push(v); continue; }
+      if (Array.isArray(v)) {
+        out.push(v);
+        continue;
+      }
       if (v && typeof v === 'object') next.push(...Object.values(v));
     }
     level = next;
@@ -84,7 +96,8 @@ export function listsIn(value: unknown, depth = 5): unknown[][] {
 
 /** One item as an instant of a forecast: its time, and a temperature, or a symbol with precipitation or wind. */
 function instantOf(item: unknown): Instant | undefined {
-  const f = fieldsOf(item), time = found(f, INSTANT.time);
+  const f = fieldsOf(item),
+    time = found(f, INSTANT.time);
   if (!isTime(time)) return undefined;
   const x: Instant = { time: time as string };
   for (const role of ['temperature', 'min', 'max', 'precipitation', 'wind'] as const) {
@@ -115,20 +128,34 @@ export function levelOf(v: unknown): WarningLevel | undefined {
   return undefined;
 }
 function warningOf(item: unknown): Warning | undefined {
-  const f = fieldsOf(item), level = levelOf(found(f, WARNING.level));
+  const f = fieldsOf(item),
+    level = levelOf(found(f, WARNING.level));
   if (!level) return undefined;
-  const interval = (item && typeof item === 'object' ? fieldsOfLists(item) : []).find(([k, v]) => WARNING.interval.test(k) && Array.isArray(v) && v.length === 2 && v.every(isTime))?.[1] as string[] | undefined;
-  const from = found(f, WARNING.from) ?? interval?.[0], to = found(f, WARNING.to) ?? interval?.[1];
-  const area = textOf(found(f, WARNING.area)), title = textOf(found(f, WARNING.title));
+  const interval = (item && typeof item === 'object' ? fieldsOfLists(item) : []).find(
+    ([k, v]) => WARNING.interval.test(k) && Array.isArray(v) && v.length === 2 && v.every(isTime),
+  )?.[1] as string[] | undefined;
+  const from = found(f, WARNING.from) ?? interval?.[0],
+    to = found(f, WARNING.to) ?? interval?.[1];
+  const area = textOf(found(f, WARNING.area)),
+    title = textOf(found(f, WARNING.title));
   if (!isTime(from) && !area) return undefined; // a level alone is a status, not a warning: a warning holds from a time, or for an area
-  return { level, ...(isTime(from) ? { from: from as string } : {}), ...(isTime(to) ? { to: to as string } : {}), ...(area ? { area } : {}), ...(title ? { title } : {}) };
+  return {
+    level,
+    ...(isTime(from) ? { from: from as string } : {}),
+    ...(isTime(to) ? { to: to as string } : {}),
+    ...(area ? { area } : {}),
+    ...(title ? { title } : {}),
+  };
 }
 /** An item's lists, its own and those of the objects inside it: where a warning keeps its from and to together. */
 const fieldsOfLists = (item: object): [string, unknown][] => {
   const out: [string, unknown][] = [];
   const walk = (o: unknown, depth: number) => {
     if (!o || typeof o !== 'object' || Array.isArray(o) || depth > 3) return;
-    for (const [k, v] of Object.entries(o)) { if (Array.isArray(v)) out.push([k, v]); else walk(v, depth + 1); }
+    for (const [k, v] of Object.entries(o)) {
+      if (Array.isArray(v)) out.push([k, v]);
+      else walk(v, depth + 1);
+    }
   };
   walk(item, 0);
   return out;
@@ -143,28 +170,40 @@ export function warningsOf(value: unknown): Warning[] {
 }
 /** The most severe of these warnings, the earliest of them where several are as severe. */
 export function worstWarning(warnings: readonly Warning[]): Warning | undefined {
-  return [...warnings].sort((a, b) => LEVELS.indexOf(b.level) - LEVELS.indexOf(a.level) || String(a.from ?? '').localeCompare(String(b.from ?? '')))[0];
+  return [...warnings].sort(
+    (a, b) =>
+      LEVELS.indexOf(b.level) - LEVELS.indexOf(a.level) || String(a.from ?? '').localeCompare(String(b.from ?? '')),
+  )[0];
 }
 
 /** The hour of a time in a time zone, with its minutes as a fraction. */
 const hourIn = (time: string, timeZone: string) => {
-  const [h, m] = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone }).format(new Date(time)).split(':').map(Number);
+  const [h, m] = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone })
+    .format(new Date(time))
+    .split(':')
+    .map(Number);
   return h + m / 60;
 };
 /** Each day's weather, by day (YYYY-MM-DD in the time zone), worked out from the forecast's instants. */
 export function dailyWeather(instants: readonly Instant[], timeZone: string): Map<string, DayWeather> {
   const byDay = new Map<string, Instant[]>();
-  for (const x of instants) { const day = dayOf(x.time, timeZone); if (day) byDay.set(day, [...(byDay.get(day) ?? []), x]); }
+  for (const x of instants) {
+    const day = dayOf(x.time, timeZone);
+    if (day) byDay.set(day, [...(byDay.get(day) ?? []), x]);
+  }
   const out = new Map<string, DayWeather>();
   for (const [day, xs] of byDay) {
-    const lows = xs.flatMap(x => [x.min, x.temperature].filter((n): n is number => n !== undefined));
-    const highs = xs.flatMap(x => [x.max, x.temperature].filter((n): n is number => n !== undefined));
-    const rain = xs.map(x => x.precipitation).filter((n): n is number => n !== undefined);
-    const winds = xs.map(x => x.wind).filter((n): n is number => n !== undefined);
-    const symbols = xs.filter(x => x.symbol).sort((a, b) => Math.abs(hourIn(a.time, timeZone) - 12) - Math.abs(hourIn(b.time, timeZone) - 12));
+    const lows = xs.flatMap((x) => [x.min, x.temperature].filter((n): n is number => n !== undefined));
+    const highs = xs.flatMap((x) => [x.max, x.temperature].filter((n): n is number => n !== undefined));
+    const rain = xs.map((x) => x.precipitation).filter((n): n is number => n !== undefined);
+    const winds = xs.map((x) => x.wind).filter((n): n is number => n !== undefined);
+    const symbols = xs
+      .filter((x) => x.symbol)
+      .sort((a, b) => Math.abs(hourIn(a.time, timeZone) - 12) - Math.abs(hourIn(b.time, timeZone) - 12));
     out.set(day, {
       ...(symbols.length ? { symbol: symbols[0].symbol } : {}),
-      ...(lows.length ? { min: Math.min(...lows) } : {}), ...(highs.length ? { max: Math.max(...highs) } : {}),
+      ...(lows.length ? { min: Math.min(...lows) } : {}),
+      ...(highs.length ? { max: Math.max(...highs) } : {}),
       ...(rain.length ? { precipitation: Number(rain.reduce((a, b) => a + b, 0).toFixed(1)) } : {}),
       ...(winds.length ? { wind: Math.max(...winds) } : {}),
     });
@@ -189,4 +228,11 @@ export function weatherSign(code: string): string {
   return '•';
 }
 /** A symbol's code as words: "partlycloudy_day" is "partly cloudy, day". */
-export const symbolWords = (code: string) => code.replace(/partly/i, 'partly ').replace(/light(?!ning)/i, 'light ').replace(/heavy/i, 'heavy ').replace(/_/g, ', ').replace(/\s+/g, ' ').trim();
+export const symbolWords = (code: string) =>
+  code
+    .replace(/partly/i, 'partly ')
+    .replace(/light(?!ning)/i, 'light ')
+    .replace(/heavy/i, 'heavy ')
+    .replace(/_/g, ', ')
+    .replace(/\s+/g, ' ')
+    .trim();

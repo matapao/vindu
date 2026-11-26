@@ -12,9 +12,7 @@ export const viewCall = async (
 ) => {
   try {
     const r = await run();
-    const id = session.live?.kindOf(args.view)
-      ? session.more.record?.({ tool, input: args, result: r })
-      : undefined;
+    const id = session.live?.kindOf(args.view) ? session.more.record?.({ tool, input: args, result: r }) : undefined;
     log(session, { tool, args, ok: true, ...(id ? { id } : {}) });
     return json(id ? { id, ...r } : r);
   } catch (e) {

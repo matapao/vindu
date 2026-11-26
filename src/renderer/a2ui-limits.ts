@@ -15,13 +15,21 @@ interface ArrayParser {
   _parse: (this: ArrayParser, input: ParseInput) => ParseReturnType<unknown>;
 }
 /** A schema of the Zod 3 whose arrays are guarded. */
-type Member = { transform(f: (value: unknown) => unknown): { array(): { max(bound: number): { safeParse(data: unknown): unknown } } } };
+type Member = {
+  transform(f: (value: unknown) => unknown): { array(): { max(bound: number): { safeParse(data: unknown): unknown } } };
+};
 
 /** Check an array's bound before its members, in the Zod 3 that member's schema comes from. Changes nothing where
  *  that Zod does so already, or was guarded before. */
 export function guardArrays(member: Member) {
   let visited = false;
-  const sample = member.transform(value => { visited = true; return value; }).array().max(0);
+  const sample = member
+    .transform((value) => {
+      visited = true;
+      return value;
+    })
+    .array()
+    .max(0);
   sample.safeParse(['item']);
   if (!visited) return; // The installed parser already stops at its bound.
 
@@ -34,7 +42,12 @@ export function guardArrays(member: Member) {
       const bound = exact && length > exact.value ? exact : this._def.maxLength;
       if (bound && length > bound.value) {
         addIssueToContext(this._getOrReturnCtx(input), {
-          code: 'too_big', type: 'array', maximum: bound.value, inclusive: true, exact: bound === exact, message: bound.message,
+          code: 'too_big',
+          type: 'array',
+          maximum: bound.value,
+          inclusive: true,
+          exact: bound === exact,
+          message: bound.message,
         });
         return INVALID;
       }

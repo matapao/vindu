@@ -25,10 +25,21 @@ export type ZipArchive = {
   /** A part as UTF-8 text, without its byte order mark; undefined when there is no such part. */
   text: (name: string) => string | undefined;
 };
-type Entry = { name: string; method: number; flags: number; crc: number; compressed: number; size: number; offset: number };
+type Entry = {
+  name: string;
+  method: number;
+  flags: number;
+  crc: number;
+  compressed: number;
+  size: number;
+  offset: number;
+};
 
-const END = 0x06054b50, CENTRAL = 0x02014b50, LOCAL = 0x04034b50;
-const STORED = 0, DEFLATED = 8;
+const END = 0x06054b50,
+  CENTRAL = 0x02014b50,
+  LOCAL = 0x04034b50;
+const STORED = 0,
+  DEFLATED = 8;
 /** The compressed bytes given to the inflater at once: what one push makes is at most about 1,000 times as many. */
 const CHUNK = 4096;
 const megabytes = (n: number) => `${(n / 1e6).toLocaleString('en-GB', { maximumFractionDigits: 1 })} MB`;
@@ -55,12 +66,18 @@ const escapes = (name: string) => /^[/\\]|^[A-Za-z]:/.test(name) || name.split(/
 
 /** The end of the central directory: where the directory is, how long it is, and how many entries it lists. */
 function endOf(source: ZipSource): { at: number; length: number; entries: number } {
-  const tail = Math.min(source.size, 22 + 0xffff), start = source.size - tail, b = source.read(start, tail);
+  const tail = Math.min(source.size, 22 + 0xffff),
+    start = source.size - tail,
+    b = source.read(start, tail);
   for (let i = tail - 22; i >= 0; i--) {
     if (u32(b, i) !== END) continue;
-    const entries = u16(b, i + 10), length = u32(b, i + 12), at = u32(b, i + 16);
-    if (u16(b, i + 4) !== 0 || u16(b, i + 6) !== 0 || u16(b, i + 8) !== entries) throw new Error('is split over several files, which the system does not read');
-    if (entries === 0xffff || length === 0xffffffff || at === 0xffffffff) throw new Error('is a ZIP64 archive, which the system does not read');
+    const entries = u16(b, i + 10),
+      length = u32(b, i + 12),
+      at = u32(b, i + 16);
+    if (u16(b, i + 4) !== 0 || u16(b, i + 6) !== 0 || u16(b, i + 8) !== entries)
+      throw new Error('is split over several files, which the system does not read');
+    if (entries === 0xffff || length === 0xffffffff || at === 0xffffffff)
+      throw new Error('is a ZIP64 archive, which the system does not read');
     if (at + length > start + i) throw damaged('its central directory runs past its end');
     return { at, length, entries };
   }
@@ -69,27 +86,51 @@ function endOf(source: ZipSource): { at: number; length: number; entries: number
 
 /** The entries the central directory lists, checked against the limits before any part is inflated. */
 function entriesOf(source: ZipSource, limits: ZipLimits): Entry[] {
-  if (source.size > limits.file) throw new Error(`is ${megabytes(source.size)}; the system reads .xlsx and .docx files up to ${megabytes(limits.file)}`);
+  if (source.size > limits.file)
+    throw new Error(
+      `is ${megabytes(source.size)}; the system reads .xlsx and .docx files up to ${megabytes(limits.file)}`,
+    );
   if (source.size < 22) throw damaged('it is too short to be one');
   const end = endOf(source);
-  if (end.entries > limits.entries) throw new Error(`holds ${count(end.entries)} parts; the system reads archives of at most ${count(limits.entries)}`);
-  const b = source.read(end.at, end.length), out: Entry[] = [], names = new Set<string>();
-  let i = 0, total = 0;
+  if (end.entries > limits.entries)
+    throw new Error(`holds ${count(end.entries)} parts; the system reads archives of at most ${count(limits.entries)}`);
+  const b = source.read(end.at, end.length),
+    out: Entry[] = [],
+    names = new Set<string>();
+  let i = 0,
+    total = 0;
   for (let n = 0; n < end.entries; n++) {
     if (i + 46 > b.length || u32(b, i) !== CENTRAL) throw damaged('its central directory is cut short');
-    const flags = u16(b, i + 8), method = u16(b, i + 10), crc = u32(b, i + 16), compressed = u32(b, i + 20), size = u32(b, i + 24);
-    const nameLength = u16(b, i + 28), extra = u16(b, i + 30), comment = u16(b, i + 32), offset = u32(b, i + 42);
+    const flags = u16(b, i + 8),
+      method = u16(b, i + 10),
+      crc = u32(b, i + 16),
+      compressed = u32(b, i + 20),
+      size = u32(b, i + 24);
+    const nameLength = u16(b, i + 28),
+      extra = u16(b, i + 30),
+      comment = u16(b, i + 32),
+      offset = u32(b, i + 42);
     if (i + 46 + nameLength > b.length) throw damaged('its central directory is cut short');
     const name = new TextDecoder('utf-8').decode(b.subarray(i + 46, i + 46 + nameLength));
-    if (compressed === 0xffffffff || size === 0xffffffff || offset === 0xffffffff) throw new Error('is a ZIP64 archive, which the system does not read');
-    if (escapes(name) || name.includes('\0')) throw new Error(`holds a part whose name leaves the archive (${JSON.stringify(name.slice(0, 80))}), so it is not read`);
+    if (compressed === 0xffffffff || size === 0xffffffff || offset === 0xffffffff)
+      throw new Error('is a ZIP64 archive, which the system does not read');
+    if (escapes(name) || name.includes('\0'))
+      throw new Error(
+        `holds a part whose name leaves the archive (${JSON.stringify(name.slice(0, 80))}), so it is not read`,
+      );
     const key = name.toLowerCase();
-    if (names.has(key)) throw new Error(`holds two parts named ${JSON.stringify(name.slice(0, 80))}, so it is not read`);
+    if (names.has(key))
+      throw new Error(`holds two parts named ${JSON.stringify(name.slice(0, 80))}, so it is not read`);
     names.add(key);
     total += size;
-    if (total > limits.total) throw new Error(`says its parts inflate to more than ${megabytes(limits.total)} in all; the system reads archives up to ${megabytes(limits.total)} inflated`);
+    if (total > limits.total)
+      throw new Error(
+        `says its parts inflate to more than ${megabytes(limits.total)} in all; the system reads archives up to ${megabytes(limits.total)} inflated`,
+      );
     if (size > limits.ratioFrom && size > limits.ratio * Math.max(compressed, 1)) {
-      throw new Error(`holds a part (${JSON.stringify(name.slice(0, 80))}) that says it inflates to ${Math.floor(size / Math.max(compressed, 1))} times its compressed size; the system reads parts of at most ${limits.ratio} times`);
+      throw new Error(
+        `holds a part (${JSON.stringify(name.slice(0, 80))}) that says it inflates to ${Math.floor(size / Math.max(compressed, 1))} times its compressed size; the system reads parts of at most ${limits.ratio} times`,
+      );
     }
     out.push({ name, method, flags, crc, compressed, size, offset });
     i += 46 + nameLength + extra + comment;
@@ -113,12 +154,17 @@ function inflated(data: Uint8Array, e: Entry): Uint8Array {
     if (data.length !== e.size) throw damaged(`its part "${e.name}" is not the size it says`);
     return data;
   }
-  if (e.method !== DEFLATED) throw new Error(`holds a part ("${e.name}") compressed in a way the system does not read (method ${e.method})`);
+  if (e.method !== DEFLATED)
+    throw new Error(`holds a part ("${e.name}") compressed in a way the system does not read (method ${e.method})`);
   const out = new Uint8Array(e.size);
   let made = 0;
-  const inflater = new Inflate(chunk => {
-    if (made + chunk.length > e.size) throw new Error(`holds a part ("${e.name}") that inflates to more than the ${count(e.size)} bytes it says, so it is not read`);
-    out.set(chunk, made); made += chunk.length;
+  const inflater = new Inflate((chunk) => {
+    if (made + chunk.length > e.size)
+      throw new Error(
+        `holds a part ("${e.name}") that inflates to more than the ${count(e.size)} bytes it says, so it is not read`,
+      );
+    out.set(chunk, made);
+    made += chunk.length;
   });
   try {
     if (!data.length) inflater.push(data, true);
@@ -134,33 +180,39 @@ function inflated(data: Uint8Array, e: Entry): Uint8Array {
 /** An archive, its central directory read and checked; its parts are inflated as they are asked for, once each. */
 function openZip(source: ZipSource, limits: ZipLimits = ZIP_LIMITS): ZipArchive {
   const entries = entriesOf(source, limits);
-  const byName = new Map(entries.map(e => [e.name.toLowerCase(), e]));
+  const byName = new Map(entries.map((e) => [e.name.toLowerCase(), e]));
   const read = new Map<Entry, Uint8Array>();
   const bytes = (name: string) => {
     const e = byName.get(name.toLowerCase());
     if (!e) return undefined;
     const kept = read.get(e);
     if (kept) return kept;
-    if (e.flags & 1) throw new Error(`is protected by a password (its part "${e.name}" is encrypted), so it is not read`);
+    if (e.flags & 1)
+      throw new Error(`is protected by a password (its part "${e.name}" is encrypted), so it is not read`);
     const out = inflated(dataOf(source, e), e);
     if (crc32(out) !== e.crc) throw damaged(`its part "${e.name}" does not match its checksum`);
     read.set(e, out);
     return out;
   };
   return {
-    names: entries.map(e => e.name),
-    has: name => byName.has(name.toLowerCase()),
+    names: entries.map((e) => e.name),
+    has: (name) => byName.has(name.toLowerCase()),
     bytes,
-    text: name => {
+    text: (name) => {
       const b = bytes(name);
       if (!b) return undefined;
-      try { return new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(b); } catch { throw new Error(`holds a part ("${name}") that is not UTF-8 text`); }
+      try {
+        return new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(b);
+      } catch {
+        throw new Error(`holds a part ("${name}") that is not UTF-8 text`);
+      }
     },
   };
 }
 
 /** An archive in memory. */
-export const bytesZip = (b: Uint8Array, limits?: ZipLimits) => openZip({ size: b.length, read: (at, length) => b.subarray(at, at + length) }, limits);
+export const bytesZip = (b: Uint8Array, limits?: ZipLimits) =>
+  openZip({ size: b.length, read: (at, length) => b.subarray(at, at + length) }, limits);
 
 /** An archive on disk, read through one descriptor while use reads it: only its directory and the parts asked for. */
 export function withZipFile<T>(file: string, use: (zip: ZipArchive) => T): T {
@@ -168,10 +220,13 @@ export function withZipFile<T>(file: string, use: (zip: ZipArchive) => T): T {
   try {
     const size = fs.fstatSync(fd).size;
     const read = (at: number, length: number) => {
-      const b = Buffer.alloc(length), n = fs.readSync(fd, b, 0, length, at);
+      const b = Buffer.alloc(length),
+        n = fs.readSync(fd, b, 0, length, at);
       if (n !== length) throw damaged('it is shorter than its directory says');
       return b;
     };
     return use(openZip({ size, read }));
-  } finally { fs.closeSync(fd); }
+  } finally {
+    fs.closeSync(fd);
+  }
 }

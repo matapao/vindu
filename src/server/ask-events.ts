@@ -5,12 +5,7 @@ import type { Session } from './state.js';
 import { asText } from '../format.js';
 
 // The host registers attachments only while this specific ask and file field are open.
-export const provideFiles = (
-  session: Session,
-  ticket: string,
-  field: string,
-  register: () => string[],
-): string[] => {
+export const provideFiles = (session: Session, ticket: string, field: string, register: () => string[]): string[] => {
   const pending = session.asks.get(ticket);
   if (session.closed || !pending || !Object.hasOwn(pending.ask.fields, field)) return [];
   if (pending.ask.fields[field].format !== 'file' || pending.approvals.length) return []; // what the first yes approved stays as it is

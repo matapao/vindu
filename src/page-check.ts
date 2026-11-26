@@ -18,20 +18,34 @@ import { cut, few, first, LIMITS, readOne, runSteps, Unanswered } from './page-s
 const need = createRequire(import.meta.url);
 let AXE: { source: string; version: string } | null | undefined;
 /** axe-core's script, read once: it runs in the page, as the page is. */
-const axe = () => { if (AXE === undefined) { try { AXE = { source: fs.readFileSync(need.resolve('axe-core/axe.min.js'), 'utf8'), version: String((need('axe-core/package.json') as { version: string }).version) }; } catch { AXE = null; } } return AXE; };
+const axe = () => {
+  if (AXE === undefined) {
+    try {
+      AXE = {
+        source: fs.readFileSync(need.resolve('axe-core/axe.min.js'), 'utf8'),
+        version: String((need('axe-core/package.json') as { version: string }).version),
+      };
+    } catch {
+      AXE = null;
+    }
+  }
+  return AXE;
+};
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
 /** A browser the host provides: Playwright for headless hosts, a hidden window in Electron. A driver refuses every
  *  request that leaves the page host (pageNavigationAllowed), navigations and popups included, and says which it
  *  refused; and takes WebRTC from every frame, which no CSP covers (noWebRtc, before anything runs). */
-export interface PageDriver { open(url: string, viewport: { width: number; height: number }): Promise<DriverPage> }
+export interface PageDriver {
+  open(url: string, viewport: { width: number; height: number }): Promise<DriverPage>;
+}
 export interface DriverPage {
-  status: number | null;   // the HTTP status of the page itself, or null when it did not load
-  ms: number;              // until the load event
-  refused(): string[];     // requests the driver refused because they left the page host
+  status: number | null; // the HTTP status of the page itself, or null when it did not load
+  ms: number; // until the load event
+  refused(): string[]; // requests the driver refused because they left the page host
   eval<T = unknown>(expression: string): Promise<T>; // a promise the expression returns is awaited
-  press(key: string): Promise<void>;                 // e.g. "ArrowRight", "Space", "Enter", "a": down and up at once
-  down?(key: string): Promise<void>;                 // a key held down until up: what a game that reads keys each frame sees
+  press(key: string): Promise<void>; // e.g. "ArrowRight", "Space", "Enter", "a": down and up at once
+  down?(key: string): Promise<void>; // a key held down until up: what a game that reads keys each frame sees
   up?(key: string): Promise<void>;
   click(selector: string): Promise<void>;
   type(text: string, selector?: string): Promise<void>;
@@ -40,39 +54,78 @@ export interface DriverPage {
   close(): Promise<void>;
 }
 
-export type Step = { press?: string; times?: number; hold?: string; ms?: number; down?: string; up?: string; click?: string; type?: string; into?: string; wait?: number | string; js?: string };
+export type Step = {
+  press?: string;
+  times?: number;
+  hold?: string;
+  ms?: number;
+  down?: string;
+  up?: string;
+  click?: string;
+  type?: string;
+  into?: string;
+  wait?: number | string;
+  js?: string;
+};
 export type StepResult = { step: string; ok: boolean; note?: string; errors?: string[] };
 export type PageReport = {
-  page: string; size?: string; loaded: boolean; status?: number | null; ms: number;
-  title?: string; errors?: string[]; warnings?: string[]; failed_requests?: string[]; blocked?: string[]; pinned?: string[];
-  libraries?: string[]; charts?: Record<string, unknown>[]; three?: Record<string, unknown>[]; canvases?: Record<string, unknown>[];
+  page: string;
+  size?: string;
+  loaded: boolean;
+  status?: number | null;
+  ms: number;
+  title?: string;
+  errors?: string[];
+  warnings?: string[];
+  failed_requests?: string[];
+  blocked?: string[];
+  pinned?: string[];
+  libraries?: string[];
+  charts?: Record<string, unknown>[];
+  three?: Record<string, unknown>[];
+  canvases?: Record<string, unknown>[];
   /** when a list was cut to its limit: how many there were */
   totals?: Record<string, number>;
   text?: { characters: number; headings?: string[]; starts?: string };
   phone?: { width: number; overflow_px: number };
-  data_fetched?: string[]; numbers_not_in_any_result?: number[]; numbers_note?: string;
+  data_fetched?: string[];
+  numbers_not_in_any_result?: number[];
+  numbers_note?: string;
   /** what the page gave task.send: a copy being checked sends nothing, so the report lists it instead */
   sent?: { values: string[]; note: string };
-  accessibility?: { engine: string; rules?: string; violations?: { rule: string; impact: string | null; says: string; elements: number; at: string[] }[]; passed?: number; to_check?: number; note?: string };
-  steps?: StepResult[]; read?: Record<string, string | null>;
+  accessibility?: {
+    engine: string;
+    rules?: string;
+    violations?: { rule: string; impact: string | null; says: string; elements: number; at: string[] }[];
+    passed?: number;
+    to_check?: number;
+    note?: string;
+  };
+  steps?: StepResult[];
+  read?: Record<string, string | null>;
 };
 export type CheckOptions = {
-  label?: string;                          // how the report names the page
-  steps?: Step[]; read?: string[];
-  usesData?: boolean;                      // the page shows process data: list numbers it shows that are in no result
-  known?: Set<number>;                     // amounts in the process's results
-  misses?: (since: number) => string[];    // requests the host could not answer since then
-  size?: 'desktop' | 'phone';              // where the page loads and the steps run: 1024 × 768 (default) or 390 × 844
-  phone?: boolean;                         // also measure overflow at phone width (default true)
-  pinned?: string[];                       // what a page can import by name, listed when it reached for the web
-  accessibility?: boolean;                 // audit the page (axe-core): default true
+  label?: string; // how the report names the page
+  steps?: Step[];
+  read?: string[];
+  usesData?: boolean; // the page shows process data: list numbers it shows that are in no result
+  known?: Set<number>; // amounts in the process's results
+  misses?: (since: number) => string[]; // requests the host could not answer since then
+  size?: 'desktop' | 'phone'; // where the page loads and the steps run: 1024 × 768 (default) or 390 × 844
+  phone?: boolean; // also measure overflow at phone width (default true)
+  pinned?: string[]; // what a page can import by name, listed when it reached for the web
+  accessibility?: boolean; // audit the page (axe-core): default true
   settleMs?: number;
 };
 
-const DESKTOP = { width: 1024, height: 768 }, PHONE = { width: 390, height: 844 };
+const DESKTOP = { width: 1024, height: 768 },
+  PHONE = { width: 390, height: 844 };
 const OVERFLOW = 'Math.max(0, document.documentElement.scrollWidth - window.innerWidth)';
 /** A long URL keeps its start and its end, where the file name is, so different files stay different. */
-const cutMiddle = (s: unknown, n: number) => { const t = asText(s ?? ''); return t.length > n ? `${t.slice(0, Math.ceil(n / 2) - 1)}…${t.slice(t.length - Math.floor(n / 2))}` : t; };
+const cutMiddle = (s: unknown, n: number) => {
+  const t = asText(s ?? '');
+  return t.length > n ? `${t.slice(0, Math.ceil(n / 2) - 1)}…${t.slice(t.length - Math.floor(n / 2))}` : t;
+};
 /** A driver's page as a check uses it: an evaluation may be given longer than a call (the audit). */
 export type Bounded = Omit<DriverPage, 'eval'> & { eval<T = unknown>(expression: string, ms?: number): Promise<T> };
 /** A driver's page, every call held to a time on this side, whatever the page does to its own timers: a call that
@@ -82,33 +135,51 @@ function bounded(page: DriverPage): Bounded {
   const within = <T>(call: () => Promise<T>, ms = LIMITS.call): Promise<T> => {
     if (dead) return Promise.reject(dead);
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const late = new Promise<never>((_, no) => { timer = setTimeout(() => {
-      dead ??= new Unanswered(`the page stopped answering: nothing came back for ${ms / 1000} s (a script that never ends, or a promise that never settles), so it was closed`);
-      void page.close().catch(() => undefined); no(dead);
-    }, ms); });
+    const late = new Promise<never>((_, no) => {
+      timer = setTimeout(() => {
+        dead ??= new Unanswered(
+          `the page stopped answering: nothing came back for ${ms / 1000} s (a script that never ends, or a promise that never settles), so it was closed`,
+        );
+        void page.close().catch(() => undefined);
+        no(dead);
+      }, ms);
+    });
     return Promise.race([call(), late]).finally(() => clearTimeout(timer));
   };
   return {
-    status: page.status, ms: page.ms, refused: () => page.refused(),
+    status: page.status,
+    ms: page.ms,
+    refused: () => page.refused(),
     eval: <T>(js: string, ms?: number) => within(() => page.eval<T>(js), ms),
-    press: key => within(() => page.press(key)),
-    ...(page.down && page.up ? { down: (key: string) => within(() => page.down!(key)), up: (key: string) => within(() => page.up!(key)) } : {}),
-    click: selector => within(() => page.click(selector)),
+    press: (key) => within(() => page.press(key)),
+    ...(page.down && page.up
+      ? { down: (key: string) => within(() => page.down!(key)), up: (key: string) => within(() => page.up!(key)) }
+      : {}),
+    click: (selector) => within(() => page.click(selector)),
     type: (text, selector) => within(() => page.type(text, selector)),
     waitFor: (selector, ms) => within(() => page.waitFor(selector, ms), ms + LIMITS.call),
-    wait: ms => within(() => page.wait(ms), ms + LIMITS.call),
-    close: () => dead ? Promise.resolve() : within(() => page.close()),
+    wait: (ms) => within(() => page.wait(ms), ms + LIMITS.call),
+    close: () => (dead ? Promise.resolve() : within(() => page.close())),
   };
 }
 /** A page the driver opens within 60 s, bounded; one that opens later is closed at once. */
 const opened = (driver: PageDriver, url: string, size: { width: number; height: number }) => {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const opening = driver.open(url, size);
-  const late = new Promise<never>((_, no) => { timer = setTimeout(() => {
-    no(new Unanswered('the browser did not open the page within 60 s'));
-    opening.then(p => p.close(), () => undefined).catch(() => undefined);
-  }, 60_000); });
-  return Promise.race([opening, late]).finally(() => clearTimeout(timer)).then(bounded);
+  const late = new Promise<never>((_, no) => {
+    timer = setTimeout(() => {
+      no(new Unanswered('the browser did not open the page within 60 s'));
+      opening
+        .then(
+          (p) => p.close(),
+          () => undefined,
+        )
+        .catch(() => undefined);
+    }, 60_000);
+  });
+  return Promise.race([opening, late])
+    .finally(() => clearTimeout(timer))
+    .then(bounded);
 };
 
 export async function checkPage(driver: PageDriver, url: string, o: CheckOptions = {}): Promise<PageReport> {
@@ -116,72 +187,185 @@ export async function checkPage(driver: PageDriver, url: string, o: CheckOptions
   const size = o.size === 'phone' ? PHONE : DESKTOP;
   const page = await opened(driver, url, size);
   try {
-    const report: PageReport = { page: o.label ?? new URL(url).pathname, ...(o.size === 'phone' ? { size: `${PHONE.width}×${PHONE.height}` } : {}), loaded: page.status !== null && page.status < 400, ms: page.ms };
-    if (!report.loaded) { report.status = page.status; return report; }
+    const report: PageReport = {
+      page: o.label ?? new URL(url).pathname,
+      ...(o.size === 'phone' ? { size: `${PHONE.width}×${PHONE.height}` } : {}),
+      loaded: page.status !== null && page.status < 400,
+      ms: page.ms,
+    };
+    if (!report.loaded) {
+      report.status = page.status;
+      return report;
+    }
     await page.wait(o.settleMs ?? 500);
     const steps = await runSteps(page, o.steps ?? [], `${size.width} px wide`);
     const c = await page.eval<Collected>(`(${collect.toString()})(${o.usesData ? 'true' : 'false'}, ${MEASURES})`);
     const read: Record<string, string | null> = Object.create(null);
     for (const q of (o.read ?? []).slice(0, 20)) read[cut(q, 200)] = await readOne(page, q);
-    const blocked = [...c.blocked, ...page.refused().map(u => `${u} (outside this page's origin)`)];
-    const blockedUrls = new Set(blocked.map(b => b.split(' ')[0]));
-    const failed = [...c.failed, ...(o.misses?.(t0) ?? []).map(p => new URL(p, url).href)].filter(f => !blockedUrls.has(f)).map(f => shortUrl(f, url));
+    const blocked = [...c.blocked, ...page.refused().map((u) => `${u} (outside this page's origin)`)];
+    const blockedUrls = new Set(blocked.map((b) => b.split(' ')[0]));
+    const failed = [...c.failed, ...(o.misses?.(t0) ?? []).map((p) => new URL(p, url).href)]
+      .filter((f) => !blockedUrls.has(f))
+      .map((f) => shortUrl(f, url));
     const totals: Record<string, number> = {};
-    const limit = <T>(name: string, xs: T[], n: number): T[] => { const u = [...new Set(xs)]; if (u.length > n) totals[name] = u.length; return u.slice(0, n); };
+    const limit = <T>(name: string, xs: T[], n: number): T[] => {
+      const u = [...new Set(xs)];
+      if (u.length > n) totals[name] = u.length;
+      return u.slice(0, n);
+    };
     if (c.title) report.title = cut(c.title, 120);
     if (c.errors.length) report.errors = few(limit('errors', c.errors, 10), 10, 300);
     if (c.warnings.length) report.warnings = few(limit('warnings', c.warnings, 5), 5, 300);
-    for (const [name, n, shown] of [['errors', c.counts.errors, report.errors?.length ?? 0], ['warnings', c.counts.warnings, report.warnings?.length ?? 0]] as const) if (n > shown) totals[name] = n; // each time one happened
+    for (const [name, n, shown] of [
+      ['errors', c.counts.errors, report.errors?.length ?? 0],
+      ['warnings', c.counts.warnings, report.warnings?.length ?? 0],
+    ] as const)
+      if (n > shown) totals[name] = n; // each time one happened
     if (failed.length) report.failed_requests = few(limit('failed_requests', failed, 10), 10, 200, cutMiddle);
     if (blocked.length) report.blocked = few(limit('blocked', blocked, 10), 10, 240, cutMiddle);
-    if (o.pinned && (blocked.some(b => /^https?:/.test(b)) || c.errors.some(e => /resolve module specifier/i.test(e)))) report.pinned = o.pinned.slice(0, 12); // the facts a page needs when it reached for the web
+    if (
+      o.pinned &&
+      (blocked.some((b) => /^https?:/.test(b)) || c.errors.some((e) => /resolve module specifier/i.test(e)))
+    )
+      report.pinned = o.pinned.slice(0, 12); // the facts a page needs when it reached for the web
     if (c.libraries.length) report.libraries = few(limit('libraries', c.libraries, 8), 8, 60);
-    if (c.charts.length) { if (c.counts.charts > 4) totals.charts = c.counts.charts;
-      report.charts = c.charts.slice(0, 4).map(ch => ({ library: ch.library, ...(ch.type ? { type: cut(ch.type, 40) } : {}), ...(ch.error ? { error: cut(ch.error, 200) } : {}),
-        ...(ch.labels ? { labels: ch.labels.slice(0, 12).map(l => cut(l, 24)) } : {}), ...(ch.series ? { series: ch.series.slice(0, 4).map(s => ({ name: cut(s.name, 40), points: s.count, values: s.values.slice(0, 12) })), ...(ch.series.length > 4 ? { series_total: ch.series.length } : {}) } : {}) })); }
-    if (c.three.length) { report.three = c.three.slice(0, 2); if (c.counts.three > 2) totals.three = c.counts.three; }
-    if (c.canvases.length) { report.canvases = c.canvases.slice(0, 8); if (c.counts.canvases > 8) totals.canvases = c.counts.canvases; }
-    report.text = { characters: c.characters, ...(c.headings.length ? { headings: few(c.headings, 8, 80) } : {}), ...(c.text ? { starts: cut(c.text, 160) } : {}) };
+    if (c.charts.length) {
+      if (c.counts.charts > 4) totals.charts = c.counts.charts;
+      report.charts = c.charts.slice(0, 4).map((ch) => ({
+        library: ch.library,
+        ...(ch.type ? { type: cut(ch.type, 40) } : {}),
+        ...(ch.error ? { error: cut(ch.error, 200) } : {}),
+        ...(ch.labels ? { labels: ch.labels.slice(0, 12).map((l) => cut(l, 24)) } : {}),
+        ...(ch.series
+          ? {
+              series: ch.series
+                .slice(0, 4)
+                .map((s) => ({ name: cut(s.name, 40), points: s.count, values: s.values.slice(0, 12) })),
+              ...(ch.series.length > 4 ? { series_total: ch.series.length } : {}),
+            }
+          : {}),
+      }));
+    }
+    if (c.three.length) {
+      report.three = c.three.slice(0, 2);
+      if (c.counts.three > 2) totals.three = c.counts.three;
+    }
+    if (c.canvases.length) {
+      report.canvases = c.canvases.slice(0, 8);
+      if (c.counts.canvases > 8) totals.canvases = c.counts.canvases;
+    }
+    report.text = {
+      characters: c.characters,
+      ...(c.headings.length ? { headings: few(c.headings, 8, 80) } : {}),
+      ...(c.text ? { starts: cut(c.text, 160) } : {}),
+    };
     if (c.counts.headings > 8) totals.headings = c.counts.headings;
-    if (o.phone !== false) report.phone = { width: PHONE.width, overflow_px: o.size === 'phone' ? await page.eval<number>(OVERFLOW) : await phoneOverflow(driver, url) };
+    if (o.phone !== false)
+      report.phone = {
+        width: PHONE.width,
+        overflow_px: o.size === 'phone' ? await page.eval<number>(OVERFLOW) : await phoneOverflow(driver, url),
+      };
     if (c.fetched.length) report.data_fetched = few(limit('data_fetched', c.fetched, 20), 20, 40); // this page's own fetches, from /data
-    if (c.counts.sent) { report.sent = { values: c.sent.slice(0, 5).map(s => cut(s, 300)), note: 'given to task.send in this copy, which sends nothing; in the person\'s window it reaches you while they use the page' }; if (c.counts.sent > 5) totals.sent = c.counts.sent; }
-    if (o.usesData) { // numbers on screen, in text or in a chart of a pinned library, that no result holds and task.value or task.group did not compute
+    if (c.counts.sent) {
+      report.sent = {
+        values: c.sent.slice(0, 5).map((s) => cut(s, 300)),
+        note: "given to task.send in this copy, which sends nothing; in the person's window it reaches you while they use the page",
+      };
+      if (c.counts.sent > 5) totals.sent = c.counts.sent;
+    }
+    if (o.usesData) {
+      // numbers on screen, in text or in a chart of a pinned library, that no result holds and task.value or task.group did not compute
       const known = o.known ?? new Set<number>();
-      const computed = new Set(c.computed.flatMap(v => amountsIn(String(v))));
+      const computed = new Set(c.computed.flatMap((v) => amountsIn(String(v))));
       // what the check itself measured (frames, draw calls, triangles, canvas sizes) is the page's own, not data
-      const own = new Set([...c.three.flatMap(t => [t.frames, t.draw_calls, t.triangles, t.renders_per_frame]), ...c.canvases.flatMap(k => [...String(k.size).split('×'), k.draw_calls])].map(Number).filter(Number.isFinite));
+      const own = new Set(
+        [
+          ...c.three.flatMap((t) => [t.frames, t.draw_calls, t.triangles, t.renders_per_frame]),
+          ...c.canvases.flatMap((k) => [...String(k.size).split('×'), k.draw_calls]),
+        ]
+          .map(Number)
+          .filter(Number.isFinite),
+      );
       const ok = (n: number) => known.has(n) || computed.has(n) || own.has(n);
-      const unknown = [...new Set([...c.texts.flatMap(t => unknownAmounts(t, ok)), ...c.charts.flatMap(ch => ch.series?.flatMap(s => s.values) ?? []).filter(Number.isFinite).flatMap(v => unknownAmounts(String(v), ok))])];
-      if (unknown.length) { report.numbers_not_in_any_result = limit('numbers_not_in_any_result', unknown, 12); report.numbers_note = 'shown by the page, but in no result and not computed with task.value or task.group: typed into the page, or worked out by its own code'; }
+      const unknown = [
+        ...new Set([
+          ...c.texts.flatMap((t) => unknownAmounts(t, ok)),
+          ...c.charts
+            .flatMap((ch) => ch.series?.flatMap((s) => s.values) ?? [])
+            .filter(Number.isFinite)
+            .flatMap((v) => unknownAmounts(String(v), ok)),
+        ]),
+      ];
+      if (unknown.length) {
+        report.numbers_not_in_any_result = limit('numbers_not_in_any_result', unknown, 12);
+        report.numbers_note =
+          'shown by the page, but in no result and not computed with task.value or task.group: typed into the page, or worked out by its own code';
+      }
     }
     if (o.accessibility !== false) report.accessibility = await audit(page, totals);
     if (steps.length) report.steps = steps;
     if (o.read?.length) report.read = read;
     if (Object.keys(totals).length) report.totals = totals;
     return report;
-  } finally { await page.close(); }
+  } finally {
+    await page.close();
+  }
 }
 
 /** WCAG 2 A and AA, by axe-core, after the steps: each rule the page fails, how bad, what it says, and where. axe-core
  *  is loaded fresh each time, and run from what its own script gives back, never from a window.axe the page set. */
 async function audit(page: Bounded, totals: Record<string, number>): Promise<NonNullable<PageReport['accessibility']>> {
-  const a = axe(); if (!a) return { engine: 'none', note: 'axe-core is not installed with Vindu here, so the page was not audited' };
+  const a = axe();
+  if (!a) return { engine: 'none', note: 'axe-core is not installed with Vindu here, so the page was not audited' };
   const engine = `axe-core ${a.version}`;
   try {
-    const r = await page.eval<{ v: { id: string; impact: string | null; help: string; n: number; at: string[] }[]; passed: number; incomplete: number }>(`(() => { const module = { exports: {} }, define = undefined; ${a.source}
+    const r = await page.eval<{
+      v: { id: string; impact: string | null; help: string; n: number; at: string[] }[];
+      passed: number;
+      incomplete: number;
+    }>(
+      `(() => { const module = { exports: {} }, define = undefined; ${a.source}
       ;return module.exports.run(document, { resultTypes: ['violations'], runOnly: { type: 'tag', values: ${scriptJson(AXE_TAGS)} } }); })()
-      .then(r => ({ v: r.violations.map(v => ({ id: v.id, impact: v.impact || null, help: v.help, n: v.nodes.length, at: v.nodes.slice(0, 3).map(n => [].concat(n.target).join(' ')) })), passed: r.passes.length, incomplete: r.incomplete.length }))`, LIMITS.audit);
+      .then(r => ({ v: r.violations.map(v => ({ id: v.id, impact: v.impact || null, help: v.help, n: v.nodes.length, at: v.nodes.slice(0, 3).map(n => [].concat(n.target).join(' ')) })), passed: r.passes.length, incomplete: r.incomplete.length }))`,
+      LIMITS.audit,
+    );
     const order = ['critical', 'serious', 'moderate', 'minor'];
     const v = [...r.v].sort((x, y) => order.indexOf(x.impact ?? 'minor') - order.indexOf(y.impact ?? 'minor'));
     if (v.length > 10) totals.accessibility_violations = v.length;
-    return { engine, rules: 'WCAG 2.0, 2.1 and 2.2, A and AA', violations: v.slice(0, 10).map(x => ({ rule: x.id, impact: x.impact, says: cut(x.help, 160), elements: x.n, at: x.at.map(t => cut(t, 120)) })), passed: r.passed, to_check: r.incomplete };
-  } catch (e) { if (e instanceof Unanswered) throw e; return { engine, note: `the audit did not run: ${first(e)}` }; }
+    return {
+      engine,
+      rules: 'WCAG 2.0, 2.1 and 2.2, A and AA',
+      violations: v.slice(0, 10).map((x) => ({
+        rule: x.id,
+        impact: x.impact,
+        says: cut(x.help, 160),
+        elements: x.n,
+        at: x.at.map((t) => cut(t, 120)),
+      })),
+      passed: r.passed,
+      to_check: r.incomplete,
+    };
+  } catch (e) {
+    if (e instanceof Unanswered) throw e;
+    return { engine, note: `the audit did not run: ${first(e)}` };
+  }
 }
 
 async function phoneOverflow(driver: PageDriver, url: string): Promise<number> {
   const p = await opened(driver, url, PHONE);
-  try { await p.wait(300); return await p.eval<number>(OVERFLOW); } finally { await p.close(); }
+  try {
+    await p.wait(300);
+    return await p.eval<number>(OVERFLOW);
+  } finally {
+    await p.close();
+  }
 }
 
-const shortUrl = (u: string, page: string) => { try { const x = new URL(u); return x.origin === new URL(page).origin ? x.pathname : x.href; } catch { return u; } };
+const shortUrl = (u: string, page: string) => {
+  try {
+    const x = new URL(u);
+    return x.origin === new URL(page).origin ? x.pathname : x.href;
+  } catch {
+    return u;
+  }
+};

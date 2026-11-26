@@ -20,7 +20,10 @@ export const VNotedTable = defineBlock('VNotedTable', 'vindu-noted-table', { cel
   const sortBy = (field: string) => (e: Event) =>
     sendBlockAction(e.currentTarget as HTMLElement, { type: 'view', action: 'sort', panel: props.panel, field });
   return html`<div class="vb-sheet vb-noted-table"><table><thead><tr>${fields.map((field, i) =>
-    headCell(html`<button class="vb-sort" @click=${sortBy(field)}>${unbroken(field)}${arrow(field)}</button>`, { note: noteAt(notes, -1, i), className: numberClass(0, i) }),
+    headCell(html`<button class="vb-sort" @click=${sortBy(field)}>${unbroken(field)}${arrow(field)}</button>`, {
+      note: noteAt(notes, -1, i),
+      className: numberClass(0, i),
+    }),
   )}</tr></thead>
 <tbody>${props.rows.map(
     (row, index) =>

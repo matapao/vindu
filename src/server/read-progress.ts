@@ -15,9 +15,16 @@ const STEP = 0.05;
 /** What the window read of a showing of a view: each panel's share, by its pid (or its id), kept where it grew. Only for
  *  the view's newest showing (seq), and only for its own panels. Whether anything grew. */
 export function readFromWindow(session: Session, x: Record<string, unknown>): boolean {
-  const view = asText(x.view ?? ''), spec = session.shown.get(view), seq = session.probes.get(view)?.seq;
+  const view = asText(x.view ?? ''),
+    spec = session.shown.get(view),
+    seq = session.probes.get(view)?.seq;
   if (!spec || seq === undefined || x.seq !== seq || !x.read || typeof x.read !== 'object') return false;
-  const ids = new Map(panelsOf(spec).flatMap((p) => [[p.id, p.id], [pidFor(p.id), p.id]]));
+  const ids = new Map(
+    panelsOf(spec).flatMap((p) => [
+      [p.id, p.id],
+      [pidFor(p.id), p.id],
+    ]),
+  );
   const kept = session.read.get(view) ?? new Map<string, { read: number; told: number }>();
   let grew = false;
   for (const [key, share] of Object.entries(x.read as Record<string, unknown>).slice(0, 200)) {
@@ -60,8 +67,11 @@ export const readForCheckpoint = (session: Session): [string, [string, number][]
 export const restoreRead = (session: Session, saved: [string, [string, number][]][] = []) => {
   session.read = new Map();
   for (const [view, panels] of saved) {
-    const spec = session.shown.get(view), ids = new Set(spec ? panelsOf(spec).map((p) => p.id) : []);
-    const kept = new Map(panels.filter(([panel]) => ids.has(panel)).map(([panel, read]) => [panel, { read, told: read }]));
+    const spec = session.shown.get(view),
+      ids = new Set(spec ? panelsOf(spec).map((p) => p.id) : []);
+    const kept = new Map(
+      panels.filter(([panel]) => ids.has(panel)).map(([panel, read]) => [panel, { read, told: read }]),
+    );
     if (kept.size) session.read.set(view, kept);
   }
 };

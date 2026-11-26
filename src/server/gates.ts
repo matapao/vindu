@@ -49,9 +49,7 @@ export const notYet = (
 ): string | undefined => {
   if (
     after.answered &&
-    !session.own
-      .slice(gate.sinceOwn)
-      .some((x) => x.to === after.answered && x.by === 'person' && x.values !== null) // the person's answer, not a page's or the host's
+    !session.own.slice(gate.sinceOwn).some((x) => x.to === after.answered && x.by === 'person' && x.values !== null) // the person's answer, not a page's or the host's
   )
     return `After you answer "${after.answered.replace(/_/g, ' ')}".`;
   /** The panel a ref names, in this view (as it is being shown) or in another view shown. */

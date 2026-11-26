@@ -23,9 +23,7 @@ import type { ServerRuntime } from './runtime.js';
 /** A page for check_page to read: where it is, how it is named, the results it reads, and whether it runs nothing. */
 export type Page = { url: string; label: string; uses: string[]; static?: true };
 export type Outcome =
-  | { action: 'accept'; values: Record<string, unknown>; n?: number }
-  | { action: 'decline' }
-  | { action: 'cancel' };
+  { action: 'accept'; values: Record<string, unknown>; n?: number } | { action: 'decline' } | { action: 'cancel' };
 export type Pending = {
   ask: Ask;
   view: string;
@@ -59,10 +57,7 @@ type Read = {
   seq: number;
   surface: 'wide' | 'compact';
   tab?: number;
-  got: Map<
-    number,
-    { text: string | null; visible: boolean; frame?: { w: number; h: number; loaded: boolean } }
-  >;
+  got: Map<number, { text: string | null; visible: boolean; frame?: { w: number; h: number; loaded: boolean } }>;
 };
 export type Session = {
   /** committed: called once the view has passed its checks and is shown, before anything is awaited; anew: the

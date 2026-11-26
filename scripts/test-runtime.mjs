@@ -5,30 +5,32 @@ import test from 'node:test';
 import { memoryResults, startVindu } from '@matapao/vindu/server';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 
-test('a host can show a tool result and read its layout over MCP', async t => {
+test('a host can show a tool result and read its layout over MCP', async (t) => {
   const provider = await startVindu();
   const clients = [];
   let task;
   t.after(async () => {
     try {
-      await Promise.all(clients.map(client => client.close()));
+      await Promise.all(clients.map((client) => client.close()));
     } finally {
       await provider.close();
     }
-    assert.equal(existsSync(task.dir), false, 'the session\'s temporary folder goes with it');
+    assert.equal(existsSync(task.dir), false, "the session's temporary folder goes with it");
   });
   async function connect(endpoint) {
     const client = new Client({ name: 'runtime-check', version: '1' });
     clients.push(client);
-    await client.connect(new StreamableHTTPClientTransport(new URL(endpoint.url), {
-      requestInit: { headers: endpoint.headers },
-    }));
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL(endpoint.url), {
+        requestInit: { headers: endpoint.headers },
+      }),
+    );
     return client;
   }
 
   const results = memoryResults();
   const views = [];
-  task = provider.open({ results }, { onView: view => views.push(view) });
+  task = provider.open({ results }, { onView: (view) => views.push(view) });
   assert.ok(existsSync(task.dir));
   const row = results.add({ server: 'inventory', tool: 'list', value: [{ quantity: 7 }] });
   task.result(row.id);
@@ -41,7 +43,10 @@ test('a host can show a tool result and read its layout over MCP', async t => {
   assert.equal(views.at(-1)?.name, 'inventory');
 
   const coordinator = await connect(task.layoutMcpServer);
-  assert.deepEqual((await coordinator.listTools()).tools.map(tool => tool.name), ['read_layout']);
+  assert.deepEqual(
+    (await coordinator.listTools()).tools.map((tool) => tool.name),
+    ['read_layout'],
+  );
   const layout = await coordinator.callTool({ name: 'read_layout', arguments: {} });
   assert.ok(!layout.isError, JSON.stringify(layout.content));
   assert.equal(JSON.parse(layout.content[0].text).paneCount, 1);

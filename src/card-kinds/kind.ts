@@ -13,14 +13,16 @@ import type { DrawnCells } from './cells.js';
 
 /** What a card draws itself with: its part of the data model, components it adds below its title, the window it is for. */
 export type DrawKit = {
-  pid: string;                                           // the id its components and its data live under
-  model: Record<string, unknown>;                        // its part of the data model, at /panels/<pid>
-  add: (c: Component) => string;                         // a component; its id, made unique
+  pid: string; // the id its components and its data live under
+  model: Record<string, unknown>; // its part of the data model, at /panels/<pid>
+  add: (c: Component) => string; // a component; its id, made unique
   text: (id: string, t: unknown, variant?: string, weight?: number) => string;
   list: (cells: string[], item?: 'Row' | 'Column') => string; // its rows (at /panels/<pid>/rows), each drawn with these cells
-  cell: (v: unknown, field?: string) => string;          // a value as the person reads it, in the window's locale
-  compact: boolean; locale: string; timeZone: string;
-  words: ViewWords;                                      // the words the view is drawn in (view-words.ts)
+  cell: (v: unknown, field?: string) => string; // a value as the person reads it, in the window's locale
+  compact: boolean;
+  locale: string;
+  timeZone: string;
+  words: ViewWords; // the words the view is drawn in (view-words.ts)
 };
 /** What a card's account is read from: its part of the data model, as drawn wide and as drawn narrow. */
 export type AccountKit = { model: Record<string, unknown>; narrow: Record<string, unknown> };

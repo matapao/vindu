@@ -63,10 +63,7 @@ export const readBack = (session: Session, view: string, ms: number) => {
 /** Wait, up to ms, until the window has read back every open pane since the panes last moved. */
 export const fresh = async (session: Session, ms: number) => {
   const until = Date.now() + ms;
-  while (
-    Date.now() < until &&
-    session.shell.open.some((v) => session.probes.has(v) && !session.shell.readSince(v))
-  )
+  while (Date.now() < until && session.shell.open.some((v) => session.probes.has(v) && !session.shell.readSince(v)))
     await new Promise((r) => setTimeout(r, 40));
 };
 /** What the window read back of a view, merged with what it read before of the same showing: A2UI draws only the tab
@@ -77,12 +74,7 @@ export const compare = (
 ): boolean => {
   const view = asText(e.view ?? '');
   const want = session.probes.get(view);
-  if (
-    !want ||
-    e.seq !== want.seq ||
-    (e.surface !== 'wide' && e.surface !== 'compact') ||
-    !Array.isArray(e.got)
-  )
+  if (!want || e.seq !== want.seq || (e.surface !== 'wide' && e.surface !== 'compact') || !Array.isArray(e.got))
     return false;
   const probes = want[e.surface],
     tab = typeof e.tab === 'number' && Number.isInteger(e.tab) ? e.tab : undefined;

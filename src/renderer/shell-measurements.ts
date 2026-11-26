@@ -21,9 +21,13 @@ function sightOf(body: HTMLElement): Record<string, Sight> | undefined {
     const panel = item?.panel ?? item?.pid;
     if (!item || !panel || (item.row === undefined && item.node === undefined)) continue;
     const bounds = mark.getBoundingClientRect();
-    const visible = bounds.width > 0 && bounds.height > 0
-      && bounds.bottom > box.top + 1 && bounds.top < box.bottom - 1
-      && bounds.right > box.left && bounds.left < box.right;
+    const visible =
+      bounds.width > 0 &&
+      bounds.height > 0 &&
+      bounds.bottom > box.top + 1 &&
+      bounds.top < box.bottom - 1 &&
+      bounds.right > box.left &&
+      bounds.left < box.right;
     if (item.node !== undefined) {
       if (visible) {
         const seen = nodes.get(panel) ?? new Set<string>();
@@ -64,7 +68,8 @@ export function measurePanes(
   let checkTimer: ReturnType<typeof setTimeout> | undefined;
   const checks = new Map<string, ReturnType<typeof setTimeout>>();
   // Each pane's last measure, kept until its pane scrolls or resizes (dirty) or the panes move (all of them).
-  const measured = new Map<string, Measured>(), dirty = new Set<string>();
+  const measured = new Map<string, Measured>(),
+    dirty = new Set<string>();
   let allDirty = true;
 
   /** Read back what a pane drew, once A2UI has drawn the probes in its open tab (hidden tabs render only when opened):
@@ -75,15 +80,17 @@ export function measurePanes(
     const current = () => pane === panes.get(name) && pane.view === view && pane.drawn === which;
     if (!current() || !view.probes) return;
     const probes = view.probes[which];
-    let tab: number | undefined, got: ReadBack[] = [];
+    let tab: number | undefined,
+      got: ReadBack[] = [];
     const read = () => {
       const tabs = tabsIn(pane.body);
-      tab = tabs ? tabs.activeIndex ?? 0 : undefined;
+      tab = tabs ? (tabs.activeIndex ?? 0) : undefined;
       got = readBack(pane.body, probes);
       return !got.some((reading, i) => {
         const probe = probes[i];
-        return reading.text === null && !probe.frame
-          && (probe.tab === undefined || tab === undefined || probe.tab === tab);
+        return (
+          reading.text === null && !probe.frame && (probe.tab === undefined || tab === undefined || probe.tab === tab)
+        );
       });
     };
     if (!(await rendered(pane.body, read))) read();
@@ -96,10 +103,13 @@ export function measurePanes(
 
   function recheck(name: string, ms = 0, always = false) {
     clearTimeout(checks.get(name));
-    checks.set(name, setTimeout(() => {
-      const pane = panes.get(name);
-      if (pane?.view?.probes && pane.drawn && !pane.el.hidden) void verify(name, pane.view, pane.drawn, always);
-    }, ms));
+    checks.set(
+      name,
+      setTimeout(() => {
+        const pane = panes.get(name);
+        if (pane?.view?.probes && pane.drawn && !pane.el.hidden) void verify(name, pane.view, pane.drawn, always);
+      }, ms),
+    );
   }
 
   // Not a wait for A2UI (verify waits for that): layout() runs on every frame of a window resize and every pointer move
@@ -128,7 +138,8 @@ export function measurePanes(
       views[view] = now;
     }
     for (const view of measured.keys()) if (!Object.hasOwn(views, view)) measured.delete(view);
-    allDirty = false; dirty.clear();
+    allDirty = false;
+    dirty.clear();
     const key = JSON.stringify(views);
     if (key === lastMeasure || !Object.keys(views).length) return;
     lastMeasure = key;
@@ -136,14 +147,20 @@ export function measurePanes(
   }
 
   return {
-    verify, recheck, recheckAll,
+    verify,
+    recheck,
+    recheckAll,
     /** Measure soon: the view's pane, which scrolled or resized; or, with none named, every pane, as after a layout. */
     scheduleMeasure: (view?: string) => {
-      if (view === undefined) allDirty = true; else dirty.add(view);
+      if (view === undefined) allDirty = true;
+      else dirty.add(view);
       clearTimeout(measureTimer);
       measureTimer = setTimeout(measure, 160);
     },
-    reset() { lastMeasure = ''; allDirty = true; },
+    reset() {
+      lastMeasure = '';
+      allDirty = true;
+    },
     destroy() {
       clearTimeout(measureTimer);
       clearTimeout(checkTimer);

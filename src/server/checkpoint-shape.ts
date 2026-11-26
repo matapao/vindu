@@ -32,10 +32,23 @@ const Shelved = z.object({
   updated: z.boolean().optional(),
 });
 const Text = (most: number) => z.string().max(most);
-const ResultPointer = z.object({ id: z.string().regex(/^r\d+$/), kind: z.literal('result'), server: Text(200), tool: Text(200), input: z.unknown().optional(), ref: Text(1000).optional() });
+const ResultPointer = z.object({
+  id: z.string().regex(/^r\d+$/),
+  kind: z.literal('result'),
+  server: Text(200),
+  tool: Text(200),
+  input: z.unknown().optional(),
+  ref: Text(1000).optional(),
+});
 const Pointer = z.discriminatedUnion('kind', [
   ResultPointer,
-  z.object({ id: z.string().regex(/^a\d+$/), kind: z.literal('attachment'), name: Text(1000), mime: Text(200), file: Text(4096) }),
+  z.object({
+    id: z.string().regex(/^a\d+$/),
+    kind: z.literal('attachment'),
+    name: Text(1000),
+    mime: Text(200),
+    file: Text(4096),
+  }),
 ]);
 const Gate = z.object({
   want: z.string(),
@@ -44,10 +57,13 @@ const Gate = z.object({
   got: z.string().optional(),
   why: z.string().max(1000).optional(),
   pointer: ResultPointer.optional(), // a restored panel's result the host could not read, to read again
-  fills: z.discriminatedUnion('field', [ // the field of its panel the result fills: from, a picture's media, or a gallery's item
-    z.object({ field: z.literal('from') }),
-    z.object({ field: z.literal('media'), at: Count.optional() }),
-  ]).optional(),
+  fills: z
+    .discriminatedUnion('field', [
+      // the field of its panel the result fills: from, a picture's media, or a gallery's item
+      z.object({ field: z.literal('from') }),
+      z.object({ field: z.literal('media'), at: Count.optional() }),
+    ])
+    .optional(),
 });
 const Fill = z.object({
   by: z.enum(['source', 'model', 'person']),
@@ -70,15 +86,28 @@ const Draft = z.object({
   view: Name,
   panel: Name,
   id: z.string().min(1).max(100),
-  of: z.string().regex(/^[a-f0-9]{64}$/).optional(), // the mail the model drafted, by its digest
-  model: z.object({ // the mail itself, as a checkpoint kept it before it kept only its digest
-    fields: DraftFields,
-    format: z.enum(['text', 'markdown']),
-    original: z
-      .object({ id: z.string().max(500), ref: z.string().max(500), from: z.string().max(DRAFT_LIMITS.address), time: z.string().max(100), subject: z.string().max(DRAFT_LIMITS.subject), body: z.string().max(DRAFT_LIMITS.body) })
-      .partial()
-      .optional(),
-  }).optional(),
+  of: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(), // the mail the model drafted, by its digest
+  model: z
+    .object({
+      // the mail itself, as a checkpoint kept it before it kept only its digest
+      fields: DraftFields,
+      format: z.enum(['text', 'markdown']),
+      original: z
+        .object({
+          id: z.string().max(500),
+          ref: z.string().max(500),
+          from: z.string().max(DRAFT_LIMITS.address),
+          time: z.string().max(100),
+          subject: z.string().max(DRAFT_LIMITS.subject),
+          body: z.string().max(DRAFT_LIMITS.body),
+        })
+        .partial()
+        .optional(),
+    })
+    .optional(),
   edited: DraftFields.optional(),
   state: z.enum(['draft', 'sent', 'failed', 'unknown']), // a send under way is kept as unknown
   reason: z.string().max(1000).optional(),
@@ -99,7 +128,10 @@ const Answer = z.object({
   who: z.array(Text(300)).max(20).optional(),
   at: Text(100),
 });
-const When = z.string().max(100).refine((t) => Number.isFinite(Date.parse(t)), 'a time');
+const When = z
+  .string()
+  .max(100)
+  .refine((t) => Number.isFinite(Date.parse(t)), 'a time');
 const Kept = z.object({
   id: z.string().regex(/^m\d+$/),
   what: Text(500),

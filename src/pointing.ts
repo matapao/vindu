@@ -22,7 +22,8 @@ export type { PointItem } from './window-reports.js';
 const panelOf = (spec: ViewSpec, it: PointItem): PanelSpec | undefined =>
   panelsOf(spec).find((p) => p.id === it.panel || pidFor(p.id) === it.pid);
 const fieldsShown = (p: PanelSpec, d: Resolved, def?: CardDef): string[] => {
-  if (def) return [...new Set(Object.values((d.shaped?.props?.map ?? p.map ?? {}) as Record<string, string>))].slice(0, 8); // a block's roles
+  if (def)
+    return [...new Set(Object.values((d.shaped?.props?.map ?? p.map ?? {}) as Record<string, string>))].slice(0, 8); // a block's roles
   return d.rows ? shownFields(p, d.rows) : [];
 };
 const pick = (r: Row, fields: string[]) =>
@@ -87,13 +88,7 @@ function terminalPoint(point: PointItem, location: PointLocation) {
   };
 }
 
-function rowPoint(
-  index: number,
-  location: PanelLocation,
-  panel: PanelSpec,
-  data: Resolved,
-  definition?: CardDef,
-) {
+function rowPoint(index: number, location: PanelLocation, panel: PanelSpec, data: Resolved, definition?: CardDef) {
   const sourceRow = data.rows?.[index];
   if (!sourceRow) return null;
   const row = pick(sourceRow, fieldsShown(panel, data, definition));
@@ -122,20 +117,16 @@ function rowPoint(
 function seenOf(data: Resolved, row: Row): string {
   const read = data.file && 'format' in data.file ? data.file : undefined; // a data file: each row is one of its own
   const line = read?.index.get(row);
-  const sheet = read?.sheets && (read.sheets.length === 1 ? read.sheets[0] : read.sheets.find(s => s.rows.includes(row))); // a workbook's
-  if (data.file && line !== undefined) return `read by the system from ${data.file.name}${sheet ? `, its sheet ${sheet.name}` : ''}, its row ${line}`;
+  const sheet =
+    read?.sheets && (read.sheets.length === 1 ? read.sheets[0] : read.sheets.find((s) => s.rows.includes(row))); // a workbook's
+  if (data.file && line !== undefined)
+    return `read by the system from ${data.file.name}${sheet ? `, its sheet ${sheet.name}` : ''}, its row ${line}`;
   if (data.file) return `computed by the system from ${data.file.name}`;
   return data.src ? 'computed by the system' : 'typed by the model';
 }
 
 /** Resolve only the selected part of a card, using the fields and source references visible there. */
-function panelPoint(
-  point: PointItem,
-  location: PanelLocation,
-  panel: PanelSpec,
-  data: Resolved,
-  definition?: CardDef,
-) {
+function panelPoint(point: PointItem, location: PanelLocation, panel: PanelSpec, data: Resolved, definition?: CardDef) {
   if (point.page !== undefined) {
     return {
       ...location,
@@ -169,7 +160,8 @@ function panelPoint(
       ...(typeof panel.marks === 'string' ? { ref: `${refOf(panel.marks)}${pointerStep(point.row)}` } : {}),
     };
   }
-  if (point.value && data.value !== undefined) { // a value worked out over the rows (a kpi)
+  if (point.value && data.value !== undefined) {
+    // a value worked out over the rows (a kpi)
     return {
       ...location,
       value: data.value,
@@ -184,9 +176,18 @@ function panelPoint(
     const ref = data.src && refOf(data.src.id, basePointer(data.src)) + pointerStep(field);
     return { ...location, field, value: data.record[field], ...(data.src ? { ref } : {}) };
   }
-  if (data.gallery && point.row !== undefined) { // an item of a gallery: which it is, and what it was found as
+  if (data.gallery && point.row !== undefined) {
+    // an item of a gallery: which it is, and what it was found as
     const item = data.gallery[point.row];
-    return item ? { ...location, media: item.name, type: item.mime, from: item.from, item: `${point.row + 1} of ${data.gallery.length}` } : null;
+    return item
+      ? {
+          ...location,
+          media: item.name,
+          type: item.mime,
+          from: item.from,
+          item: `${point.row + 1} of ${data.gallery.length}`,
+        }
+      : null;
   }
   if (point.node !== undefined) return { ...location, node: point.node };
   if (point.row !== undefined && data.rows) return rowPoint(point.row, location, panel, data, definition);
@@ -210,9 +211,7 @@ export function resolvePoint(
   if (context.kind === 'browser') return browserPoint(point, location);
   if (context.kind === 'terminal') return terminalPoint(point, location);
   if (!context.spec || !context.data) {
-    return point.page === undefined
-      ? null
-      : { ...location, page: point.page, note: 'as the page reported it' };
+    return point.page === undefined ? null : { ...location, page: point.page, note: 'as the page reported it' };
   }
   const panel = panelOf(context.spec, point);
   if (!panel) return null;
@@ -226,11 +225,7 @@ export function resolvePoint(
 }
 
 /** The rows a group stands for: one list of source indices per group value (for drilling, and for pointing at a bar). */
-export function groupsBehind(
-  rowsBefore: Row[],
-  group: string,
-  index: Map<Row, number>,
-): Map<string, number[]> {
+export function groupsBehind(rowsBefore: Row[], group: string, index: Map<Row, number>): Map<string, number[]> {
   const out = new Map<string, number[]>();
   for (const r of rowsBefore) {
     const i = index.get(r);

@@ -39,13 +39,7 @@ export const plainText = (v: unknown): string => {
   d.querySelectorAll('script,style').forEach((e) => e.remove());
   return (d.body.textContent ?? '').replace(/\n{3,}/g, '\n\n').trim();
 };
-export const rowContainer = (
-  props: BlockProps,
-  index: number,
-  className: string,
-  body: unknown,
-  extra = '',
-) =>
+export const rowContainer = (props: BlockProps, index: number, className: string, body: unknown, extra = '') =>
   html`<div class=${extra ? `${className} ${extra}` : className} data-panel=${props.panel ?? ''} data-row=${String(index)}>${body}</div>`;
 /** A person or a thing by its name, email or title (an object), or as it is written. */
 const displayName = (x: unknown): string => {
@@ -60,13 +54,19 @@ export const displayNames = (v: unknown): string[] => {
 };
 /** An address a block draws media from: http or https, a scheme the host serves pictures from (schemes, for a picture:
  *  picture-sources.ts), or a data: URL of the kinds given (images, base64); '' otherwise. */
-export function imageSource(v: unknown, data: RegExp = /^data:image\/(png|jpeg|gif|webp|svg\+xml);base64,/, schemes: readonly string[] = []): string {
+export function imageSource(
+  v: unknown,
+  data: RegExp = /^data:image\/(png|jpeg|gif|webp|svg\+xml);base64,/,
+  schemes: readonly string[] = [],
+): string {
   const s = typeof v === 'string' ? v.trim() : '';
   if (data.test(s)) return s;
   try {
     const scheme = new URL(s).protocol;
     return /^https?:$/.test(scheme) || schemes.includes(scheme) ? s : '';
-  } catch { return ''; }
+  } catch {
+    return '';
+  }
 }
 export const emptyMessage = (what: string) => html`<p class="vb-muted">${what}</p>`;
 export const defineBlock = (

@@ -25,7 +25,8 @@ export function forModelOf(said: unknown): string | undefined {
 const OUTCOME: Record<SendResult['outcome'], string> = {
   sent: 'the host sent it',
   failed: 'the host could not send it: it did not go, and the person may change it and send it again',
-  unknown: 'the host cannot say whether it went: it may not have arrived, and the person checks before sending it again',
+  unknown:
+    'the host cannot say whether it went: it may not have arrived, and the person checks before sending it again',
 };
 /** How a send the host could not say had gone was settled, in Vindu's words. */
 const SETTLED = {
@@ -36,7 +37,11 @@ const SETTLED = {
 const hostSays = (forModel: string | undefined) => (forModel ? `; the host says: ${JSON.stringify(forModel)}` : '');
 
 /** The mail as it was sent, for the model: its fields, and the mail it replies to without the host's ref. */
-type AsSent = Omit<DraftFields, 'attachments'> & { format: DraftFormat; in_reply_to?: DraftOriginal; attachments: (string | { path: string; size: number })[] };
+type AsSent = Omit<DraftFields, 'attachments'> & {
+  format: DraftFormat;
+  in_reply_to?: DraftOriginal;
+  attachments: (string | { path: string; size: number })[];
+};
 const withoutRef = (original: DraftOriginal | undefined) => {
   if (!original) return {};
   const { ref: _ref, ...told } = original;
@@ -47,16 +52,25 @@ function partsOf(mail: AsSent): string {
   const body = mail.body.length > 200 ? `${JSON.stringify(mail.body.slice(0, 199))}…` : JSON.stringify(mail.body);
   const attached = mail.attachments.map((f) => (typeof f === 'string' ? f : `${f.path} (${f.size} bytes)`));
   return [
-    `to ${mail.to.join(', ')}`, mail.cc.length ? `cc ${mail.cc.join(', ')}` : '', `subject ${JSON.stringify(mail.subject)}`,
+    `to ${mail.to.join(', ')}`,
+    mail.cc.length ? `cc ${mail.cc.join(', ')}` : '',
+    `subject ${JSON.stringify(mail.subject)}`,
     `body (${mail.body.length} characters${mail.format === 'markdown' ? ', Markdown' : ''}) ${body}`,
     attached.length ? `attached ${attached.join(', ')}` : '',
     mail.in_reply_to?.subject ? `in reply to ${JSON.stringify(mail.in_reply_to.subject)}` : '',
-  ].filter(Boolean).join('; ');
+  ]
+    .filter(Boolean)
+    .join('; ');
 }
 /** The mail as it was sent, kept as an answer about the draft in view: the person's, who pressed Send (who), or the
  *  host's, which settled it. Told with it, and not again as an answer. */
 function kept(session: Session, view: string, values: Record<string, unknown>, who?: string) {
-  const e = keep(session, { to: `Send on the mail drafted in view "${view}"`, by: who ? 'person' : 'host', values, ...(who ? { who: [who] } : {}) });
+  const e = keep(session, {
+    to: `Send on the mail drafted in view "${view}"`,
+    by: who ? 'person' : 'host',
+    values,
+    ...(who ? { who: [who] } : {}),
+  });
   session.heard.add(e.id);
   return e.id;
 }
@@ -67,19 +81,58 @@ const titleOf = (session: Session, view: string) => session.shown.get(view)?.tit
 export function toldSent(session: Session, draft: MessageDraft, result: SendResult) {
   const { id, view, panel, by, in_reply_to, ...fields } = draft;
   const mail = { ...fields, ...withoutRef(in_reply_to) };
-  const entry = kept(session, view, { outcome: result.outcome, ...(result.forModel ? { host_says: result.forModel } : {}), ...mail }, by.name);
+  const entry = kept(
+    session,
+    view,
+    { outcome: result.outcome, ...(result.forModel ? { host_says: result.forModel } : {}), ...mail },
+    by.name,
+  );
   const who = by.name === 'the person' ? 'the person' : `${by.name} (${by.window})`;
-  session.shell.say(`${who} pressed Send on the mail drafted in "${titleOf(session, view)}" (${panel}), and ${OUTCOME[result.outcome]}${hostSays(result.forModel)}; as it was sent: ${partsOf(mail)} (all of it: ctx_read ${entry})`);
-  log(session, { drafts: { draft: id, view, panel, outcome: result.outcome, ...('reason' in result && result.reason ? { reason: result.reason } : {}), entry } });
+  session.shell.say(
+    `${who} pressed Send on the mail drafted in "${titleOf(session, view)}" (${panel}), and ${OUTCOME[result.outcome]}${hostSays(result.forModel)}; as it was sent: ${partsOf(mail)} (all of it: ctx_read ${entry})`,
+  );
+  log(session, {
+    drafts: {
+      draft: id,
+      view,
+      panel,
+      outcome: result.outcome,
+      ...('reason' in result && result.reason ? { reason: result.reason } : {}),
+      entry,
+    },
+  });
 }
 
 /** A draft whose send the host settled, as the model is told it. */
-type Settled = { id: string; view: string; panel: string; fields: DraftFields; format: DraftFormat; original?: DraftOriginal };
+type Settled = {
+  id: string;
+  view: string;
+  panel: string;
+  fields: DraftFields;
+  format: DraftFormat;
+  original?: DraftOriginal;
+};
 /** What the model hears, once, when the host settles a send it could not say had gone: sent, or it did not go, in
  *  Vindu's words (and the host's forModel), with the mail as it was sent, kept as an answer for ctx_read. */
 export function toldSettled(session: Session, d: Settled, result: SendResult & { outcome: 'sent' | 'failed' }) {
   const mail = { ...d.fields, format: d.format, ...withoutRef(d.original) };
-  const entry = kept(session, d.view, { outcome: result.outcome, settled: 'by the host, after a send it could not say had gone', ...(result.forModel ? { host_says: result.forModel } : {}), ...mail });
-  session.shell.say(`the mail the person sent from "${titleOf(session, d.view)}" (${d.panel}), of which the host could not say whether it went: ${SETTLED[result.outcome]}${hostSays(result.forModel)}; as it was sent: ${partsOf(mail)} (all of it: ctx_read ${entry})`);
-  log(session, { drafts: { draft: d.id, view: d.view, panel: d.panel, settled: result.outcome, ...('reason' in result && result.reason ? { reason: result.reason } : {}), entry } });
+  const entry = kept(session, d.view, {
+    outcome: result.outcome,
+    settled: 'by the host, after a send it could not say had gone',
+    ...(result.forModel ? { host_says: result.forModel } : {}),
+    ...mail,
+  });
+  session.shell.say(
+    `the mail the person sent from "${titleOf(session, d.view)}" (${d.panel}), of which the host could not say whether it went: ${SETTLED[result.outcome]}${hostSays(result.forModel)}; as it was sent: ${partsOf(mail)} (all of it: ctx_read ${entry})`,
+  );
+  log(session, {
+    drafts: {
+      draft: d.id,
+      view: d.view,
+      panel: d.panel,
+      settled: result.outcome,
+      ...('reason' in result && result.reason ? { reason: result.reason } : {}),
+      entry,
+    },
+  });
 }

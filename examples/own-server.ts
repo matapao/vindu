@@ -6,8 +6,11 @@ import { progress } from './progress-card.js';
 
 // pinned and served here like Vindu's own: the files come from this folder, since a page cannot fetch from the network
 export const SPARKLINE: Library = {
-  name: 'sparkline', version: '1.0.0', license: 'MIT',
-  dir: path.join(import.meta.dirname, 'lib'), imports: { sparkline: 'sparkline.js' },
+  name: 'sparkline',
+  version: '1.0.0',
+  license: 'MIT',
+  dir: path.join(import.meta.dirname, 'lib'),
+  imports: { sparkline: 'sparkline.js' },
 };
 
 export function startFjord(o: { driver?: PageDriver } = {}) {

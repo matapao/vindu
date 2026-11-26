@@ -14,7 +14,12 @@ export async function check() {
 
   // A host extending the shared catalog uses the same parser as Vindu's renderer.
   let visited = 0;
-  const schema = DynamicStringSchema.transform(value => { visited++; return value; }).array().max(1);
+  const schema = DynamicStringSchema.transform((value) => {
+    visited++;
+    return value;
+  })
+    .array()
+    .max(1);
   const valid = schema.safeParse(['item']).success;
   const overLimit = (await schema.safeParseAsync(['one', 'two'])).success;
   return { mounted, valid, overLimit, visited };

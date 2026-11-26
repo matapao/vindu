@@ -13,7 +13,8 @@ const failed = (v: unknown): string | null => {
   if (!v || typeof v !== 'object') return null;
   const o = v as Row;
   if (o.isError === true || o.ok === false || o.success === false) return asText(o.error ?? o.message ?? 'failed');
-  if (typeof o.status === 'string' && /^(fail|error|rejected|bounced)/i.test(o.status)) return asText(o.error ?? o.status);
+  if (typeof o.status === 'string' && /^(fail|error|rejected|bounced)/i.test(o.status))
+    return asText(o.error ?? o.status);
   if (typeof o.error === 'string' && o.error) return o.error;
   return null;
 };
@@ -25,7 +26,8 @@ const NUMBER_ENDING = /^(\p{L}{3,}?)(nummer|nr)$/iu;
 /** A field that is a thing itself, given by its number or code: invoice: 10233. */
 const THING = /^(invoice|order|ticket|case|issue|booking|account|customer_?id|faktura|ordre|sak|bestilling|konto)$/i;
 /** A field that names who or what a call is for: a name, a title, an address. */
-const NAMED = /^(name|title|subject|customer|client|recipient|to|email|company|organi[sz]ation|person|navn|tittel|emne|kunde|mottaker|firma)$/i;
+const NAMED =
+  /^(name|title|subject|customer|client|recipient|to|email|company|organi[sz]ation|person|navn|tittel|emne|kunde|mottaker|firma)$/i;
 /** At most this many characters of a value in a label. */
 const VALUE_MOST = 60;
 
@@ -60,24 +62,47 @@ export function callLabel(input: Row, tool: string): string {
 }
 
 export const BATCH = block({
-  name: 'batch', component: 'VBatch', about: 'a result per call, for many calls at once (40 replies sent, 12 refunds): one row each, ok or failed, from the calls\' own results; give results (ids) instead of from',
+  name: 'batch',
+  component: 'VBatch',
+  about:
+    "a result per call, for many calls at once (40 replies sent, 12 refunds): one row each, ok or failed, from the calls' own results; give results (ids) instead of from",
   roles: {},
-  fields: { results: resultRef(z.array(z.string()).optional().describe('batch: the result ids of the calls, e.g. ["r5", "r6"], or ["r5-r44"] for a run of them')) },
+  fields: {
+    results: resultRef(
+      z
+        .array(z.string())
+        .optional()
+        .describe('batch: the result ids of the calls, e.g. ["r5", "r6"], or ["r5-r44"] for a run of them'),
+    ),
+  },
   derived: ['id', 'call', 'for', 'outcome', 'detail'],
   source: (p, read) => {
-    const list = (p.results ?? []) as string[], n = countIds(list); // counted before any run is written out
+    const list = (p.results ?? []) as string[],
+      n = countIds(list); // counted before any run is written out
     if (!n) throw new Error('a batch needs results: the result ids of its calls');
     if (n > 500) throw new Error(`${n} calls: show at most 500 in one batch`);
     const ids = resultIds(list, 500);
-    return ids.map(id => {
+    return ids.map((id) => {
       const e = read(id);
       if (!e || e.kind !== 'result') return { id, call: '', for: '', outcome: 'missing', detail: `no result ${id}` };
       const input = (e.input && typeof e.input === 'object' && !Array.isArray(e.input) ? e.input : {}) as Row;
       const why = failed(e.value ?? e.rows) ?? (/^(error|failed)\b/i.test(e.text) ? e.text.slice(0, 120) : null);
-      return { id, call: `${e.server}.${e.tool}`, for: callLabel(input, e.tool), outcome: why ? 'failed' : 'ok', detail: why ?? '' };
+      return {
+        id,
+        call: `${e.server}.${e.tool}`,
+        for: callLabel(input, e.tool),
+        outcome: why ? 'failed' : 'ok',
+        detail: why ?? '',
+      };
     });
   },
-  check: rows => (rows.length ? null : 'no calls in this batch'),
-  words: w => ({ ...w.batch }),
-  account: rows => ({ calls: rows.length, ok: rows.filter(r => r.outcome === 'ok').length, failed: rows.filter(r => r.outcome === 'failed').map(r => r.id), missing: rows.filter(r => r.outcome === 'missing').map(r => r.id), outcome: 'read by the system from each call\'s own result' }),
+  check: (rows) => (rows.length ? null : 'no calls in this batch'),
+  words: (w) => ({ ...w.batch }),
+  account: (rows) => ({
+    calls: rows.length,
+    ok: rows.filter((r) => r.outcome === 'ok').length,
+    failed: rows.filter((r) => r.outcome === 'failed').map((r) => r.id),
+    missing: rows.filter((r) => r.outcome === 'missing').map((r) => r.id),
+    outcome: "read by the system from each call's own result",
+  }),
 });

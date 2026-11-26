@@ -35,9 +35,7 @@ export function dispatchEvent(session: Session, e: unknown, replyToWindow = sess
       return true;
     }
     if (x.name === 'reminder')
-      return !(
-        'refusal' in doRem(session, asText(ctx.id ?? ''), asText(ctx.do ?? ''), 'person', whoOf(x).name)
-      );
+      return !('refusal' in doRem(session, asText(ctx.id ?? ''), asText(ctx.do ?? ''), 'person', whoOf(x).name));
     if (x.name === 'reminder_new') {
       askRem(session);
       return true;
@@ -61,11 +59,7 @@ export function dispatchEvent(session: Session, e: unknown, replyToWindow = sess
   if (x.type === 'operation')
     return (
       typeof x.name === 'string' &&
-      personRuns(
-        session,
-        x.name,
-        x.input && typeof x.input === 'object' ? (x.input as Record<string, unknown>) : {},
-      )
+      personRuns(session, x.name, x.input && typeof x.input === 'object' ? (x.input as Record<string, unknown>) : {})
     );
   if (x.type === 'close') {
     // closing an ask's pane is no answer, in a pane or in the shelf: it leaves the window, and no layout change is told
@@ -140,8 +134,7 @@ function updateView(session: Session, x: Record<string, unknown>): boolean | und
         : it,
     );
     setPicked(session, items);
-    session.pointedBy =
-      x.from && typeof x.from === 'object' ? (x.from as { name: string; window: string }) : undefined;
+    session.pointedBy = x.from && typeof x.from === 'object' ? (x.from as { name: string; window: string }) : undefined;
     log(session, { person: { points: session.picked.length } });
     return true;
   }
@@ -176,7 +169,8 @@ function updateView(session: Session, x: Record<string, unknown>): boolean | und
     if (!h?.do.job || !args || !session.jobs) return false;
     const on = c.on === true;
     if (hookIsOn(session, view, n, h) === on) return false;
-    if (on) session.hookOn.set(`${view}#${n}`, hookDigest(h)); // this hook, as it is now: any other is not turned on
+    if (on)
+      session.hookOn.set(`${view}#${n}`, hookDigest(h)); // this hook, as it is now: any other is not turned on
     else session.hookOn.delete(`${view}#${n}`);
     // said as it is done, before the view is drawn again: what the model is told never waits on a drawing
     session.shell.say(

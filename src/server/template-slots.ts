@@ -69,11 +69,17 @@ export const fillSlot = async (session: Session, args: Record<string, unknown>) 
       `slot ${name} (${slot.title}) is ${had.approved ? `approved, by ${had.approved.join(', ')}` : 'filled by the person'}; it stays as it is`,
     );
   const fill: Fill = { by: 'model', at: new Date().toISOString() };
-  const acc = (await session.present(fit.args, false, false, () => {
-    const waiting = had && approving.get(had); // a fill that waited for a yes is gone: so is its ask
-    if (waiting && session.asks.get(waiting.ask.ticket) === waiting) answered(session, waiting, { action: 'cancel' });
-    m.fills.set(name, fill);
-  }, true)) as Account & { slot?: string };
+  const acc = (await session.present(
+    fit.args,
+    false,
+    false,
+    () => {
+      const waiting = had && approving.get(had); // a fill that waited for a yes is gone: so is its ask
+      if (waiting && session.asks.get(waiting.ask.ticket) === waiting) answered(session, waiting, { action: 'cancel' });
+      m.fills.set(name, fill);
+    },
+    true,
+  )) as Account & { slot?: string };
   acc.slot = name;
   const notes = [
     ...fit.notes,
@@ -86,17 +92,10 @@ export const fillSlot = async (session: Session, args: Record<string, unknown>) 
 };
 /** What the model filled goes to the person next: to approve (by n people), or to change and approve. A yes is to this
  *  fill only: once the model fills the slot again, the ask is taken away. */
-const thenAsk = async (
-  session: Session,
-  name: string,
-  slot: Slot,
-  args: Record<string, unknown>,
-  fill: Fill,
-) => {
+const thenAsk = async (session: Session, name: string, slot: Slot, args: Record<string, unknown>, fill: Fill) => {
   if (session.mode?.fills.get(name) !== fill) return; // filled again while it was drawn: the newer fill is asked
   const then = slot.then!;
-  const text0 =
-    ((args.panels as Record<string, unknown>[] | undefined)?.[0]?.text as string | undefined) ?? '';
+  const text0 = ((args.panels as Record<string, unknown>[] | undefined)?.[0]?.text as string | undefined) ?? '';
   const edit = then.edit && typeof text0 === 'string' && text0 !== '';
   const p = openAsk(
     session,
@@ -150,9 +149,7 @@ const thenAsk = async (
     f.by = 'person';
     f.id = e.id;
   }
-  session.shell.tell(
-    `approved slot ${name} (${slot.title})${edited !== undefined ? ', after changing it' : ''}`,
-  );
+  session.shell.tell(`approved slot ${name} (${slot.title})${edited !== undefined ? ', after changing it' : ''}`);
 };
 /** A slot the person fills: a form, or what they capture with the host's own way to (attachments). */
 export const personSlot = async (session: Session, name: string, slot: Slot, more: OpenMore) => {

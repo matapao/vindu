@@ -10,7 +10,7 @@ import type { Page as BrowserPage } from 'playwright';
 import { callLabel, memoryResults, startVindu, type Shown, type ShellState } from '../src/index.js';
 import { chromium, mcpClient, shellServer, panelsIn } from './helpers.js';
 
-test('a call\'s label: its number and its name, by the names of its fields, else the tool\'s name in words', () => {
+test("a call's label: its number and its name, by the names of its fields, else the tool's name in words", () => {
   for (const [input, tool, label] of [
     [{ invoice_number: 10233 }, 'send_reminder', 'invoice 10233'],
     [{ invoice: 10233, customer: 'Vik Data' }, 'send_reminder', 'invoice 10233 · Vik Data'],
@@ -22,22 +22,49 @@ test('a call\'s label: its number and its name, by the names of its fields, else
     [{ title: 'Quarterly report' }, 'publish', 'Quarterly report'],
     [{ amount: 5, nested: { id: 1 } }, 'accounting.sendReminder', 'send reminder'],
     [{}, 'send_reminder', 'send reminder'],
-  ] as const) assert.equal(callLabel(input, tool), label, JSON.stringify(input));
+  ] as const)
+    assert.equal(callLabel(input, tool), label, JSON.stringify(input));
 });
 
 test('drawn in Chromium, each row of a batch says what its call was about, and the result ids stay in its rows and its account', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'batch-labels-')), results = memoryResults(dir);
-  const ids = [10231, 10232, 10233].map((n, i) => results.add({ server: 'accounting', tool: 'send_reminder', input: { invoice: n }, value: i === 1 ? { ok: false, error: 'mailbox full' } : { ok: true } }).id);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'batch-labels-')),
+    results = memoryResults(dir);
+  const ids = [10231, 10232, 10233].map(
+    (n, i) =>
+      results.add({
+        server: 'accounting',
+        tool: 'send_reminder',
+        input: { invoice: n },
+        value: i === 1 ? { ok: false, error: 'mailbox full' } : { ok: true },
+      }).id,
+  );
   const vindu = await startVindu({ waitMs: 300 });
-  const shown: Shown[] = []; const st: { s?: ShellState } = {};
-  const ui = vindu.open({ results, dir }, { onView: v => shown.push(v), onState: s => { st.s = s; } });
+  const shown: Shown[] = [];
+  const st: { s?: ShellState } = {};
+  const ui = vindu.open(
+    { results, dir },
+    {
+      onView: (v) => shown.push(v),
+      onState: (s) => {
+        st.s = s;
+      },
+    },
+  );
   const c = await mcpClient(ui.url);
-  const shell = await shellServer(import.meta.dirname), browser = await chromium.launch();
+  const shell = await shellServer(import.meta.dirname),
+    browser = await chromium.launch();
   try {
-    const a = await c.json('show_view', { name: 'sent', title: 'Reminders', panels: [{ id: 'sent', card: 'batch', results: ids }] });
+    const a = await c.json('show_view', {
+      name: 'sent',
+      title: 'Reminders',
+      panels: [{ id: 'sent', card: 'batch', results: ids }],
+    });
     assert.deepEqual([a.panels[0].calls, a.panels[0].ok, a.panels[0].failed], [3, 2, [ids[1]]]); // the account, by id
     const model = panelsIn(shown.at(-1)!.wide);
-    assert.deepEqual(model.p_sent.rows.map(r => [r.id, r.for]), ids.map((id, i) => [id, `invoice ${10231 + i}`])); // pointed at by id
+    assert.deepEqual(
+      model.p_sent.rows.map((r) => [r.id, r.for]),
+      ids.map((id, i) => [id, `invoice ${10231 + i}`]),
+    ); // pointed at by id
     const page: BrowserPage = await browser.newPage({ viewport: { width: 1000, height: 800 } });
     await page.goto(shell.url);
     await page.evaluate(() => window.app.shell('light'));
@@ -45,7 +72,16 @@ test('drawn in Chromium, each row of a batch says what its call was about, and t
     await page.evaluate((s: ShellState) => window.app.state(s), st.s!);
     await page.locator('[data-panel="sent"][data-row="2"]').waitFor();
     const rows = await page.locator('vindu-batch .vb-call').allInnerTexts();
-    assert.deepEqual(rows.map(r => r.replace(/\s+/g, ' ').trim()), ['✓ invoice 10231', '✗ invoice 10232 mailbox full', '✓ invoice 10233']);
+    assert.deepEqual(
+      rows.map((r) => r.replace(/\s+/g, ' ').trim()),
+      ['✓ invoice 10231', '✗ invoice 10232 mailbox full', '✓ invoice 10233'],
+    );
     for (const r of rows) assert.doesNotMatch(r, /\br\d+\b|accounting\.|send_reminder/);
-  } finally { await browser.close(); shell.close(); await c.mcp.close(); ui.close(); await vindu.close(); }
+  } finally {
+    await browser.close();
+    shell.close();
+    await c.mcp.close();
+    ui.close();
+    await vindu.close();
+  }
 });

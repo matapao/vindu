@@ -100,8 +100,7 @@ export const setRem = (
   if (!asText(x.when ?? '').trim()) return { refusal: 'a reminder needs when' };
   if (
     by === 'model' &&
-    session.reminders.filter((r) => r.by === 'model' && r.state === 'set').length >=
-      session.runtime.reminderLimit
+    session.reminders.filter((r) => r.by === 'model' && r.state === 'set').length >= session.runtime.reminderLimit
   )
     return {
       refusal: `you have ${session.runtime.reminderLimit} reminders set already: drop one first (look lists them)`,
@@ -162,8 +161,7 @@ export const doRem = (
     return {
       refusal: `no reminder "${id}"; there are ${session.reminders.map((x) => x.id).join(', ') || 'none'}`,
     };
-  if (by === 'model' && r.by !== 'model')
-    return { refusal: `${id} is the person's reminder: only they change it` };
+  if (by === 'model' && r.by !== 'model') return { refusal: `${id} is the person's reminder: only they change it` };
   if (r.state === 'done') return { refusal: `${id} is done already` };
   const now = Date.now();
   if (d === 'done' || d === 'drop') {
@@ -190,7 +188,8 @@ export const doRem = (
   log(session, { reminder: { id: r.id, [d]: true, by } });
   armRem(session);
   drawRem(session);
-  let did = `put off to ${r.said}`, told = `put off reminder ${r.id} ("${r.what}") to ${r.said}`; // as the model is told it
+  let did = `put off to ${r.said}`,
+    told = `put off reminder ${r.id} ("${r.what}") to ${r.said}`; // as the model is told it
   if (d === 'done') [did, told] = ['marked done', `marked reminder ${r.id} ("${r.what}") done`];
   else if (d === 'drop') [did, told] = ['dropped', `dropped reminder ${r.id} ("${r.what}")`];
   if (by === 'person') session.shell.say(`${who && who !== 'the person' ? who : 'the person'} ${told}`);
@@ -229,25 +228,29 @@ export const askRem = (session: Session, error?: string, values?: Record<string,
     p.ask = { ...p.ask, error };
     drawAsk(session, p);
   }
-  unawaited(session, { reminder: 'the person\'s own' }, p.outcome.then((r) => {
-    if (r.action !== 'accept') return;
-    const who = p.approvals[0];
-    const got = setRem(session, { what: r.values.what, when: r.values.when }, 'person', who?.name);
-    if ('refusal' in got) {
-      askRem(session, got.refusal, r.values);
-      return;
-    }
-    const e = keep(session, {
-      to: 'remind',
-      by: 'person',
-      values: r.values,
-      output: { reminder: got.id, at: got.at, said: got.said },
-      ...(who ? { who: [`${who.name} (${who.window})`] } : {}),
-    });
-    session.shell.say(
-      `${who && who.name !== 'the person' ? who.name : 'the person'} set reminder ${got.id} (${e.id}): "${got.what}" for ${got.said}`,
-    );
-  }));
+  unawaited(
+    session,
+    { reminder: "the person's own" },
+    p.outcome.then((r) => {
+      if (r.action !== 'accept') return;
+      const who = p.approvals[0];
+      const got = setRem(session, { what: r.values.what, when: r.values.when }, 'person', who?.name);
+      if ('refusal' in got) {
+        askRem(session, got.refusal, r.values);
+        return;
+      }
+      const e = keep(session, {
+        to: 'remind',
+        by: 'person',
+        values: r.values,
+        output: { reminder: got.id, at: got.at, said: got.said },
+        ...(who ? { who: [`${who.name} (${who.window})`] } : {}),
+      });
+      session.shell.say(
+        `${who && who.name !== 'the person' ? who.name : 'the person'} set reminder ${got.id} (${e.id}): "${got.what}" for ${got.said}`,
+      );
+    }),
+  );
   return p;
 };
 

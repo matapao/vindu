@@ -65,9 +65,7 @@ export const present = async (
   session.onShow({ name: v.spec.name, wide: v.wide, compact: v.compact, seq, probes }); // the person sees it now; page checks follow
   const panels = panelsOf(v.spec);
   const masters = [
-    ...new Set(
-      panels.map((p) => (p.detail as { of?: string } | undefined)?.of).filter((x): x is string => !!x),
-    ),
+    ...new Set(panels.map((p) => (p.detail as { of?: string } | undefined)?.of).filter((x): x is string => !!x)),
   ].flatMap((id) => [id, pidFor(id)]);
   const framed = (ps: PanelSpec[]) => ps.length === 1 && !!kindOf(ps[0].card, session.runtime.cards)?.framed; // one page, or one in each tab: it fills its pane
   const fill = v.spec.tabs ? v.spec.tabs.every((t) => framed(t.panels)) : framed(panels);
@@ -107,14 +105,17 @@ export const present = async (
   /** Whether this is still the view's newest showing: once another has begun, it tells the window and checks. */
   const current = () => !session.closed && session.probes.get(v.spec.name)?.seq === seq;
   const superseded = () => {
-    v.account.verified = 'drawn again since, while this showing was checked: the newer showing is what the window shows; look tells';
+    v.account.verified =
+      'drawn again since, while this showing was checked: the newer showing is what the window shows; look tells';
     return v.account;
   };
   if (!current()) return superseded(); // gone as soon as it was shown (whatever went with it took it away)
   if (session.more.onPresentation) {
     // Native windows can interact as soon as they receive the resolved view, while checks are still running.
     try {
-      session.more.onPresentation(presentationOf(v.spec, v.data, seq, session.runtime.cards, { ...kit, ...(changed ? { changed } : {}) }));
+      session.more.onPresentation(
+        presentationOf(v.spec, v.data, seq, session.runtime.cards, { ...kit, ...(changed ? { changed } : {}) }),
+      );
     } catch (error) {
       log(session, { presentation: v.spec.name, failed: String((error as Error).message) });
     }

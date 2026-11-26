@@ -13,8 +13,16 @@ const APP_PAGE = /^app-[a-f0-9]{32}\.localhost$/;
 const named = (url: string | URL, name: RegExp, port?: number): URL | null => {
   try {
     const u = new URL(String(url));
-    return u.protocol === 'http:' && name.test(u.hostname) && !u.username && !u.password && (port === undefined || u.port === String(port)) ? u : null;
-  } catch { return null; }
+    return u.protocol === 'http:' &&
+      name.test(u.hostname) &&
+      !u.username &&
+      !u.password &&
+      (port === undefined || u.port === String(port))
+      ? u
+      : null;
+  } catch {
+    return null;
+  }
 };
 /** A URL on one of a task's page origins (the task's own, or one of its working folder's), parsed; else null. A host
  *  that recognises Vindu's pages asks this, so the shape of the names stays Vindu's. With port, only on that port. */
@@ -26,8 +34,12 @@ export const appHost = (url: string | URL, port?: number): URL | null => named(u
 function onPageHost(url: string, port: number): boolean {
   try {
     const u = new URL(url);
-    return u.protocol === 'http:' && PAGE_NAME.test(u.hostname) && u.port === String(port) && !u.username && !u.password;
-  } catch { return false; }
+    return (
+      u.protocol === 'http:' && PAGE_NAME.test(u.hostname) && u.port === String(port) && !u.username && !u.password
+    );
+  } catch {
+    return false;
+  }
 }
 
 /** The page host's origins as one CSP source, for the frame-src of the window's own document: the browser then refuses

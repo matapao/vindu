@@ -6,8 +6,9 @@ const fieldsOf = (v: unknown): Fields => (v && typeof v === 'object' ? (v as Fie
 
 /** Each field that changed, with its value before and after (undefined where the field is not there). */
 export function changedFields(before: unknown, after: unknown): [field: string, before: unknown, after: unknown][] {
-  const was = fieldsOf(before), now = fieldsOf(after);
+  const was = fieldsOf(before),
+    now = fieldsOf(after);
   return [...new Set([...Object.keys(was), ...Object.keys(now)])]
-    .filter(field => JSON.stringify(was[field]) !== JSON.stringify(now[field]))
-    .map(field => [field, was[field], now[field]]);
+    .filter((field) => JSON.stringify(was[field]) !== JSON.stringify(now[field]))
+    .map((field) => [field, was[field], now[field]]);
 }

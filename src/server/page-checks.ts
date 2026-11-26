@@ -23,14 +23,8 @@ const CheckPage = z.object({
     .string()
     .optional()
     .describe('a page in the working folder, e.g. "index.html", "game/" or "game/index.html?level=2#start"'),
-  panel: z
-    .string()
-    .optional()
-    .describe('or a page panel already shown: its id, or the name of the view it is in'),
-  html: z
-    .string()
-    .optional()
-    .describe("or a page you write, checked before you show it (as a page panel's html)"),
+  panel: z.string().optional().describe('or a page panel already shown: its id, or the name of the view it is in'),
+  html: z.string().optional().describe("or a page you write, checked before you show it (as a page panel's html)"),
   uses: z
     .array(z.string())
     .optional()
@@ -40,10 +34,7 @@ const CheckPage = z.object({
   steps: z
     .array(
       z.looseObject({
-        press: z
-          .string()
-          .optional()
-          .describe('a key, down and up at once: "ArrowRight", "Space", "Enter", "a"'),
+        press: z.string().optional().describe('a key, down and up at once: "ArrowRight", "Space", "Enter", "a"'),
         times: z.number().int().positive().optional().describe('with press: how many times'),
         hold: z
           .string()
@@ -85,9 +76,7 @@ const CheckPage = z.object({
   size: z
     .enum(['desktop', 'phone'])
     .optional()
-    .describe(
-      'where the page loads and the steps run: desktop, 1024 × 768 (the default), or phone, 390 × 844',
-    ),
+    .describe('where the page loads and the steps run: desktop, 1024 × 768 (the default), or phone, 390 × 844'),
   accessibility: z
     .boolean()
     .optional()
@@ -103,9 +92,13 @@ const checkStatic = async (session: Session, pg: Page, asked: boolean): Promise<
   const served = await session.runtime.host.serve(session.key, at.pathname + at.search);
   const loaded = served.status === 200;
   return {
-    page: pg.label, static: 'nothing in it runs, so it was not run: only whether it loaded, and its size', loaded,
+    page: pg.label,
+    static: 'nothing in it runs, so it was not run: only whether it loaded, and its size',
+    loaded,
     ...(loaded ? { bytes: Buffer.byteLength(served.body) } : { status: served.status }),
-    ...(asked ? { steps: 'not done: a static page runs nothing, so there is nothing to press, click or read in it' } : {}),
+    ...(asked
+      ? { steps: 'not done: a static page runs nothing, so there is nothing to press, click or read in it' }
+      : {}),
   };
 };
 
@@ -149,7 +142,11 @@ const writtenPage = (session: Session, html: string, uses: string[]): [Page, str
   const name = `check_${++session.runtime.pageCheckCount}`;
   return [
     {
-      url: pageUrl(`${session.runtime.host.base(session.key)}/view/${session.runtime.host.writeView(session.key, name, html)}`, '', uses),
+      url: pageUrl(
+        `${session.runtime.host.base(session.key)}/view/${session.runtime.host.writeView(session.key, name, html)}`,
+        '',
+        uses,
+      ),
       label: 'a page you wrote, not shown yet',
       uses,
     },
@@ -188,7 +185,8 @@ export function registerPageCheck(server: McpServer, session: Session) {
           .join('; ');
         let why: string;
         if (given !== 1)
-          why = 'give one of "path" (a page in the working folder), "html" (a page you write) or "panel" (a page panel shown)';
+          why =
+            'give one of "path" (a page in the working folder), "html" (a page you write) or "panel" (a page panel shown)';
         else if (unknown.length) why = `no result ${unknown.map((x) => `"${x}"`).join(', ')} to give the page (uses)`;
         else if (args.panel)
           why = inView?.length

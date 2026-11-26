@@ -11,9 +11,7 @@ const NOTE_MAX = 500;
 
 /** What pages sent that the model has not heard yet, oldest first: from one view's pages, or from any. */
 export const unheard = (session: Session, view?: string) =>
-  session.own.filter(
-    (a) => a.from && !session.heard.has(a.id) && (view === undefined || a.from.view === view),
-  );
+  session.own.filter((a) => a.from && !session.heard.has(a.id) && (view === undefined || a.from.view === view));
 /** The next thing sent that has not been heard, at once when there is one; undefined when ms pass first, or the call is cancelled. */
 export const nextSent = (session: Session, view: string | undefined, ms: number, signal?: AbortSignal) =>
   new Promise<AnswerEntry | undefined>((resolve) => {

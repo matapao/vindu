@@ -37,11 +37,7 @@ export const Arrange = z.object({
   open: ViewNames.optional().describe(
     'views to open from the shelf: each goes back where it was (beside the same views, on the same side, at the same share) when that still fits, or else as a new view would',
   ),
-  maximize: z
-    .string()
-    .nullable()
-    .optional()
-    .describe('a view to fill the window, or null to restore the layout'),
+  maximize: z.string().nullable().optional().describe('a view to fill the window, or null to restore the layout'),
   focus: z.string().optional().describe('a view to point the person to'),
 });
 
@@ -55,9 +51,7 @@ const ReadView = z.object({
     .min(0)
     .max(100)
     .optional()
-    .describe(
-      'a terminal: how many of its last commands (5 by default); a page with log: how many log lines',
-    ),
+    .describe('a terminal: how many of its last commands (5 by default); a page with log: how many log lines'),
   screen: z.boolean().optional().describe('a terminal: the visible screen too, as text'),
   max: z
     .number()
@@ -75,9 +69,7 @@ export const ActInView = z.object({
   view: z.string(),
   action: z
     .enum([...BROWSER_ACTIONS, 'run'])
-    .describe(
-      'in a page: click, type, select, press, go_to, back, forward, reload, wait; in a terminal: run',
-    ),
+    .describe('in a page: click, type, select, press, go_to, back, forward, reload, wait; in a terminal: run'),
   ref: z.string().optional().describe("click, type, select: an element's reference from the latest snapshot"),
   text: z.string().optional().describe('type: what to type; wait: text to wait for'),
   submit: z.boolean().optional().describe('type: press Enter after'),
@@ -85,13 +77,7 @@ export const ActInView = z.object({
   key: z.string().optional().describe('press: "Enter", "Escape", "ArrowDown", "Control+a"'),
   url: z.string().optional().describe('go_to: a web address'),
   ms: z.number().int().positive().max(10_000).optional().describe('wait: this long'),
-  timeout_ms: z
-    .number()
-    .int()
-    .positive()
-    .max(30_000)
-    .optional()
-    .describe('wait: for text, at most this long'),
+  timeout_ms: z.number().int().positive().max(30_000).optional().describe('wait: for text, at most this long'),
   command: z.string().optional().describe('run: one command, one line'),
   wait_ms: z
     .number()
@@ -106,10 +92,7 @@ const only = (shape: z.ZodRawShape, keys: string[]) =>
 /** read_view's fields, for what this window has (the handler's type stays the whole one). */
 export const readViewFor = (h: Has) =>
   z.object({
-    ...only(ReadView.shape, [
-      ...(h.terminals ? ['screen', 'max'] : []),
-      ...(h.pages ? ['log', 'errors_only'] : []),
-    ]),
+    ...only(ReadView.shape, [...(h.terminals ? ['screen', 'max'] : []), ...(h.pages ? ['log', 'errors_only'] : [])]),
     view: z
       .string()
       .describe(
@@ -164,7 +147,9 @@ const cardFields = (h: Has, acts: string[]) => ({
     .number()
     .int()
     .optional()
-    .describe(`${listed(['move', 'plan', 'select'].filter((a) => acts.includes(a)))}: the row's place, from 0, instead of its key`),
+    .describe(
+      `${listed(['move', 'plan', 'select'].filter((a) => acts.includes(a)))}: the row's place, from 0, instead of its key`,
+    ),
   to: z
     .number()
     .int()
@@ -211,9 +196,7 @@ export const actInViewFor = (h: Has, cards: Iterable<CardDef>) => {
     ...cardFields(h, acts),
     ...only(
       ActInView.shape,
-      [...(h.pages ? PAGE_FIELDS : []), ...(h.run ? RUN_FIELDS : [])].filter(
-        (k) => k !== 'value' && k !== 'key',
-      ),
+      [...(h.pages ? PAGE_FIELDS : []), ...(h.run ? RUN_FIELDS : [])].filter((k) => k !== 'value' && k !== 'key'),
     ),
   });
 };

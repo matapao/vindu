@@ -16,13 +16,21 @@ const aboutPart = (name: string, x: unknown) => new Error(`has a part (${name}) 
 export function partTree(zip: ZipArchive, name: string): XmlElement | undefined {
   const text = zip.text(name);
   if (text === undefined) return undefined;
-  try { return xmlTree(text); } catch (x) { throw aboutPart(name, x); }
+  try {
+    return xmlTree(text);
+  } catch (x) {
+    throw aboutPart(name, x);
+  }
 }
 /** A part's XML read as it goes (a worksheet, which may be large); false when there is no such part. */
 export function readPart(zip: ZipArchive, name: string, on: XmlHandler): boolean {
   const text = zip.text(name);
   if (text === undefined) return false;
-  try { readXml(text, on); } catch (x) { throw aboutPart(name, x); }
+  try {
+    readXml(text, on);
+  } catch (x) {
+    throw aboutPart(name, x);
+  }
   return true;
 }
 
@@ -31,7 +39,10 @@ export function readPart(zip: ZipArchive, name: string, on: XmlHandler): boolean
 function partPath(from: string, target: string): string | null {
   const segments = target.startsWith('/') ? [] : from.split('/').slice(0, -1);
   for (const s of target.replace(/^\/+/, '').split('/')) {
-    if (s === '..') { if (!segments.length) return null; segments.pop(); } else if (s && s !== '.') segments.push(s);
+    if (s === '..') {
+      if (!segments.length) return null;
+      segments.pop();
+    } else if (s && s !== '.') segments.push(s);
   }
   return segments.length ? segments.join('/') : null;
 }
@@ -42,7 +53,9 @@ export function relationsOf(zip: ZipArchive, part: string): Map<string, Relation
   const root = partTree(zip, `${part.slice(0, at + 1)}_rels/${part.slice(at + 1)}.rels`);
   const out = new Map<string, Relation>();
   for (const r of root ? elementsOf(root, 'Relationship') : []) {
-    const id = attributeOf(r, 'Id'), target = attributeOf(r, 'Target') ?? '', external = attributeOf(r, 'TargetMode') === 'External';
+    const id = attributeOf(r, 'Id'),
+      target = attributeOf(r, 'Target') ?? '',
+      external = attributeOf(r, 'TargetMode') === 'External';
     const kind = (attributeOf(r, 'Type') ?? '').split('/').at(-1)!;
     const resolved = external ? target : partPath(part, target);
     if (id && resolved !== null) out.set(id, { kind, target: resolved, external });
@@ -51,13 +64,17 @@ export function relationsOf(zip: ZipArchive, part: string): Map<string, Relation
 }
 /** The part a relationship of this kind goes to, the first of them; undefined when there is none. */
 export const relatedPart = (relations: Map<string, Relation>, kind: string): string | undefined =>
-  [...relations.values()].find(r => r.kind === kind && !r.external)?.target;
+  [...relations.values()].find((r) => r.kind === kind && !r.external)?.target;
 
 /** The package's main part (its officeDocument), or the usual one when the package does not say. */
-export const mainPart = (zip: ZipArchive, usual: string): string => relatedPart(relationsOf(zip, ''), 'officeDocument') ?? usual;
+export const mainPart = (zip: ZipArchive, usual: string): string =>
+  relatedPart(relationsOf(zip, ''), 'officeDocument') ?? usual;
 
 /** Refuse a package with macros: a vbaProject.bin part (VBA), wherever it is. */
 export function refuseMacros(zip: ZipArchive): void {
-  const macros = zip.names.find(n => /(^|\/)vbaProject\.bin$/i.test(n));
-  if (macros) throw new Error(`holds macros (its part ${macros}); the system reads workbooks and documents without them: .xlsx and .docx`);
+  const macros = zip.names.find((n) => /(^|\/)vbaProject\.bin$/i.test(n));
+  if (macros)
+    throw new Error(
+      `holds macros (its part ${macros}); the system reads workbooks and documents without them: .xlsx and .docx`,
+    );
 }

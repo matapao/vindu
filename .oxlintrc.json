@@ -1,14 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": [
-    "typescript",
-    "unicorn",
-    "oxc",
-    "import",
-    "node",
-    "promise",
-    "vitest"
-  ],
+  "plugins": ["typescript", "unicorn", "oxc", "import", "node", "promise", "vitest"],
   "categories": {
     "correctness": "error"
   },
@@ -57,54 +49,34 @@
   },
   "overrides": [
     {
-      "files": [
-        "*.config.{js,mjs,ts,mts}"
-      ],
+      "files": ["*.config.{js,mjs,ts,mts}"],
       "rules": {
         "import/no-default-export": "off"
       }
     },
     {
-      "files": [
-        "test/**",
-        "tests/**",
-        "**/*.test.{ts,tsx,mts,mjs}"
-      ],
+      "files": ["test/**", "tests/**", "**/*.test.{ts,tsx,mts,mjs}"],
       "rules": {
         "typescript/no-floating-promises": "off"
       }
     },
     {
-      "files": [
-        "test/**"
-      ],
+      "files": ["test/**"],
       "rules": {
         "vitest/expect-expect": [
           "error",
           {
-            "assertFunctionNames": [
-              "expect",
-              "assert",
-              "assert.*",
-              "fc.assert"
-            ]
+            "assertFunctionNames": ["expect", "assert", "assert.*", "fc.assert"]
           }
         ]
       }
     },
     {
-      "files": [
-        "scripts/test-runtime.mjs"
-      ],
+      "files": ["scripts/test-runtime.mjs"],
       "rules": {
         "typescript/no-floating-promises": "off"
       }
     }
   ],
-  "ignorePatterns": [
-    "dist/**",
-    "coverage/**",
-    "node_modules/**",
-    "out/**"
-  ]
+  "ignorePatterns": ["dist/**", "coverage/**", "node_modules/**", "out/**"]
 }

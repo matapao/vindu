@@ -1,6 +1,14 @@
 // A host can draw a resolved view with its own components and still share Vindu's state and actions.
 import { kindOf } from './card-kinds/registry.js';
-import { MAX_ROWS, recordFields, shownFields, type CardDef, type PanelSpec, type Resolved, type ViewSpec } from './cards.js';
+import {
+  MAX_ROWS,
+  recordFields,
+  shownFields,
+  type CardDef,
+  type PanelSpec,
+  type Resolved,
+  type ViewSpec,
+} from './cards.js';
 import { panelSummaryOf, type PanelSummary, type SummaryKit } from './panel-summary.js';
 import type { Row } from './results.js';
 import { shownPanels, viewSize, waitsForPerson, type ViewChange, type ViewSize } from './view-summary.js';
@@ -28,7 +36,7 @@ export type PanelPresentation = {
   chart?: { x: string; y: string[] };
   media?: Resolved['media'];
   marks?: Row[];
-  gallery?: Resolved['gallery'];  // a gallery's pictures and videos, in order
+  gallery?: Resolved['gallery']; // a gallery's pictures and videos, in order
   /** A page's or an app's frame; a static page runs nothing, and its frame is drawn with sandbox="". */
   frame?: { kind: 'page' | 'app'; url: string; height: number; static?: true };
   props?: Record<string, unknown>;
@@ -66,11 +74,17 @@ export type ViewPresentation = {
 export type PresentationKit = Omit<SummaryKit, 'title'> & { changed?: ViewChange };
 
 const project = (row: Row, fields: string[]): Row =>
-  Object.fromEntries(fields.filter(field => Object.hasOwn(row, field)).map(field => [field, row[field]]));
+  Object.fromEntries(fields.filter((field) => Object.hasOwn(row, field)).map((field) => [field, row[field]]));
 
 function panelOf(p: PanelSpec, d: Resolved, cards: ReadonlyMap<string, CardDef>, kit: SummaryKit): PanelPresentation {
-  const def = cards.get(p.card); const kind = kindOf(p.card, cards);
-  const base = { id: p.id, card: d.waiting?.card ?? p.card, ...(p.title === undefined ? {} : { title: p.title }), summary: panelSummaryOf(p, d, kit) };
+  const def = cards.get(p.card);
+  const kind = kindOf(p.card, cards);
+  const base = {
+    id: p.id,
+    card: d.waiting?.card ?? p.card,
+    ...(p.title === undefined ? {} : { title: p.title }),
+    summary: panelSummaryOf(p, d, kit),
+  };
   if (d.failed !== undefined) return { ...base, state: 'error', message: d.failed };
   if (d.waiting) {
     const again = d.waiting.again ? { again: { event: 'try_again' as const, context: { panel: p.id } } } : {}; // as a2ui.ts draws it
@@ -79,11 +93,12 @@ function panelOf(p: PanelSpec, d: Resolved, cards: ReadonlyMap<string, CardDef>,
 
   const result: PanelPresentation = { ...base, state: 'ready' };
   const props = kind?.props?.(p, d);
-  if (d.rows && d.value === undefined) { // the rows a value is worked out over are not what it shows
+  if (d.rows && d.value === undefined) {
+    // the rows a value is worked out over are not what it shows
     const rows = d.rows.slice(0, kind?.maxRows ?? MAX_ROWS);
     const fields = kind?.presentFields ? kind.presentFields(rows, p, d) : shownFields(p, d.rows, def);
     if (fields.length) result.fields = fields;
-    result.rows = kind?.presentFields || fields.length ? rows.map(row => project(row, fields)) : rows;
+    result.rows = kind?.presentFields || fields.length ? rows.map((row) => project(row, fields)) : rows;
     result.availableRows = d.rows.length;
   }
   if (d.record) {
@@ -103,25 +118,44 @@ function panelOf(p: PanelSpec, d: Resolved, cards: ReadonlyMap<string, CardDef>,
   if (d.follows) result.follows = d.follows;
   kind?.present?.(result, p, d);
   if (d.media) result.media = d.media;
-  if (d.marks) result.marks = d.marks.map(mark => project(mark, ['x', 'y', 'w', 'h', 'start', 'end', 'label']));
+  if (d.marks) result.marks = d.marks.map((mark) => project(mark, ['x', 'y', 'w', 'h', 'start', 'end', 'label']));
   if (d.gallery) result.gallery = d.gallery;
-  if (d.page) result.frame = { kind: 'page', url: d.page.url, height: d.page.height, ...(d.page.static ? { static: true as const } : {}) };
+  if (d.page)
+    result.frame = {
+      kind: 'page',
+      url: d.page.url,
+      height: d.page.height,
+      ...(d.page.static ? { static: true as const } : {}),
+    };
   if (d.app) result.frame = { kind: 'app', url: d.app.url, height: d.app.height };
   if (props) result.props = props;
   return result;
 }
 
-export function presentationOf(spec: ViewSpec, data: Record<string, Resolved>, seq: number, cards: ReadonlyMap<string, CardDef>, kit: PresentationKit): ViewPresentation {
-  const panels = shownPanels(spec), { changed, ...words } = kit, size = viewSize(spec, data);
+export function presentationOf(
+  spec: ViewSpec,
+  data: Record<string, Resolved>,
+  seq: number,
+  cards: ReadonlyMap<string, CardDef>,
+  kit: PresentationKit,
+): ViewPresentation {
+  const panels = shownPanels(spec),
+    { changed, ...words } = kit,
+    size = viewSize(spec, data);
   const result: ViewPresentation = {
-    name: spec.name, title: spec.title, seq, panels: panels.map(p => panelOf(p, data[p.id], cards, { ...words, title: spec.title })),
+    name: spec.name,
+    title: spec.title,
+    seq,
+    panels: panels.map((p) => panelOf(p, data[p.id], cards, { ...words, title: spec.title })),
     changed: changed ?? { by: 'model', at: new Date(kit.now ?? Date.now()).toISOString() },
-    ...(panels.some(p => waitsForPerson(p, data[p.id])) ? { waits: true as const } : {}),
+    ...(panels.some((p) => waitsForPerson(p, data[p.id])) ? { waits: true as const } : {}),
     ...(size ? { size } : {}),
     ...(spec.subtitle === undefined ? {} : { subtitle: spec.subtitle }),
-    ...(spec.tabs ? { tabs: spec.tabs.map(tab => ({ title: tab.title, panels: tab.panels.map(p => p.id) })) } : {}),
+    ...(spec.tabs ? { tabs: spec.tabs.map((tab) => ({ title: tab.title, panels: tab.panels.map((p) => p.id) })) } : {}),
     ...(spec.step ? { step: spec.step } : {}),
-    ...(spec.path && spec.path.length > 1 ? { path: spec.path, back: { event: 'drill_back' as const, context: { depth: spec.path.length - 1 } } } : {}), // as a2ui.ts draws the head
+    ...(spec.path && spec.path.length > 1
+      ? { path: spec.path, back: { event: 'drill_back' as const, context: { depth: spec.path.length - 1 } } }
+      : {}), // as a2ui.ts draws the head
   };
   // A host's renderer must not be able to mutate the resolved data used by MCP actions and accounts.
   return structuredClone(result);

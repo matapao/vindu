@@ -1,13 +1,5 @@
 import { CARDS } from '../cards.js';
-import {
-  asViewLayout,
-  checkTemplate,
-  fitRead,
-  sourceName,
-  uriWith,
-  waitingPanel,
-  withInputs,
-} from '../templates.js';
+import { asViewLayout, checkTemplate, fitRead, sourceName, uriWith, waitingPanel, withInputs } from '../templates.js';
 import { openAsk } from './asks.js';
 import type { OpenMore } from './contracts.js';
 import { keep, log, unawaited } from './records.js';
@@ -16,12 +8,7 @@ import { personSlot } from './template-slots.js';
 import { keepFresh, stopWatch } from './template-updates.js';
 
 /** Ask for inputs before replacing the active template or reading its sources. */
-const startTemplate = async (
-  session: Session,
-  raw: unknown,
-  more: OpenMore,
-  given?: Record<string, unknown>,
-) => {
+const startTemplate = async (session: Session, raw: unknown, more: OpenMore, given?: Record<string, unknown>) => {
   const cancelled = { started: false, action: 'cancel' } as const;
   if (session.closed) return cancelled;
   const checked = checkTemplate(raw, {
@@ -156,9 +143,7 @@ export function templateControls(session: Session) {
       session.mode = undefined;
       for (const stop of session.slotWatches.values()) stopWatch(session, stop); // the slots are the model's now: no source refills them
       session.slotWatches.clear();
-      session.shell.tell(
-        `let you change the view: it is dynamic again (the template "${n}" stays as it was)`,
-      );
+      session.shell.tell(`let you change the view: it is dynamic again (the template "${n}" stays as it was)`);
       return true;
     },
     /** A template from the view as it is now (the person names it), to keep as a file and choose for a process like this. */
@@ -169,9 +154,7 @@ export function templateControls(session: Session) {
         layout: session.shell.layoutNow(),
         views: session.shell
           .state()
-          .views.filter(
-            (v) => session.specs.has(v.name) && v.role.checkpointed,
-          )
+          .views.filter((v) => session.specs.has(v.name) && v.role.checkpointed)
           .map((v) => ({
             name: v.name,
             title: session.shown.get(v.name)?.title ?? v.name,
@@ -190,8 +173,6 @@ export function templateControls(session: Session) {
 
     /** Static (and which template) or dynamic. */
     mode: () =>
-      session.mode
-        ? { kind: 'static' as const, template: session.mode.template.name }
-        : { kind: 'dynamic' as const },
+      session.mode ? { kind: 'static' as const, template: session.mode.template.name } : { kind: 'dynamic' as const },
   };
 }

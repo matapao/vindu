@@ -5,7 +5,10 @@ import type { ProtocolNode } from './browser-accessibility.js';
 import type { Paused } from './browser-requests.js';
 
 /** A CDP connection to one page: Electron's webContents.debugger, or a CDP session of any Chromium. */
-export type Cdp = { send(method: string, params?: Record<string, unknown>): Promise<unknown>; on(event: string, fn: (params: unknown) => void): () => void };
+export type Cdp = {
+  send(method: string, params?: Record<string, unknown>): Promise<unknown>;
+  on(event: string, fn: (params: unknown) => void): () => void;
+};
 
 /** What a script run in the page gave back: its value (returnByValue), or a reference to the object it made. */
 type Evaluated = { result?: { value?: unknown; objectId?: string } };
@@ -29,19 +32,32 @@ export type CdpEvents = {
   'Page.navigatedWithinDocument': { frameId?: string; url: string };
   'Page.loadEventFired': unknown;
   'Page.frameStoppedLoading': { frameId?: string };
-  'Runtime.consoleAPICalled': { type?: string; args?: { value?: string | number | boolean | null; unserializableValue?: string; description?: string }[] }; // a primitive's value; an object's description
+  'Runtime.consoleAPICalled': {
+    type?: string;
+    args?: { value?: string | number | boolean | null; unserializableValue?: string; description?: string }[];
+  }; // a primitive's value; an object's description
   'Runtime.exceptionThrown': { exceptionDetails?: { exception?: { description?: string }; text?: string } };
   'Log.entryAdded': { entry?: { level?: string; text?: string; source?: string } };
   'Network.requestWillBeSent': { requestId: string; request: { url: string; method: string } };
   'Network.loadingFinished': { requestId: string };
   'Network.responseReceived': { requestId: string; type?: string; response: { status: number; url: string } };
-  'Network.loadingFailed': { requestId: string; type?: string; canceled?: boolean; blockedReason?: string; errorText?: string };
+  'Network.loadingFailed': {
+    requestId: string;
+    type?: string;
+    canceled?: boolean;
+    blockedReason?: string;
+    errorText?: string;
+  };
   'Fetch.requestPaused': Paused & { requestId: string; frameId?: string };
   'Overlay.inspectNodeRequested': { backendNodeId?: number };
 };
 
 /** A command's answer, as the protocol says it comes. */
-export function ask<M extends keyof Answers>(cdp: Cdp, method: M, params?: Record<string, unknown>): Promise<Answers[M]> {
+export function ask<M extends keyof Answers>(
+  cdp: Cdp,
+  method: M,
+  params?: Record<string, unknown>,
+): Promise<Answers[M]> {
   return cdp.send(method, params) as Promise<Answers[M]>;
 }
 /** Each time an event comes, its params as the protocol says they come. Returns a function that stops listening. */

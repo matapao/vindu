@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'vitest';
 import { moveLine } from '../src/renderer/shell-dividers.js';
 
-test('a divider stops at each pane\'s minimum, and stays put where the two minimums no longer fit', () => {
+test("a divider stops at each pane's minimum, and stays put where the two minimums no longer fit", () => {
   assert.deepEqual(moveLine([300, 300], [100, 100], 0, 500), [500, 100]);
   assert.deepEqual(moveLine([300, 300], [100, 100], 0, -500), [100, 500]);
   assert.deepEqual(moveLine([300, 300, 300], [100, 100, 100], 1, 40), [300, 340, 260]);

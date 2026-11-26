@@ -23,48 +23,38 @@ export const VTasks = defineBlock('VTasks', 'vindu-tasks', { order: 'value', wor
   const meta = (row: BlockRow) =>
     html`${
       fieldValue(props, row, 'who') !== undefined
-        ? html`<span class="vb-muted"> · ${
-            displayNames(fieldValue(props, row, 'who')).join(', ')
-          }</span>`
+        ? html`<span class="vb-muted"> · ${displayNames(fieldValue(props, row, 'who')).join(', ')}</span>`
         : nothing
     }${
       fieldValue(props, row, 'due') !== undefined
-        ? html`<span class="vb-muted"> · ${
-            wordWith(words.due, { date: formatTime(props, fieldValue(props, row, 'due'), false) })
-          }</span>`
+        ? html`<span class="vb-muted"> · ${wordWith(words.due, {
+            date: formatTime(props, fieldValue(props, row, 'due'), false),
+          })}</span>`
         : nothing
     }${
       fieldValue(props, row, 'priority') !== undefined
-        ? html`<span class="vb-chip">${
-            formatCell(props, fieldValue(props, row, 'priority'))
-          }</span>`
+        ? html`<span class="vb-chip">${formatCell(props, fieldValue(props, row, 'priority'))}</span>`
         : nothing
     }`;
   if (props.layout === 'board') {
     const columns = [
       ...new Set([...(Array.isArray(props.order) ? props.order.map(String) : []), ...rows.map(stateOf)]),
     ];
-    return html`<div class="vb-board" style=${`--cols:${columns.length}`}>${
-      columns.map(
-        (column) =>
-          html`<div class="vb-col"><div class="vb-dayhead">${column || '(no state)'} <span class="vb-muted">${
-            rows.filter((row) => stateOf(row) === column).length
-          }</span></div>${
-            rows.map((row, index) =>
-              stateOf(row) === column
-                ? rowContainer(
-                    props,
-                    index,
-                    'vb-card',
-                    html`<div>${
-                      formatCell(props, fieldValue(props, row, 'title'))
-                    }</div><div>${meta(row)}</div>`,
-                  )
-                : nothing,
-            )
-          }</div>`,
-      )
-    }</div>`;
+    return html`<div class="vb-board" style=${`--cols:${columns.length}`}>${columns.map(
+      (column) =>
+        html`<div class="vb-col"><div class="vb-dayhead">${column || '(no state)'} <span class="vb-muted">${
+          rows.filter((row) => stateOf(row) === column).length
+        }</span></div>${rows.map((row, index) =>
+          stateOf(row) === column
+            ? rowContainer(
+                props,
+                index,
+                'vb-card',
+                html`<div>${formatCell(props, fieldValue(props, row, 'title'))}</div><div>${meta(row)}</div>`,
+              )
+            : nothing,
+        )}</div>`,
+    )}</div>`;
   }
   // a task is moved by hand: dragged, or Alt and an arrow key; the window sends it as an action inside the view (actions.ts)
   const move = (e: Event, from: number, to: number) =>
@@ -97,20 +87,13 @@ export const VTasks = defineBlock('VTasks', 'vindu-tasks', { order: 'value', wor
     if (props.layout === 'steps') mark = `${index + 1}.`;
     return html`<div class="vb-item vb-task" data-panel=${props.panel ?? ''} data-row=${String(index)} draggable="true" tabindex="0" role="group" aria-roledescription="task you can move" @dragstart=${
       handlers.start
-    } @dragover=${handlers.over} @drop=${handlers.drop} @keydown=${handlers.key}>${
-      html`<span class="vb-mark">${
-        mark
-      }</span><span class=${
-        completed ? 'vb-done' : ''
-      }>${
-        formatCell(props, fieldValue(props, row, 'title'))
-      }${meta(row)}</span>${
-        props.layout === 'steps' && stateOf(row)
-          ? html`<span class="vb-chip">${
-              stateOf(row)
-            }</span>`
-          : nothing
-      }`
-    }</div>`;
+    } @dragover=${handlers.over} @drop=${handlers.drop} @keydown=${handlers.key}>${html`<span class="vb-mark">${
+      mark
+    }</span><span class=${completed ? 'vb-done' : ''}>${formatCell(
+      props,
+      fieldValue(props, row, 'title'),
+    )}${meta(row)}</span>${
+      props.layout === 'steps' && stateOf(row) ? html`<span class="vb-chip">${stateOf(row)}</span>` : nothing
+    }`}</div>`;
   })}</div>`;
 });

@@ -18,10 +18,15 @@ export function jsonLength(value: unknown): number {
 
 /** One more send from a view: the view's sends still within the window (the caller adds this one to them when it
  *  goes), and why it may not go, if it may not. */
-export function checkSend(sentAt: readonly number[], value: unknown, now = Date.now()): { recent: number[]; why?: string } {
-  const recent = sentAt.filter(t => now - t < SEND_WINDOW_MS);
+export function checkSend(
+  sentAt: readonly number[],
+  value: unknown,
+  now = Date.now(),
+): { recent: number[]; why?: string } {
+  const recent = sentAt.filter((t) => now - t < SEND_WINDOW_MS);
   let why: string | undefined;
-  if (recent.length >= SENDS_AT_ONCE) why = `too many: ${SENDS_AT_ONCE} sends in ${SEND_WINDOW_MS / 1000} seconds at most`;
+  if (recent.length >= SENDS_AT_ONCE)
+    why = `too many: ${SENDS_AT_ONCE} sends in ${SEND_WINDOW_MS / 1000} seconds at most`;
   else if (jsonLength(value) > SEND_MAX) why = `not a value of at most ${SEND_MAX} characters as JSON`;
   return why ? { recent, why } : { recent };
 }

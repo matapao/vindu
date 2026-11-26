@@ -17,11 +17,16 @@ function whenOf(props: BlockProps, words: NoticeWords, from: unknown, to: unknow
 export const VNotice = defineBlock('VNotice', 'vindu-notice', { words: 'value' }, (props) => {
   const words = wordsGiven(props.words, BLOCK_WORDS.notice);
   return html`<div class="vb-notices">${props.rows.map((row, index) => {
-    const level = asText(row.__level ?? 'note'), known = LEVELS.has(level);
-    const said = (role: string) => { const v = fieldValue(props, row, role); return v === undefined || v === '' ? '' : formatCell(props, v); };
+    const level = asText(row.__level ?? 'note'),
+      known = LEVELS.has(level);
+    const said = (role: string) => {
+      const v = fieldValue(props, row, role);
+      return v === undefined || v === '' ? '' : formatCell(props, v);
+    };
     const when = whenOf(props, words, fieldValue(props, row, 'from'), fieldValue(props, row, 'to'));
     const body = html`${known ? html`<b>${words[level as 'yellow' | 'orange' | 'red']}</b> ` : nothing}<span>${said('text')}</span>${
-      said('area') ? html`<span class="vb-muted"> · ${said('area')}</span>` : nothing}${when ? html`<span class="vb-muted"> · ${when}</span>` : nothing}`;
+      said('area') ? html`<span class="vb-muted"> · ${said('area')}</span>` : nothing
+    }${when ? html`<span class="vb-muted"> · ${when}</span>` : nothing}`;
     return rowContainer(props, index, `vb-notice ${known ? `vb-level-${level}` : 'vb-level-note'}`, body);
   })}</div>`;
 });

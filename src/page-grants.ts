@@ -10,13 +10,18 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 export const GRANT_LENGTH = 24;
 
 export function pageGrants(secret: Buffer = randomBytes(32)) {
-  const sign = (key: string, uses: readonly string[]) => createHmac('sha256', secret).update(`${key}\n${uses.join(',')}`).digest('hex').slice(0, GRANT_LENGTH);
+  const sign = (key: string, uses: readonly string[]) =>
+    createHmac('sha256', secret)
+      .update(`${key}\n${uses.join(',')}`)
+      .digest('hex')
+      .slice(0, GRANT_LENGTH);
   return {
     /** The host name of the work origin for these uses. */
     name: (key: string, uses: readonly string[]) => `work-${key}${uses.length ? `-${sign(key, uses)}` : ''}`,
     /** The uses a request names when the work origin it came to (its grant) is theirs; none otherwise. */
     granted(key: string, uses: string[], grant: string | undefined): string[] {
-      const want = Buffer.from(sign(key, uses)), got = Buffer.from(grant ?? '');
+      const want = Buffer.from(sign(key, uses)),
+        got = Buffer.from(grant ?? '');
       return uses.length && got.length === want.length && timingSafeEqual(got, want) ? uses : [];
     },
   };

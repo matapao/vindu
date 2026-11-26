@@ -17,9 +17,7 @@ const questionField = FieldSchema.pick({
   multi: true,
   long: true,
 }).extend({
-  type: FieldSchema.shape.type
-    .optional()
-    .describe('string (the default), number, integer or boolean (yes or no)'),
+  type: FieldSchema.shape.type.optional().describe('string (the default), number, integer or boolean (yes or no)'),
   enum: FieldSchema.shape.enum.describe('the values to pick from'),
   multi: FieldSchema.shape.multi.describe('with enum: any number of them'),
   long: FieldSchema.shape.long.describe('text over several lines'),
@@ -158,9 +156,7 @@ export function registerOperationTools(server: McpServer, session: Session) {
       },
       async (args) => {
         const id = args.done ?? args.drop;
-        const r = id
-          ? doRem(session, id, args.done ? 'done' : 'drop', 'model')
-          : setRem(session, args, 'model');
+        const r = id ? doRem(session, id, args.done ? 'done' : 'drop', 'model') : setRem(session, args, 'model');
         if ('refusal' in r) {
           log(session, { tool: 'remind', args, refused: r.refusal });
           return text(`not set: ${r.refusal}`, true);

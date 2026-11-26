@@ -25,7 +25,9 @@ const malformed = (why: string) => new Error(`is not XML the system can read: ${
 
 /** A character reference's character: U+FFFD for one that names no character. */
 function character(code: number): string {
-  return Number.isInteger(code) && code > 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff) ? String.fromCodePoint(code) : String.fromCharCode(0xfffd);
+  return Number.isInteger(code) && code > 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff)
+    ? String.fromCodePoint(code)
+    : String.fromCharCode(0xfffd);
 }
 /** Text with its references read: the predefined entities and character references, and nothing else. */
 function decoded(raw: string): string {
@@ -35,20 +37,28 @@ function decoded(raw: string): string {
     if (Object.hasOwn(PREDEFINED, ref)) return PREDEFINED[ref];
     if (/^#x[0-9a-fA-F]{1,6}$/.test(ref)) return character(parseInt(ref.slice(2), 16));
     if (/^#[0-9]{1,7}$/.test(ref)) return character(Number(ref.slice(1)));
-    throw new Error(`refers to an entity (&${ref.slice(0, 20)};) that XML does not define, and the system expands none`);
+    throw new Error(
+      `refers to an entity (&${ref.slice(0, 20)};) that XML does not define, and the system expands none`,
+    );
   });
 }
 
 /** A declaration, refused for what it is. */
 function declaration(xml: string, at: number): Error {
   const word = /^<!([A-Za-z]+)/.exec(xml.slice(at, at + 20))?.[1]?.toUpperCase();
-  if (word === 'DOCTYPE') return new Error('declares a document type (<!DOCTYPE), which the system never reads, so that no entity is defined');
+  if (word === 'DOCTYPE')
+    return new Error(
+      'declares a document type (<!DOCTYPE), which the system never reads, so that no entity is defined',
+    );
   if (word === 'ENTITY') return new Error('declares an entity (<!ENTITY), which the system never reads or expands');
   return new Error(`holds a declaration (<!${word ?? ''}) the system never reads`);
 }
 
 /** A start tag from at (its <): its name, attributes, whether it closes itself, and where it ends. */
-function startTag(xml: string, at: number): { name: string; attributes: Record<string, string>; empty: boolean; end: number } {
+function startTag(
+  xml: string,
+  at: number,
+): { name: string; attributes: Record<string, string>; empty: boolean; end: number } {
   NAME.lastIndex = at + 1;
   const name = NAME.exec(xml)?.[0];
   if (!name) throw malformed(`a < with no name after it, at character ${at}`);
@@ -61,7 +71,8 @@ function startTag(xml: string, at: number): { name: string; attributes: Record<s
     ATTRIBUTE.lastIndex = i;
     const a = ATTRIBUTE.exec(xml);
     if (!a) throw malformed(`the tag <${name.slice(0, 40)}> is not closed or has an attribute without a quoted value`);
-    if (Object.hasOwn(attributes, a[1])) throw malformed(`the tag <${name.slice(0, 40)}> has the attribute ${a[1].slice(0, 40)} twice`);
+    if (Object.hasOwn(attributes, a[1]))
+      throw malformed(`the tag <${name.slice(0, 40)}> has the attribute ${a[1].slice(0, 40)} twice`);
     attributes[a[1]] = decoded(a[2] ?? a[3]);
     i = ATTRIBUTE.lastIndex;
   }
@@ -70,11 +81,19 @@ function startTag(xml: string, at: number): { name: string; attributes: Record<s
 /** Read XML from start to end, telling on what it holds as it goes. Throws, saying why, at what it does not read. */
 export function readXml(xml: string, on: XmlHandler): void {
   const open: string[] = [];
-  let i = 0, rooted = false;
-  const text = (raw: string) => { if (open.length) { if (raw) on.text?.(raw); } else if (raw.trim()) throw malformed('text outside its root element'); };
+  let i = 0,
+    rooted = false;
+  const text = (raw: string) => {
+    if (open.length) {
+      if (raw) on.text?.(raw);
+    } else if (raw.trim()) throw malformed('text outside its root element');
+  };
   while (i < xml.length) {
     const lt = xml.indexOf('<', i);
-    if (lt < 0) { text(decoded(xml.slice(i))); break; }
+    if (lt < 0) {
+      text(decoded(xml.slice(i)));
+      break;
+    }
     if (lt > i) text(decoded(xml.slice(i, lt)));
     if (xml.startsWith('<!--', lt)) {
       const end = xml.indexOf('-->', lt + 4);
@@ -94,7 +113,8 @@ export function readXml(xml: string, on: XmlHandler): void {
     } else if (xml[lt + 1] === '/') {
       const end = xml.indexOf('>', lt);
       if (end < 0) throw malformed('an end tag that is never closed');
-      const name = xml.slice(lt + 2, end).trim(), was = open.pop();
+      const name = xml.slice(lt + 2, end).trim(),
+        was = open.pop();
       if (name !== was) throw malformed(`</${name.slice(0, 40)}> closes ${was ? `<${was.slice(0, 40)}>` : 'nothing'}`);
       on.close?.(name);
       i = end + 1;
@@ -117,9 +137,20 @@ export function xmlTree(xml: string): XmlElement {
   const root: XmlElement = { name: '', attributes: {}, children: [] };
   const stack: XmlElement[] = [root];
   readXml(xml, {
-    open: (name, attributes) => { const e: XmlElement = { name, attributes, children: [] }; stack.at(-1)!.children.push(e); stack.push(e); },
-    close: () => { stack.pop(); },
-    text: t => { const kids = stack.at(-1)!.children, last = kids.at(-1); if (typeof last === 'string') kids[kids.length - 1] = last + t; else kids.push(t); },
+    open: (name, attributes) => {
+      const e: XmlElement = { name, attributes, children: [] };
+      stack.at(-1)!.children.push(e);
+      stack.push(e);
+    },
+    close: () => {
+      stack.pop();
+    },
+    text: (t) => {
+      const kids = stack.at(-1)!.children,
+        last = kids.at(-1);
+      if (typeof last === 'string') kids[kids.length - 1] = last + t;
+      else kids.push(t);
+    },
   });
   return root.children.find((x): x is XmlElement => typeof x !== 'string')!;
 }
@@ -133,6 +164,9 @@ export function attributeOf(e: XmlElement, local: string): string | undefined {
 }
 /** The child elements of e, with this name without a prefix, or all of them. */
 export const elementsOf = (e: XmlElement, local?: string): XmlElement[] =>
-  e.children.filter((x): x is XmlElement => typeof x !== 'string' && (local === undefined || localName(x.name) === local));
+  e.children.filter(
+    (x): x is XmlElement => typeof x !== 'string' && (local === undefined || localName(x.name) === local),
+  );
 /** The first child element of e with this name without a prefix. */
-export const elementOf = (e: XmlElement | undefined, local: string): XmlElement | undefined => (e ? elementsOf(e, local)[0] : undefined);
+export const elementOf = (e: XmlElement | undefined, local: string): XmlElement | undefined =>
+  e ? elementsOf(e, local)[0] : undefined;

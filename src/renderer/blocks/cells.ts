@@ -9,7 +9,16 @@ export type CellNote = { n: number; cell: string; note: string; row: number; col
 /** What the server says of the cells it sends: their fields, the notes on them, how many rows and columns there are
  *  (a sheet), how the table is sorted and the columns of each row that hold a number (a table, whose cells come as
  *  text), and of a workbook its sheets and each row's looks (sheet-workbook.ts). */
-export type Cells = { fields?: string[]; notes?: CellNote[]; rows?: number; columns?: number; sort?: string; numbers?: number[][]; sheets?: unknown; looks?: unknown };
+export type Cells = {
+  fields?: string[];
+  notes?: CellNote[];
+  rows?: number;
+  columns?: number;
+  sort?: string;
+  numbers?: number[][];
+  sheets?: unknown;
+  looks?: unknown;
+};
 
 /** A browser breaks a word after a hyphen, a dash or a slash. */
 const BREAKS_INSIDE = /[-\u2010\u2013\u2014/]/;
@@ -19,13 +28,18 @@ const WORD_MOST = 40;
  *  spaces and at its own line breaks (white-space: pre-line) alone. The text itself is as it was. */
 export function unbroken(text: string): unknown {
   if (!BREAKS_INSIDE.test(text)) return text;
-  return text.split(/(\s+)/).map(word => (word.length <= WORD_MOST && BREAKS_INSIDE.test(word) ? html`<span class="vb-nobr">${word}</span>` : word));
+  return text
+    .split(/(\s+)/)
+    .map((word) =>
+      word.length <= WORD_MOST && BREAKS_INSIDE.test(word) ? html`<span class="vb-nobr">${word}</span>` : word,
+    );
 }
 
 /** The notes by the cell they are on. */
 export const notesByCell = (notes: readonly CellNote[] = []): ReadonlyMap<string, CellNote> =>
   new Map(notes.map((x) => [`${x.row}:${x.column}`, x]));
-export const noteAt = (notes: ReadonlyMap<string, CellNote>, row: number, column: number) => notes.get(`${row}:${column}`);
+export const noteAt = (notes: ReadonlyMap<string, CellNote>, row: number, column: number) =>
+  notes.get(`${row}:${column}`);
 
 /** The class a cell has: its own, and vb-noted when it has a note. */
 const noteClass = (className: string, note: CellNote | undefined) =>
@@ -35,7 +49,13 @@ const noteMark = (note: CellNote | undefined) =>
   note ? html`<sup class="vb-notemark" aria-hidden="true">${note.n}</sup>` : nothing;
 /** How a cell is drawn besides its value: its note, its class, its title when it has no note, its field, and the rows
  *  and columns it spans (a workbook's merged cells). */
-type CellLook = { note?: CellNote; className?: string; title?: string; field?: string; span?: { rows: number; columns: number } };
+type CellLook = {
+  note?: CellNote;
+  className?: string;
+  title?: string;
+  field?: string;
+  span?: { rows: number; columns: number };
+};
 const spanned = (n: number | undefined) => (n && n > 1 ? String(n) : nothing);
 /** A data cell: its value (text kept whole, word by word), marked, focusable and described by its note when it has one. */
 export const dataCell = (content: unknown, { note, className = '', title = '', field, span }: CellLook) =>

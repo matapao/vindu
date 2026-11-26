@@ -17,9 +17,7 @@ export type Endpoints = Map<string, () => McpServer>;
 export function configureServer(options: UiServerOptions) {
   const operations: Operation[] = [
     ...(options.operations ?? []),
-    ...(options.decisions
-      ? [decisionOperation(typeof options.decisions === 'object' ? options.decisions : {})]
-      : []),
+    ...(options.decisions ? [decisionOperation(typeof options.decisions === 'object' ? options.decisions : {})] : []),
   ];
   const offered = [
     ...(options.blocks === false

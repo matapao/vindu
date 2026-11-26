@@ -74,9 +74,7 @@ export function appControls(session: Session) {
       // Keep the exact JSON keys and retain an independent record of what left the control.
       const submitted = structuredClone(input),
         args = structuredClone(submitted);
-      const result = dispatch
-        ? await dispatch(app.server, name, args)
-        : await provider.call(app.server, name, args);
+      const result = dispatch ? await dispatch(app.server, name, args) : await provider.call(app.server, name, args);
       keep(session, {
         to: `${app.server}.${name}`,
         by: 'person',

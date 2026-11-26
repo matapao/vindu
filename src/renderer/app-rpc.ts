@@ -15,7 +15,8 @@ const RELATED_TASK = 'io.modelcontextprotocol/related-task';
 const DISPLAY_MODES: readonly unknown[] = ['inline', 'fullscreen', 'pip'];
 
 /** An object, as a JSON-RPC object is one: not null, not an array. */
-const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 /** A record of keys, as Zod takes one: an object made as a literal is, a Date or a Map is not. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   if (!isObject(value)) return false;
@@ -30,7 +31,8 @@ const optional = (value: unknown, check: (value: unknown) => boolean) => value =
 const isId = (value: unknown): value is RpcId => isString(value) || Number.isSafeInteger(value);
 
 /** An object's own keys and values, as a fresh object: never a key that would set its prototype. */
-const copyOf = (value: Record<string, unknown>) => Object.fromEntries(Object.entries(value).filter(([key]) => key !== '__proto__'));
+const copyOf = (value: Record<string, unknown>) =>
+  Object.fromEntries(Object.entries(value).filter(([key]) => key !== '__proto__'));
 
 /** MCP's _meta on params: an object, its progress token an id, its related task a task's id. */
 function metaOf(value: unknown): Record<string, unknown> | null {
@@ -66,7 +68,12 @@ export function appRpcOf(data: unknown): AppRpc | undefined {
   }
   const params = paramsOf(data.params);
   if (params === null) return undefined;
-  return { jsonrpc: '2.0', ...(request ? { id: data.id as RpcId } : {}), method: data.method, ...(params ? { params } : {}) };
+  return {
+    jsonrpc: '2.0',
+    ...(request ? { id: data.id as RpcId } : {}),
+    method: data.method,
+    ...(params ? { params } : {}),
+  };
 }
 
 /** Whether data is the response to the request the window sent with id: a JSON-RPC 2.0 result or error with that id and
@@ -82,22 +89,44 @@ export function isResponseTo(data: unknown, id: RpcId): boolean {
   return isObject(error) && Number.isSafeInteger(error.code) && isString(error.message);
 }
 
-const isIcon = (value: unknown) => isObject(value) && isString(value.src) && optional(value.mimeType, isString) &&
-  optional(value.sizes, isStrings) && optional(value.theme, theme => theme === 'light' || theme === 'dark');
+const isIcon = (value: unknown) =>
+  isObject(value) &&
+  isString(value.src) &&
+  optional(value.mimeType, isString) &&
+  optional(value.sizes, isStrings) &&
+  optional(value.theme, (theme) => theme === 'light' || theme === 'dark');
 /** Who the app is: MCP's Implementation. */
-const isImplementation = (value: unknown) => isObject(value) && isString(value.name) && isString(value.version) &&
-  optional(value.title, isString) && optional(value.websiteUrl, isString) && optional(value.description, isString) &&
-  optional(value.icons, icons => Array.isArray(icons) && Array.from(icons).every(isIcon));
+const isImplementation = (value: unknown) =>
+  isObject(value) &&
+  isString(value.name) &&
+  isString(value.version) &&
+  optional(value.title, isString) &&
+  optional(value.websiteUrl, isString) &&
+  optional(value.description, isString) &&
+  optional(value.icons, (icons) => Array.isArray(icons) && Array.from(icons).every(isIcon));
 /** What the app can do: MCP Apps' McpUiAppCapabilities. */
-const isAppCapabilities = (value: unknown) => isObject(value) &&
-  optional(value.experimental, features => isRecord(features) && Object.values(features).every(isRecord)) &&
-  optional(value.tools, tools => isObject(tools) && optional(tools.listChanged, on => typeof on === 'boolean')) &&
-  optional(value.availableDisplayModes, modes => Array.isArray(modes) && Array.from(modes).every(mode => DISPLAY_MODES.includes(mode)));
+const isAppCapabilities = (value: unknown) =>
+  isObject(value) &&
+  optional(value.experimental, (features) => isRecord(features) && Object.values(features).every(isRecord)) &&
+  optional(value.tools, (tools) => isObject(tools) && optional(tools.listChanged, (on) => typeof on === 'boolean')) &&
+  optional(
+    value.availableDisplayModes,
+    (modes) => Array.isArray(modes) && Array.from(modes).every((mode) => DISPLAY_MODES.includes(mode)),
+  );
 
 /** The params of ui/initialize, as MCP Apps' McpUiInitializeRequest has them. */
-export type InitializeParams = { protocolVersion: string; appInfo: Record<string, unknown>; appCapabilities: Record<string, unknown> };
+export type InitializeParams = {
+  protocolVersion: string;
+  appInfo: Record<string, unknown>;
+  appCapabilities: Record<string, unknown>;
+};
 export function isInitializeParams(params: unknown): params is InitializeParams {
-  return isObject(params) && isString(params.protocolVersion) && isImplementation(params.appInfo) && isAppCapabilities(params.appCapabilities);
+  return (
+    isObject(params) &&
+    isString(params.protocolVersion) &&
+    isImplementation(params.appInfo) &&
+    isAppCapabilities(params.appCapabilities)
+  );
 }
 
 /** A display mode MCP Apps names. */

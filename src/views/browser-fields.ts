@@ -7,11 +7,15 @@ import { ask, type Cdp } from './browser-protocol.js';
 
 export type FieldReference = { backendNodeId: number } | { objectId: string };
 const FIELD_INSPECTION_FAILED = 'The browser could not verify whether this field contains private information.';
-export const SECRET_REFUSED = 'this is a secret field (a password, card number or code): the person fills it in themselves; ask them to, in the chat';
+export const SECRET_REFUSED =
+  'this is a secret field (a password, card number or code): the person fills it in themselves; ask them to, in the chat';
 
 /** The names (or ids) of the secret fields on the page now. */
 export async function secretFieldNames(cdp: Cdp): Promise<string[]> {
-  const r = await ask(cdp, 'Runtime.evaluate', { expression: `[...document.querySelectorAll(${JSON.stringify(SECRET_FIELDS)})].map(e => e.name || e.id || e.getAttribute('autocomplete') || e.type)`, returnByValue: true }).catch(() => null);
+  const r = await ask(cdp, 'Runtime.evaluate', {
+    expression: `[...document.querySelectorAll(${JSON.stringify(SECRET_FIELDS)})].map(e => e.name || e.id || e.getAttribute('autocomplete') || e.type)`,
+    returnByValue: true,
+  }).catch(() => null);
   if (!Array.isArray(r?.result?.value)) throw new Error(FIELD_INSPECTION_FAILED);
   return r.result.value.map(String);
 }
@@ -22,14 +26,16 @@ export async function fieldPrivacy(cdp: Cdp, reference: FieldReference): Promise
   const response = await ask(cdp, 'DOM.describeNode', reference).catch(() => undefined);
   const node = response?.node;
   if (!node || typeof node.nodeName !== 'string') return 'unknown';
-  const tag = node.nodeName.toLowerCase(), attributes = node.attributes;
+  const tag = node.nodeName.toLowerCase(),
+    attributes = node.attributes;
   const named = (name: string) => Array.isArray(attributes) && attributes.some((a, i) => i % 2 === 0 && a === name);
   if (tag !== 'input' && tag !== 'select' && tag !== 'textarea' && !named('contenteditable')) return 'public';
   if (!Array.isArray(attributes) || attributes.length % 2 !== 0) return 'unknown';
   for (let i = 0; i < attributes.length; i += 2) {
     const value = String(attributes[i + 1]).toLowerCase();
     if (tag === 'input' && attributes[i] === 'type' && value === 'password') return 'secret';
-    if (attributes[i] === 'autocomplete' && value.split(/\s+/).some(token => SECRET_AUTOCOMPLETE.includes(token))) return 'secret';
+    if (attributes[i] === 'autocomplete' && value.split(/\s+/).some((token) => SECRET_AUTOCOMPLETE.includes(token)))
+      return 'secret';
   }
   return 'public';
 }

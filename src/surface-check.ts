@@ -1,5 +1,11 @@
 // Check a compiled Vindu view before recording it as shown. No DOM or renderer is required.
-import { Catalog, ComponentModel, DataModel, SurfaceComponentsModel, type ComponentChildRefs } from '@a2ui/web_core/v0_9';
+import {
+  Catalog,
+  ComponentModel,
+  DataModel,
+  SurfaceComponentsModel,
+  type ComponentChildRefs,
+} from '@a2ui/web_core/v0_9';
 import { basicCatalog } from '@a2ui/web_core/v0_9/basic_catalog';
 import type { Component, Surface } from './a2ui.js';
 import { VINDU_CATALOG, componentsOf, dataModelOf } from './catalog-id.js';

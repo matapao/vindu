@@ -14,7 +14,8 @@ const same = (a: number[], b: number[]) => a.length === b.length && a.every((val
 export function moveLine(extents: number[], mins: number[], index: number, delta: number): number[] {
   const left = extents[index];
   const right = extents[index + 1];
-  const lower = mins[index] - left, upper = right - mins[index + 1];
+  const lower = mins[index] - left,
+    upper = right - mins[index + 1];
   if (lower > upper) return [...extents]; // too narrow for both minimums already: the line stays where it is
   const change = Math.max(lower, Math.min(upper, Math.round(delta)));
   const sizes = [...extents];
@@ -37,7 +38,7 @@ export function mountDividers(root: HTMLElement, desk: HTMLElement, host: Divide
   let lines: HTMLElement[] = [];
   let previousKey = '';
   let dragging = false;
-  const splitOf = (path: number[]) => placement.splits.find(split => same(split.path, path));
+  const splitOf = (path: number[]) => placement.splits.find((split) => same(split.path, path));
 
   function divider(index: number) {
     const element = desk.ownerDocument.createElement('div');
@@ -47,12 +48,16 @@ export function mountDividers(root: HTMLElement, desk: HTMLElement, host: Divide
     element.setAttribute('aria-valuemin', '0');
     element.setAttribute('aria-valuemax', '100');
     const { path, index: child } = placement.lines[index];
-    const titles = (child: number) => splitOf(path) ? placement.panes
-      .filter(p => same(p.path.slice(0, path.length + 1), [...path, child]))
-      .map(p => host.title(p.view)).join(' + ') : '';
+    const titles = (child: number) =>
+      splitOf(path)
+        ? placement.panes
+            .filter((p) => same(p.path.slice(0, path.length + 1), [...path, child]))
+            .map((p) => host.title(p.view))
+            .join(' + ')
+        : '';
     element.setAttribute('aria-label', host.label(titles(child), titles(child + 1)));
 
-    element.addEventListener('pointerdown', event => {
+    element.addEventListener('pointerdown', (event) => {
       const line = placement.lines[index];
       const split = splitOf(line.path);
       if (event.button !== 0 || !split) return;
@@ -61,7 +66,7 @@ export function mountDividers(root: HTMLElement, desk: HTMLElement, host: Divide
       element.classList.add('is-drag');
       root.classList.add('is-dragging');
       dragging = true;
-      const position = (e: PointerEvent) => line.dir === 'row' ? e.clientX : e.clientY;
+      const position = (e: PointerEvent) => (line.dir === 'row' ? e.clientX : e.clientY);
       const start = position(event);
       const extents = [...split.extents];
       const mins = [...split.mins];
@@ -92,7 +97,7 @@ export function mountDividers(root: HTMLElement, desk: HTMLElement, host: Divide
       host.layout();
       host.commit(path, sizes);
     };
-    element.addEventListener('keydown', event => {
+    element.addEventListener('keydown', (event) => {
       const line = placement.lines[index];
       const split = splitOf(line.path);
       if (!split) return;
@@ -101,8 +106,12 @@ export function mountDividers(root: HTMLElement, desk: HTMLElement, host: Divide
       if (event.key !== back && event.key !== forward && event.key !== 'Enter') return;
       event.preventDefault();
       const delta = (event.key === forward ? 1 : -1) * (event.shiftKey ? 96 : 24);
-      setSizes(line.path, event.key === 'Enter' ? equalSizes(split.extents, line.index)
-        : moveLine(split.extents, split.mins, line.index, delta));
+      setSizes(
+        line.path,
+        event.key === 'Enter'
+          ? equalSizes(split.extents, line.index)
+          : moveLine(split.extents, split.mins, line.index, delta),
+      );
     });
     element.addEventListener('dblclick', () => {
       const line = placement.lines[index];
@@ -115,9 +124,9 @@ export function mountDividers(root: HTMLElement, desk: HTMLElement, host: Divide
 
   function render(current: Placement) {
     placement = current;
-    const key = current.lines.map(line => `${line.path.join('.')}:${line.index}:${line.dir}`).join('|');
+    const key = current.lines.map((line) => `${line.path.join('.')}:${line.index}:${line.dir}`).join('|');
     if (key !== previousKey && !dragging) {
-      lines.forEach(element => element.remove());
+      lines.forEach((element) => element.remove());
       lines = current.lines.map((_, index) => divider(index));
       previousKey = key;
     }
@@ -131,10 +140,18 @@ export function mountDividers(root: HTMLElement, desk: HTMLElement, host: Divide
       const split = splitOf(line.path);
       if (split) {
         const width = split.extents[line.index];
-        element.setAttribute('aria-valuenow', String(Math.round(100 * width / (width + split.extents[line.index + 1]))));
+        element.setAttribute(
+          'aria-valuenow',
+          String(Math.round((100 * width) / (width + split.extents[line.index + 1]))),
+        );
       }
     });
   }
 
-  return { render, get dragging() { return dragging; } };
+  return {
+    render,
+    get dragging() {
+      return dragging;
+    },
+  };
 }

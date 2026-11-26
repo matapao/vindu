@@ -54,10 +54,15 @@ export function placeHost(pane: PaneEl, shown: boolean) {
   const host = pane.host;
   if (!host?.pane?.place) return;
   const bounds = shown ? pane.body.getBoundingClientRect() : null;
-  const box = bounds && bounds.width > 0 && bounds.height > 0 ? {
-    x: Math.round(bounds.left), y: Math.round(bounds.top),
-    w: Math.round(bounds.width), h: Math.round(bounds.height),
-  } : null;
+  const box =
+    bounds && bounds.width > 0 && bounds.height > 0
+      ? {
+          x: Math.round(bounds.left),
+          y: Math.round(bounds.top),
+          w: Math.round(bounds.width),
+          h: Math.round(bounds.height),
+        }
+      : null;
   const key = box ? `${box.x},${box.y},${box.w},${box.h}` : 'hidden';
   if (key !== host.box) {
     host.box = key;
@@ -87,7 +92,7 @@ export function fitPages(fills: PaneEl[], stacked: () => boolean) {
     if (height) pane.body.style.setProperty('--vindu-page-h', height);
     else if (!waitingForPage.has(pane)) {
       waitingForPage.add(pane);
-      void rendered(pane.body, () => !!pageFrame(pane.body)).then(drawn => {
+      void rendered(pane.body, () => !!pageFrame(pane.body)).then((drawn) => {
         waitingForPage.delete(pane);
         if (drawn && pane.body.isConnected) fitPages([pane], stacked); // a pane gone meanwhile has nothing to fit
       });
@@ -113,7 +118,10 @@ export function drawPaneSurface(pane: PaneEl, view: View, which: Surface, render
   const keep = tabTitle(pane.body) ?? rendering.savedTab;
   const previousElement = pane.body.firstElementChild;
   const treeChanged = updateSurface(pane.body, view, which, {
-    onAction: rendering.action, components: rendering.components, head: false, missing: rendering.missing,
+    onAction: rendering.action,
+    components: rendering.components,
+    head: false,
+    missing: rendering.missing,
   });
   pane.view = view;
   pane.drawn = which;
@@ -136,7 +144,7 @@ export function drawPaneSurface(pane: PaneEl, view: View, which: Surface, render
     await rendered(pane.body, () => !!tabsIn(pane.body) && buttons().length > 0);
     if (pane.view !== view || !pane.body.isConnected) return;
     const tabs = tabsIn(pane.body);
-    const index = [...buttons()].findIndex(button => button.textContent?.trim() === title);
+    const index = [...buttons()].findIndex((button) => button.textContent?.trim() === title);
     if (tabs && index > 0 && tabs.activeIndex !== index) tabs.activeIndex = index;
     if (view.probes) rendering.verify(pane.drawn!);
   }

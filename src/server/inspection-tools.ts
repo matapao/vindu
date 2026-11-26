@@ -110,8 +110,7 @@ export function registerInspectionTools(server: McpServer, session: Session, has
       annotations: HINTS.read,
     },
     async () => {
-      if (session.runtime.options.verifyMs)
-        await fresh(session, Math.min(session.runtime.options.verifyMs, 1500));
+      if (session.runtime.options.verifyMs) await fresh(session, Math.min(session.runtime.options.verifyMs, 1500));
       const about = new Map(
         await Promise.all(
           [...session.abouts].map(

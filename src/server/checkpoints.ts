@@ -23,7 +23,8 @@ export const snapshotOf = (session: Session): ViewSnapshot => {
       args: structuredClone(session.specs.get(v.name)!),
       ...(v.mark ? { mark: { text: v.mark.text, by: v.mark.by } } : {}),
     }));
-  const ids = new Set<string>(); const refs = refsOf(session);
+  const ids = new Set<string>();
+  const refs = refsOf(session);
   for (const v of views) idsIn(v.args, refs, ids);
   const drafts = savedDrafts(session).filter((d) => views.some((v) => v.name === d.view)); // the person's, in these views
   return {
@@ -36,9 +37,7 @@ export const snapshotOf = (session: Session): ViewSnapshot => {
       .map((id) => session.own.find((a) => a.id === id))
       .filter((a): a is AnswerEntry => !!a),
     changes: views.flatMap((v) =>
-      (session.vhistory.get(v.name) ?? []).map(
-        (h) => `${h.by === 'person' ? 'the person' : 'the model'} ${h.what}`,
-      ),
+      (session.vhistory.get(v.name) ?? []).map((h) => `${h.by === 'person' ? 'the person' : 'the model'} ${h.what}`),
     ),
     picked: session.picked.filter((it) => views.some((v) => v.name === it.view)),
     ...(drafts.length ? { drafts } : {}),
@@ -58,7 +57,8 @@ export const startFrom = async (session: Session, snap: ViewSnapshot, carried: R
   }
   restoreDrafts(session, snap.drafts); // as restore brings them back: each the person's again where its view draws the same mail
   const shown: string[] = [];
-  const refused: Record<string, string> = {}; const refs = refsOf(session);
+  const refused: Record<string, string> = {};
+  const refs = refsOf(session);
   for (const v of snap.views) {
     const missing = [...idsIn(v.args, refs)].filter((id) => !Object.hasOwn(map, id));
     if (missing.length) {
@@ -95,7 +95,8 @@ export const checkpoint = (session: Session): ViewCheckpoint => {
   const { focus, maximized, shelf, recent } = session.shell.state();
   const gates = keptGates(session, gatesOf(session, new Set(views.map((v) => v.name))));
   const reminders = session.runtime.options.reminders ? session.reminders.map((r) => ({ ...r })) : [];
-  const refs = refsOf(session), ids = new Set<string>();
+  const refs = refsOf(session),
+    ids = new Set<string>();
   for (const v of views) idsIn(v.args, refs, ids);
   const fresh = [...session.fresh].filter(([read]) => ids.has(read)); // the newest read of each the views show
   for (const pair of fresh) for (const id of pair) ids.add(id);
@@ -160,15 +161,21 @@ export const restore = async (session: Session, saved: ViewCheckpoint) => {
       return [k, restoredGate(g, since, answered.sinceOwn(g.sinceOwn), r)];
     }),
   );
-  session.fresh = new Map(saved.fresh.flatMap(([was, newest]): [string, string][] => {
-    const a = now(was), b = now(newest);
-    return a && b && a !== b ? [[a, b]] : [];
-  }));
+  session.fresh = new Map(
+    saved.fresh.flatMap(([was, newest]): [string, string][] => {
+      const a = now(was),
+        b = now(newest);
+      return a && b && a !== b ? [[a, b]] : [];
+    }),
+  );
   if (saved.mode)
     session.mode = { ...saved.mode, fills: new Map(saved.mode.fills.map(([n, f]) => [n, restoredFill(f, now)])) };
   restoreDrafts(session, saved.drafts);
   const refs = refsOf(session);
-  restoreRem(session, saved.reminders?.map((r) => (r.about ? { ...r, about: swapIds(r.about, refs, map) as string } : r)));
+  restoreRem(
+    session,
+    saved.reminders?.map((r) => (r.about ? { ...r, about: swapIds(r.about, refs, map) as string } : r)),
+  );
   const restoring: Restoring = { refs, map, missing: read.missing, again: read.again, pointers, waits };
   const refused: string[] = [];
   for (const v of saved.views) {
@@ -187,7 +194,9 @@ export const restore = async (session: Session, saved: ViewCheckpoint) => {
     session.shell.say(
       `this task was opened again where the person left it, its views drawn from their results read again; ${waitsSaid(waits)}`,
     );
-  log(session, { restore: { read: Object.keys(read.map), missing: [...read.missing.keys()], waits: waits.length, refused } });
+  log(session, {
+    restore: { read: Object.keys(read.map), missing: [...read.missing.keys()], waits: waits.length, refused },
+  });
   return refused;
 };
 export const branchNote = (session: Session) => {

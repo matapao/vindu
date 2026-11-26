@@ -59,7 +59,8 @@ export async function startUiServer(options: UiServerOptions = {}) {
     // the token in the path (/mcp/<token>), or on /mcp as Authorization: Bearer <token>, so it stays out of URL logs
     const inPath = /^\/mcp\/([a-f0-9]{32})(?:\?[^#]*)?$/.exec(target)?.[1];
     const bare = /^\/mcp(\?[^#]*)?$/.exec(target);
-    const token = inPath ?? (bare ? /^Bearer ([a-f0-9]{32})$/.exec(String(req.headers.authorization ?? ''))?.[1] : undefined);
+    const token =
+      inPath ?? (bare ? /^Bearer ([a-f0-9]{32})$/.exec(String(req.headers.authorization ?? ''))?.[1] : undefined);
     if (!token || !endpoints.has(token)) {
       res.writeHead(404).end();
       return;
@@ -81,12 +82,7 @@ export async function startUiServer(options: UiServerOptions = {}) {
     /** Serve one process: its MCP URL for the processor, and the origin its pages and media come from.
      *  onShow gets each view's surfaces (and each ask); onShell gets the shell's state on every change, for the renderer
      *  (mountShell). event takes what the window reports: its size, the person's changes and answers, what it drew. */
-    open(
-      proc: UiProcess,
-      onShow: (v: Shown) => void,
-      onShell?: (s: ShellState) => void,
-      more: OpenMore = {},
-    ) {
+    open(proc: UiProcess, onShow: (v: Shown) => void, onShell?: (s: ShellState) => void, more: OpenMore = {}) {
       return openSession(runtime, endpoints, port, proc, onShow, onShell, more);
     },
     /** The page host's port, on loopback: where the pages and media the window shows come from (pageFrameSource). */

@@ -17,7 +17,9 @@ import { workbookOf } from './workbook-file.js';
 const DATA_MAX = 5_000_000;
 export type DataFormat = 'csv' | 'tsv' | 'json' | 'xlsx';
 const BY_TYPE: Record<string, DataFormat> = {
-  'text/csv': 'csv', 'text/tab-separated-values': 'tsv', 'application/json': 'json',
+  'text/csv': 'csv',
+  'text/tab-separated-values': 'tsv',
+  'application/json': 'json',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
   'application/vnd.ms-excel.sheet.macroenabled.12': 'xlsx', // a workbook with macros, refused for them
 };
@@ -44,10 +46,15 @@ const cellValue = (s: string): string | number => (NUMBER.test(s) && String(Numb
 
 /** Records under a header row: one row each, a cell past the header named by its place. */
 function underHeader(records: unknown[][], toValue: (x: unknown) => unknown, said: string[]): DataTable {
-  const columns = headerOf((records[0] ?? []).map(x => asText(x ?? '')), said);
+  const columns = headerOf(
+    (records[0] ?? []).map((x) => asText(x ?? '')),
+    said,
+  );
   const width = records.reduce((n, r) => Math.max(n, r.length), columns.length);
   for (let i = columns.length; i < width; i++) columns.push(`c${i + 1}`);
-  const rows = records.slice(1).map(r => Object.fromEntries(columns.map((c, i) => [c, i < r.length ? toValue(r[i]) : ''])));
+  const rows = records
+    .slice(1)
+    .map((r) => Object.fromEntries(columns.map((c, i) => [c, i < r.length ? toValue(r[i]) : ''])));
   return { rows, columns, lines: rows.map((_, i) => i + 2) };
 }
 
@@ -64,47 +71,70 @@ const isRecord = (v: unknown): v is Row => !!v && typeof v === 'object' && !Arra
  *  for each field (Key, Value). pick: the list or object inside it to show, e.g. "items". */
 function jsonTable(text: string, name: string, pick: string | undefined, said: string[]): DataTable {
   let v: unknown;
-  try { v = JSON.parse(text); } catch (e) { throw new Error(`"${name}" is not JSON: ${(e as Error).message}`); }
-  if (pick) for (const k of pick.split('.')) {
-    if (!isRecord(v) || !Object.hasOwn(v, k)) throw new Error(`"${name}" has no "${pick}"`);
-    // nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop -- it only reads, and only a field the object has of its own; nothing is written
-    v = v[k];
+  try {
+    v = JSON.parse(text);
+  } catch (e) {
+    throw new Error(`"${name}" is not JSON: ${(e as Error).message}`);
   }
+  if (pick)
+    for (const k of pick.split('.')) {
+      if (!isRecord(v) || !Object.hasOwn(v, k)) throw new Error(`"${name}" has no "${pick}"`);
+      // nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop -- it only reads, and only a field the object has of its own; nothing is written
+      v = v[k];
+    }
   if (Array.isArray(v) && v.every(isRecord)) {
-    const columns = [...new Set(v.flatMap(r => Object.keys(r)))];
+    const columns = [...new Set(v.flatMap((r) => Object.keys(r)))];
     return { rows: v, columns, lines: v.map((_, i) => i + 2) };
   }
-  if (Array.isArray(v) && v.length && v.every(Array.isArray)) return underHeader(v as unknown[][], x => x, said);
+  if (Array.isArray(v) && v.length && v.every(Array.isArray)) return underHeader(v as unknown[][], (x) => x, said);
   if (isRecord(v)) {
     said.push(`showed the object in "${name}" as one row for each of its ${Object.keys(v).length} fields (Key, Value)`);
     const rows = Object.entries(v).map(([Key, Value]) => ({ Key, Value }));
     return { rows, columns: ['Key', 'Value'], lines: rows.map((_, i) => i + 2) };
   }
-  throw new Error(`"${name}"${pick ? ` at "${pick}"` : ''} holds ${whatItHolds(v)}, not rows: a JSON file shows as a list of records, a list of lists (the first its header) or one object`);
+  throw new Error(
+    `"${name}"${pick ? ` at "${pick}"` : ''} holds ${whatItHolds(v)}, not rows: a JSON file shows as a list of records, a list of lists (the first its header) or one object`,
+  );
 }
 
 /** A data file's text as rows. Throws, saying why, when it holds no rows that can be shown. */
 function tableOf(text: string, format: DataFormat, name: string, pick: string | undefined, said: string[]): DataTable {
   if (format === 'json') return jsonTable(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text, name, pick, said);
-  if (pick) throw new Error(`pick reads inside a JSON file, or names a workbook's sheet; "${name}" is one table, shown whole`);
+  if (pick)
+    throw new Error(`pick reads inside a JSON file, or names a workbook's sheet; "${name}" is one table, shown whole`);
   let records: string[][];
-  try { records = parseDelimited(text, format === 'tsv' ? '\t' : ','); } catch (e) { throw new Error(`"${name}" is not ${format.toUpperCase()} the system can read: ${(e as Error).message}`); }
-  return underHeader(records, x => cellValue(x as string), said);
+  try {
+    records = parseDelimited(text, format === 'tsv' ? '\t' : ',');
+  } catch (e) {
+    throw new Error(`"${name}" is not ${format.toUpperCase()} the system can read: ${(e as Error).message}`);
+  }
+  return underHeader(records, (x) => cellValue(x as string), said);
 }
 
 /** A file's bytes as text, read no further than DATA_MAX allows. */
 function textOfFile(file: string, name: string): string {
   const { size, bytes } = readText(file, DATA_MAX);
-  if (!bytes) throw new Error(`"${name}" is ${(size / 1e6).toFixed(1)} MB; a table or a sheet reads data files up to ${DATA_MAX / 1e6} MB`);
-  try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { throw new Error(`"${name}" is not UTF-8 text`); }
+  if (!bytes)
+    throw new Error(
+      `"${name}" is ${(size / 1e6).toFixed(1)} MB; a table or a sheet reads data files up to ${DATA_MAX / 1e6} MB`,
+    );
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    throw new Error(`"${name}" is not UTF-8 text`);
+  }
 }
 
 /** Where a data file is: an attachment, or a file in the working folder (path), with its name and format. */
 type Source = { name: string; from: string; file: string; format: DataFormat };
 function sourceOf(p: PanelSpec, e: Entry | undefined, ctx: ViewContext, workbooks: boolean): Source {
-  if (p.path !== undefined && p.from !== undefined) throw new Error(`a ${p.card} shows from (a result or an attachment) or path (a file in the working folder), not both`);
+  if (p.path !== undefined && p.from !== undefined)
+    throw new Error(
+      `a ${p.card} shows from (a result or an attachment) or path (a file in the working folder), not both`,
+    );
   if (isDataAttachment(e)) return { name: e.name, from: e.id, file: e.file, format: dataFormat(e.name, e.mime)! };
-  const want = String(p.path), notData = `"${want}" is not a data file: a ${p.card} reads .csv, .tsv${workbooks ? ', .json and .xlsx' : ' and .json'} files`;
+  const want = String(p.path),
+    notData = `"${want}" is not a data file: a ${p.card} reads .csv, .tsv${workbooks ? ', .json and .xlsx' : ' and .json'} files`;
   if (!dataFormat(want)) throw new Error(notData);
   if (!ctx.pages?.workPath) throw new Error('this host reads no files from a working folder');
   const found = ctx.pages.workPath(want);
@@ -117,21 +147,42 @@ function sourceOf(p: PanelSpec, e: Entry | undefined, ctx: ViewContext, workbook
 /** The rows a table or a sheet shows from a data file, and what the file is: an attachment that is CSV, TSV or JSON
  *  (from), or a file of these in the working folder (path); and a workbook, for a card that reads them (workbooks: a
  *  sheet). Undefined when the panel names neither. */
-export function dataFileOf(p: PanelSpec, e: Entry | undefined, ctx: ViewContext, said: string[], workbooks = false): { rows: Row[]; file: DataFileRead } | undefined {
+export function dataFileOf(
+  p: PanelSpec,
+  e: Entry | undefined,
+  ctx: ViewContext,
+  said: string[],
+  workbooks = false,
+): { rows: Row[]; file: DataFileRead } | undefined {
   if (p.path === undefined && !isDataAttachment(e)) return undefined;
   const notes: string[] = [];
   let at: Source, table: DataTable;
   try {
     at = sourceOf(p, e, ctx, workbooks);
-    if (at.format === 'xlsx' && !workbooks) throw new Error(`"${at.name}" is a workbook; a ${p.card} reads .csv, .tsv and .json files: show a workbook in a sheet, a tab for each of its sheets`);
+    if (at.format === 'xlsx' && !workbooks)
+      throw new Error(
+        `"${at.name}" is a workbook; a ${p.card} reads .csv, .tsv and .json files: show a workbook in a sheet, a tab for each of its sheets`,
+      );
     if (at.format === 'xlsx') {
       const book = workbookOf(at.file, at.name, p, notes);
       for (const n of notes) said.push(`panel ${p.id}: ${n}`);
       return { rows: book.rows, file: { name: at.name, from: at.from, ...book.file } };
     }
     table = tableOf(textOfFile(at.file, at.name), at.format, at.name, p.pick, notes);
-  } catch (x) { throw new Refusal(`panel ${p.id}: ${(x as Error).message}`); }
+  } catch (x) {
+    throw new Refusal(`panel ${p.id}: ${(x as Error).message}`);
+  }
   for (const n of notes) said.push(`panel ${p.id}: ${n}`);
   const index = new Map(table.rows.map((r, i) => [r, table.lines[i]]));
-  return { rows: table.rows, file: { name: at.name, from: at.from, format: at.format, rows: table.rows.length, columns: table.columns.length, index } };
+  return {
+    rows: table.rows,
+    file: {
+      name: at.name,
+      from: at.from,
+      format: at.format,
+      rows: table.rows.length,
+      columns: table.columns.length,
+      index,
+    },
+  };
 }
