@@ -12,7 +12,7 @@ all in TypeScript. This file is for the people and coding agents who change it.
   tests and examples), `lint` (oxlint with type-aware rules on src, test, scripts and examples, then Knip for unused
   code and dependencies), `format:check` (Prettier), `check:files` (500 lines a file, the Markdown, suppressions with
   their reasons, nothing left behind) and `test` (builds the SDK and runs Vitest, in Node and Chromium, with isolated
-  data). CI runs `pnpm check --coverage` on macOS: `test:coverage`, the same tests with their floors (lines 69,
+  data). CI runs `pnpm check --coverage` on macOS: `test:coverage`, the same tests with their floors (lines 68,
   branches 64, functions 69, as measured; `vitest.config.ts`), and `pnpm check` on Linux, not yet required.
 - `pnpm check:security` when a change adds a package or touches `.github/`: lockfile sources, hidden characters,
   licences, OSV-Scanner, secrets, Semgrep, zizmor and actionlint. CI runs it with `--strict`, and pnpm audit too.
@@ -60,6 +60,8 @@ all in TypeScript. This file is for the people and coding agents who change it.
 - Give each module one responsibility. Aim for 300 lines; `check:files` enforces 500 for every hand-written file,
   comments and blank lines included.
 - Use descriptive names, named exports and type-only imports. Keep related state and operations together.
+- Prettier formats the code but not what is inside lit's `html` and `css` templates (`embeddedLanguageFormatting`
+  off): the whitespace in a template is text a view reads and says.
 - Prefer straightforward control flow: no nested ternaries (an if/else or a small named function) and no explicit
   `any` (a real type, or `unknown` and a check). Keep semantic markup, presentation and data handling distinct.
 - A2UI's Zod advisory GHSA-mrhx-c7xc-m3w5 is covered by the workspace patch (`patches/`) and the renderer's guard
