@@ -3,7 +3,8 @@
 // tasks due on its days (block-week.ts).
 import { z } from 'zod';
 import { block, needOne, type Roles } from './block-kit.js';
-import { resultRef, SOURCE, sourceRow, type CardAction, type CardDef, type PanelSpec } from './cards.js';
+import { SOURCE, sourceRow, type CardAction, type CardDef, type PanelSpec } from './cards.js';
+import { resultRef } from './card-schema.js';
 import type { Row } from './results.js';
 import { rowAt, rowKey, rowLabel } from './row-keys.js';
 import { asText } from './format.js';
@@ -104,5 +105,8 @@ export const EVENTS = block({
   },
   props: p => (p.layout === 'free' ? { map: { start: 'start', end: 'end' } } : {}),
   derived: ['planned_from', 'clashes'], actions: { plan }, suggest: clashCue, words: w => ({ ...w.events }),
-  account: (rows, p, m) => (p.layout !== 'free' && p.planned && Object.keys(p.planned).length ? { events: rows.length, ...planAccount(rows, m) } : p.layout === 'free' ? { free: `computed by the system from the busy events: ${rows.length} free spans of at least ${asText(p.length ?? '30m')}, ${(p.hours as string[] | undefined)?.join('–') ?? '08:00–16:00'} UTC` } : { events: rows.length }),
+  account: (rows, p, m) => {
+    if (p.layout === 'free') return { free: `computed by the system from the busy events: ${rows.length} free spans of at least ${asText(p.length ?? '30m')}, ${(p.hours as string[] | undefined)?.join('–') ?? '08:00–16:00'} UTC` };
+    return p.planned && Object.keys(p.planned).length ? { events: rows.length, ...planAccount(rows, m) } : { events: rows.length };
+  },
 });

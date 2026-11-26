@@ -60,14 +60,26 @@ export const SHELL_LABELS: ShellLabels = {
   collapsed: (t, updated) => `${t}${updated ? ', updated' : ''}: collapsed. Click to open it where it was, or drag it beside a pane`,
   peek: 'Click to open it where it was', open: 'Open',
   resize: (a, b) => `Resize ${a} and ${b}`,
-  mode: (m, n) => (m === 'empty' ? '' : m === 'tiled' ? `${n} panes` : m === 'maximized' ? 'maximized · esc restores' : m),
+  mode: (m, n) => {
+    if (m === 'empty') return '';
+    if (m === 'tiled') return `${n} panes`;
+    return m === 'maximized' ? 'maximized · esc restores' : m;
+  },
   missing: MISSING,
   suggestion: 'Use the suggested layout',
   byModel: 'By the model', suggests: 'The model suggests', undo: 'Undo', take: 'Take it', dismiss: 'No',
-  reminders: (set, due) => (due ? `${due} reminder${due > 1 ? 's' : ''} due` : set ? `Reminders · ${set}` : 'Reminders'), remindersHint: 'Show the reminders, and set one',
+  reminders: (set, due) => {
+    if (due) return `${due} reminder${due > 1 ? 's' : ''} due`;
+    return set ? `Reminders · ${set}` : 'Reminders';
+  },
+  remindersHint: 'Show the reminders, and set one',
   noDrawer: k => `This window cannot show a ${k} pane.`,
   stack: 'Stack', stackHint: 'Stack with its neighbours: one in front, the others as tabs', spread: 'Spread out', spreadHint: 'Show these views side by side again',
-  tab: (t, o) => `${t.join(' + ')}${o.asks ? ': waiting for you' : o.changed ? ': changed' : ''}${o.front ? ' (in front)' : ''}`,
+  tab: (t, o) => {
+    let state = ''; // what it waits for, or that it changed
+    if (o.asks) state = ': waiting for you'; else if (o.changed) state = ': changed';
+    return `${t.join(' + ')}${state}${o.front ? ' (in front)' : ''}`;
+  },
   showAs: 'Show the views as', cards: 'Cards', content: 'Content',
   cardKind: kinds => kinds.join(' · '),
   openCard: (title, lines) => `${title}${lines ? `: ${lines}` : ''}. Open it alone`,

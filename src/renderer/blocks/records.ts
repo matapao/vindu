@@ -66,21 +66,21 @@ export const VMap = defineBlock('VMap', 'vindu-map', { frame: 'value', words: 'v
         const s = row.__shape as { kind: string; points: number[][] } | undefined;
         if (!s?.points?.length) return svg``;
         const c = color(row);
-        return s.kind === 'area'
-          ? svg`<polygon points=${pts(s)} fill=${c} fill-opacity=".18" stroke=${
-              c
-            } stroke-width="1.5" data-panel=${props.panel ?? ''} data-row=${String(index)}/>`
-          : s.kind === 'line'
-            ? svg`<polyline points=${pts(s)} fill="none" stroke=${c} stroke-width="2.5" stroke-linejoin="round" data-panel=${
-                props.panel ?? ''
-              } data-row=${String(index)}/>`
-            : svg`<circle cx=${s.points[0][0]} cy=${s.points[0][1]} r="5.5" fill=${c} stroke="var(--v-pane)" stroke-width="2" data-panel=${props.panel ?? ''} data-row=${String(index)}/>${
-                props.rows.length <= 40 && fieldValue(props, row, 'label') !== undefined
-                  ? svg`<text x=${s.points[0][0] + 8} y=${s.points[0][1] + 4} class="vb-maplabel">${
-                      formatCell(props, fieldValue(props, row, 'label'))
-                    }</text>`
-                  : svg``
-              }`;
+        if (s.kind === 'area')
+          return svg`<polygon points=${pts(s)} fill=${c} fill-opacity=".18" stroke=${
+            c
+          } stroke-width="1.5" data-panel=${props.panel ?? ''} data-row=${String(index)}/>`;
+        if (s.kind === 'line')
+          return svg`<polyline points=${pts(s)} fill="none" stroke=${c} stroke-width="2.5" stroke-linejoin="round" data-panel=${
+            props.panel ?? ''
+          } data-row=${String(index)}/>`;
+        return svg`<circle cx=${s.points[0][0]} cy=${s.points[0][1]} r="5.5" fill=${c} stroke="var(--v-pane)" stroke-width="2" data-panel=${props.panel ?? ''} data-row=${String(index)}/>${
+          props.rows.length <= 40 && fieldValue(props, row, 'label') !== undefined
+            ? svg`<text x=${s.points[0][0] + 8} y=${s.points[0][1] + 4} class="vb-maplabel">${
+                formatCell(props, fieldValue(props, row, 'label'))
+              }</text>`
+            : svg``
+        }`;
       })
     }`
   }</svg>

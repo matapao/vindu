@@ -138,6 +138,11 @@ export const within = async (p: Pending, ms: number, signal?: AbortSignal) => {
 
 /** Exactly what an ask's call will send or change, beside the ask: its payload kept by reference (a host entry), shown
  *  with the block that fits it. A payload no block fits stays in the ask's details, as it always is. */
+/** What of a preview's payload its panel shows: a list's rows, or the part the preview names. */
+const pickOf = (payload: unknown, pick: PreviewPanel['pick']) => {
+  if (Array.isArray(payload)) return { pick: 'rows' };
+  return pick ? { pick } : {};
+};
 export const showPreview = async (
   session: Session,
   p: Pending,
@@ -154,7 +159,7 @@ export const showPreview = async (
     id: 'preview',
     card: pv.card,
     from: e.id,
-    ...(Array.isArray(payload) ? { pick: 'rows' } : pv.pick ? { pick: pv.pick } : {}),
+    ...pickOf(payload, pv.pick),
     ...(pv.layout ? { layout: pv.layout } : {}),
     ...(pv.map ? { map: pv.map } : {}),
     ...(pv.columns ? { columns: pv.columns } : {}),

@@ -92,6 +92,11 @@ export const VMessages = defineBlock('VMessages', 'vindu-messages', { draft: 'va
 });
 
 // a document of sections, or one read from a Markdown file, which is drawn from its blocks (markdown.ts)
+/** A section's class: gone since the version it is compared with, new in this one, or neither. */
+const sectionClass = (row: { __gone?: unknown; __new?: unknown }) => {
+  if (row.__gone) return 'vb-gone';
+  return row.__new ? 'vb-new' : '';
+};
 export const VDocument = defineBlock(
   'VDocument',
   'vindu-document',
@@ -103,9 +108,10 @@ export const VDocument = defineBlock(
       const heading = fieldValue(props, row, 'heading');
       const changes = row.__changes as { op: string; t: string }[] | undefined;
       const body = changes
-        ? changes.map((c) =>
-            c.op === '+' ? html`<ins>${c.t}</ins>` : c.op === '-' ? html`<del>${c.t}</del>` : c.t,
-          )
+        ? changes.map((c) => {
+            if (c.op === '+') return html`<ins>${c.t}</ins>`;
+            return c.op === '-' ? html`<del>${c.t}</del>` : c.t;
+          })
         : formatCell(props, fieldValue(props, row, 'text'));
       const sources = displayNames(fieldValue(props, row, 'sources'));
       return rowContainer(
@@ -144,7 +150,7 @@ export const VDocument = defineBlock(
               }</div>`
             : nothing
         }`,
-        row.__gone ? 'vb-gone' : row.__new ? 'vb-new' : '',
+        sectionClass(row),
       );
     })}</div>`,
 );

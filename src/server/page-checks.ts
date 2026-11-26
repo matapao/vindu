@@ -172,34 +172,30 @@ export function registerPageCheck(server: McpServer, session: Session) {
       const unknown = (args.uses ?? []).filter((id) => session.results.get(id)?.kind !== 'result');
       const given = (args.panel ? 1 : 0) + (args.path ? 1 : 0) + (args.html ? 1 : 0);
       let written: string | undefined; // a page written for this check: removed once it is checked
-      const pg =
-        unknown.length || given !== 1
-          ? undefined
-          : args.panel
-            ? (session.pages.get(args.panel) ??
-              (inView?.length === 1 ? session.pages.get(`${args.panel}/${inView[0]}`) : undefined))
-            : args.path
-              ? workPage(session, args.path, args.uses ?? [])
-              : (() => {
-                  const [page, name] = writtenPage(session, args.html!, args.uses ?? []);
-                  written = name;
-                  return page;
-                })();
+      let pg: Page | undefined; // the page to check: a panel's, one in the working folder, or one written for this check
+      if (!unknown.length && given === 1) {
+        if (args.panel)
+          pg =
+            session.pages.get(args.panel) ??
+            (inView?.length === 1 ? session.pages.get(`${args.panel}/${inView[0]}`) : undefined);
+        else if (args.path) pg = workPage(session, args.path, args.uses ?? []);
+        else [pg, written] = writtenPage(session, args.html!, args.uses ?? []);
+      }
       if (!pg) {
         const shown = [...session.views]
           .filter(([, ids]) => ids.length)
           .map(([view, ids]) => `${ids.join(', ')} (in view ${view})`)
           .join('; ');
-        const why =
-          given !== 1
-            ? 'give one of "path" (a page in the working folder), "html" (a page you write) or "panel" (a page panel shown)'
-            : unknown.length
-              ? `no result ${unknown.map((x) => `"${x}"`).join(', ')} to give the page (uses)`
-              : args.panel
-                ? inView?.length
-                  ? `view "${args.panel}" has ${inView.length} page panels: ${inView.join(', ')}; name one`
-                  : `no page panel "${args.panel}" has been shown; shown: ${shown || 'none'}`
-                : `no page "${splitPath(args.path ?? '').file}" in the working folder; pages there: ${session.runtime.host.workPages(session.key).slice(0, 12).join(', ') || 'none'}`;
+        let why: string;
+        if (given !== 1)
+          why = 'give one of "path" (a page in the working folder), "html" (a page you write) or "panel" (a page panel shown)';
+        else if (unknown.length) why = `no result ${unknown.map((x) => `"${x}"`).join(', ')} to give the page (uses)`;
+        else if (args.panel)
+          why = inView?.length
+            ? `view "${args.panel}" has ${inView.length} page panels: ${inView.join(', ')}; name one`
+            : `no page panel "${args.panel}" has been shown; shown: ${shown || 'none'}`;
+        else
+          why = `no page "${splitPath(args.path ?? '').file}" in the working folder; pages there: ${session.runtime.host.workPages(session.key).slice(0, 12).join(', ') || 'none'}`;
         log(session, { tool: 'check_page', ok: false, args, refusal: why });
         return text(`not checked: ${why}`, true);
       }

@@ -1,7 +1,8 @@
 // A card a host adds, and each of Vindu's blocks (blocks.ts): its rows resolved as for any card, its own shaping and
 // checks, and the rows, exact, bound to the component the host's renderer registers. A card of cells (a sheet) draws
 // its rows as cells by A1 address, with the model's notes on them.
-import { MAX_ROWS, PANEL_FIELDS, rowFields, type CardDef, type PanelSpec, type Resolved } from '../cards.js';
+import { MAX_ROWS, rowFields, type CardDef, type PanelSpec, type Resolved } from '../cards.js';
+import { PANEL_FIELDS } from '../card-schema.js';
 import { pointerStep, type Row } from '../results.js';
 import { VIEW_WORDS, type ViewWords } from '../view-words.js';
 import { notesAccount, notesProblem, placedNotes, type DrawnCells } from './cells.js';

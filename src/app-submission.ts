@@ -93,9 +93,11 @@ function observeConnectorForm(tag: string, submitToken: string): void {
     for (let i = 0; i < count; i++) {
       const control = apply(item, list, [i]);
       if (!control || apply(matches, control, [':disabled'])) continue;
-      const kind = is(inputType, control) ? 'input' : is(area.name, control) ? 'area' : is(multiple, control) ? 'select' : null;
+      let kind: 'input' | 'area' | 'select' | null = null; // each kind by its own getter
+      if (is(inputType, control)) kind = 'input'; else if (is(area.name, control)) kind = 'area'; else if (is(multiple, control)) kind = 'select';
       if (!kind) continue;
-      const access = kind === 'input' ? input : kind === 'area' ? area : select;
+      let access = select;
+      if (kind === 'input') access = input; else if (kind === 'area') access = area;
       const name = apply(access.name, control, []) as string;
       if (!name) continue;
       if (kind === 'input' && !matched(textInput, apply(inputType, control, []))) continue;

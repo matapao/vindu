@@ -13,6 +13,12 @@ const TEMPLATES_OWN = ['place', 'hooks', 'steps', 'suggestions', 'after'] as con
 /** Each fill of the model's that waits for the person's yes, and that ask: a new fill of the slot takes it away. */
 const approving = new WeakMap<Fill, Pending>();
 
+/** Who filled a slot, as the model is told it: its source (and which), the person, or the model. */
+const filledBy = (f: Fill) => {
+  if (f.by === 'source') return `its source${f.id ? ` (${f.id})` : ''}`;
+  return f.by === 'person' ? 'the person' : 'you';
+};
+
 // ── static views ──────────────────────────────────────────────────────────────────────────────────────────────
 export const slotsOf = (session: Session) =>
   session.mode
@@ -24,9 +30,7 @@ export const slotsOf = (session: Session) =>
             slot: n,
             block: sl.block === 'choose' ? `one of ${sl.of!.join(', ')}` : sl.block,
             ...(sl.needs ? { needs: sl.needs } : {}),
-            filled: f
-              ? `by ${f.by === 'source' ? `its source${f.id ? ` (${f.id})` : ''}` : f.by === 'person' ? 'the person' : 'you'}`
-              : 'no',
+            filled: f ? `by ${filledBy(f)}` : 'no',
             ...(f?.failed ? { failed: f.failed } : {}),
             ...(sl.required && !f ? { required: true } : {}),
             ...(f?.approved ? { approved_by: f.approved } : {}),

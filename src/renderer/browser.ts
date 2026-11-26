@@ -107,16 +107,18 @@ function pictured(h: ElementMaker, slot: HTMLElement, name: string, io: BrowserI
   const mods = (e: MouseEvent | KeyboardEvent) => (e.altKey ? 1 : 0) | (e.ctrlKey ? 2 : 0) | (e.metaKey ? 4 : 0) | (e.shiftKey ? 8 : 0);
   const at = (e: MouseEvent) => { const r = slot.getBoundingClientRect(); return { x: Math.round(e.clientX - r.left), y: Math.round(e.clientY - r.top) }; };
   const button = (b: number) => (['left', 'middle', 'right'] as const)[b] ?? 'none';
+  const held = (buttons: number) => { if (buttons & 1) return 'left'; return buttons & 2 ? 'right' : 'none'; }; // the button a move drags with
   slot.addEventListener('mousedown', e => { slot.focus(); e.preventDefault(); send({ type: 'mouse', event: 'mousePressed', ...at(e), button: button(e.button), buttons: e.buttons, clickCount: e.detail || 1, modifiers: mods(e) }); });
   slot.addEventListener('mouseup', e => { e.preventDefault(); send({ type: 'mouse', event: 'mouseReleased', ...at(e), button: button(e.button), buttons: e.buttons, clickCount: e.detail || 1, modifiers: mods(e) }); });
   const view = slot.ownerDocument.defaultView ?? window;
   let moving: MouseEvent | undefined, frame = 0; // one move a frame, the latest
   slot.addEventListener('mousemove', e => {
-    if (!moving) frame = view.requestAnimationFrame(() => { const m = moving!; moving = undefined; send({ type: 'mouse', event: 'mouseMoved', ...at(m), button: m.buttons & 1 ? 'left' : m.buttons & 2 ? 'right' : 'none', buttons: m.buttons, modifiers: mods(m) }); });
+    if (!moving) frame = view.requestAnimationFrame(() => { const m = moving!; moving = undefined; send({ type: 'mouse', event: 'mouseMoved', ...at(m), button: held(m.buttons), buttons: m.buttons, modifiers: mods(m) }); });
     moving = e;
   });
   const leaves = (e: KeyboardEvent) => e.key === 'F6' && !e.altKey && !e.ctrlKey && !e.metaKey; // the shell's, never the page's
-  slot.addEventListener('wheel', e => { e.preventDefault(); const k = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? slot.clientHeight : 1; send({ type: 'wheel', ...at(e), deltaX: e.deltaX * k, deltaY: e.deltaY * k, modifiers: mods(e) }); }, { passive: false });
+  const pixels = (mode: number) => { if (mode === 1) return 16; return mode === 2 ? slot.clientHeight : 1; }; // a wheel's lines or pages, in pixels
+  slot.addEventListener('wheel', e => { e.preventDefault(); const k = pixels(e.deltaMode); send({ type: 'wheel', ...at(e), deltaX: e.deltaX * k, deltaY: e.deltaY * k, modifiers: mods(e) }); }, { passive: false });
   slot.addEventListener('contextmenu', e => e.preventDefault());
   slot.addEventListener('keydown', e => {
     if (leaves(e)) return;
@@ -125,8 +127,9 @@ function pictured(h: ElementMaker, slot: HTMLElement, name: string, io: BrowserI
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'v') return; // the browser pastes: the text goes to the page from there
     e.preventDefault();
     const printable = e.key.length === 1 && !e.ctrlKey && !e.metaKey;
-    send({ type: 'key', event: printable ? 'keyDown' : 'rawKeyDown', key: e.key, code: e.code, keyCode: e.keyCode, modifiers: mods(e), location: e.location, autoRepeat: e.repeat,
-      ...(printable ? { text: e.key } : e.key === 'Enter' ? { text: '\r' } : {}) });
+    let typed: { text?: string } = {}; // what the key types: its character, or a return for Enter
+    if (printable) typed = { text: e.key }; else if (e.key === 'Enter') typed = { text: '\r' };
+    send({ type: 'key', event: printable ? 'keyDown' : 'rawKeyDown', key: e.key, code: e.code, keyCode: e.keyCode, modifiers: mods(e), location: e.location, autoRepeat: e.repeat, ...typed });
   });
   slot.addEventListener('keyup', e => { if (leaves(e)) return; e.stopPropagation(); e.preventDefault(); send({ type: 'key', event: 'keyUp', key: e.key, code: e.code, keyCode: e.keyCode, modifiers: mods(e), location: e.location }); });
   slot.addEventListener('paste', e => { const t = e.clipboardData?.getData('text/plain'); if (t) { e.preventDefault(); send({ type: 'text', text: t }); } });

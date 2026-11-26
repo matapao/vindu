@@ -5,8 +5,8 @@
 import type { ModelDraft } from './block-drafts.js';
 import { addDates } from './dates.js';
 import { keyField, rowKey } from './row-keys.js';
-import type { Row } from './results.js';
-import { CARDS, COMMON_FIELDS, FROM_ALIASES as ALIASES, cardsReading, noCard, panelIdsOf, panelTitle, panelsOf, sourceRow, type CardName, type PanelSpec, type Resolved, type ViewSpec } from './cards.js';
+import type { Entry, Row } from './results.js';
+import { panelTitle, panelsOf, sourceRow, type PanelSpec, type Resolved, type ViewSpec } from './cards.js';
 import { compile, type Surface } from './a2ui.js';
 import { account, type Account } from './account.js';
 import { check, kindOf } from './card-kinds/registry.js';
@@ -18,6 +18,7 @@ import { checkSurface } from './surface-check.js';
 import { Refusal, listing, type ViewContext } from './view-context.js';
 import { rowsOf, shape, matcher } from './view-rows.js';
 import { asText } from './format.js';
+import { read } from './view-read.js';
 
 export type Shown = { account: Account; wide: Surface; compact: Surface; spec: ViewSpec; data: Record<string, Resolved> };
 
@@ -74,7 +75,11 @@ export function showView(input: Record<string, unknown>, ctx: ViewContext): Show
     const of = spec.panels.length, at = Math.min(of, Math.max(1, ctx.step?.(spec.name) ?? 1));
     spec.step = { at, of };
   }
-  if (spec.hooks?.length) spec.hookStates = spec.hooks.map((h, i) => { const st = ctx.hookState?.(spec.name, i); return st === 'idle' ? 'idle' : h.do.job ? st ?? 'unavailable' : 'system'; });
+  if (spec.hooks?.length) spec.hookStates = spec.hooks.map((h, i) => {
+    const st = ctx.hookState?.(spec.name, i);
+    if (st === 'idle') return 'idle';
+    return h.do.job ? st ?? 'unavailable' : 'system';
+  });
   spec.suggestions = (spec.suggestions ?? []).slice(0, 3).map(sg => ({ ...sg, by: 'model' as const }));
   // cues: what the system noticed that usually means a next step, offered as a prompt the person may take; no model is
   // asked: what a card noticed in its rows (more rows than it shows, a plan that clashes), then a read that changed since
@@ -99,51 +104,22 @@ export function showView(input: Record<string, unknown>, ctx: ViewContext): Show
   }
   if (spec.suggestions.length) (b.account as Account & { suggestions?: unknown }).suggestions = spec.suggestions.map(sg => ({ label: sg.label, by: sg.by }));
   if (spec.hooks?.length) (b.account as Account & { hooks?: unknown }).hooks = spec.hooks.map((h, i) => ({ n: i, does: hookWords(h, id => panelTitle(spec, id)),
-    state: spec.hookStates![i] === 'system' ? 'on: the system does it by itself' : spec.hookStates![i] === 'on' ? 'on: the person turned this job on' : spec.hookStates![i] === 'off' ? 'off until the person turns it on, in the window' : spec.hookStates![i] === 'idle' ? 'off: this is a job\'s own task, which runs no hooks' : 'off: jobs are off in this app' }));
+    state: HOOK_STATES[spec.hookStates![i]] }));
   return { ...b, spec, data };
 }
 
-// a view's fields, as show_view takes them (cards.ts), and the path a drill gives it (server/selection.ts)
-const VIEW_FIELDS = new Set(['name', 'title', 'slot', 'subtitle', 'panels', 'tabs', 'suggestions', 'after', 'hooks', 'steps', 'place', 'path']);
+/** Each hook's state as the account says it. */
+const HOOK_STATES: Record<NonNullable<ViewSpec['hookStates']>[number], string> = {
+  system: 'on: the system does it by itself', on: 'on: the person turned this job on', off: 'off until the person turns it on, in the window',
+  idle: 'off: this is a job\'s own task, which runs no hooks', unavailable: 'off: jobs are off in this app',
+};
 
-/** Read what the model sent: ids, cards and common shapes from other UI libraries, each reading noted; a card there is
- *  not is a problem, and a field the card does not read is ignored, and said to be. */
-function read(input: Record<string, unknown>, notes: string[], ctx: ViewContext, problems: string[], ignored: string[]): ViewSpec {
-  const v = structuredClone(input) as unknown as ViewSpec;
-  if (!v.panels?.length && !v.tabs?.length) throw new Refusal('a view needs "panels" (one page) or "tabs" (several pages, each with panels)');
-  const extra = Object.keys(input).filter(k => !VIEW_FIELDS.has(k));
-  if (extra.length) ignored.push(`the view: ${extra.map(k => `"${k}"`).join(', ')} ${extra.length > 1 ? 'are' : 'is'} not a field of a view (its fields: name, title, subtitle, panels or tabs, suggestions, after, hooks, steps, place)`);
-  const offered = [...(ctx.kinds ?? CARDS), ...(ctx.cards?.keys() ?? [])].filter(k => k !== 'app' || ctx.apps || ctx.kinds?.has('app'));
-  const ids = panelIdsOf(panelsOf(v));
-  for (const [n, p] of panelsOf(v).entries()) {
-    const raw = p as Record<string, unknown>;
-    const id = ids[n]; p.id = id;
-    const own = ctx.cards?.get(p.card);
-    const builtIn = CARDS.includes(p.card as CardName) && (!ctx.kinds || ctx.kinds.has(p.card));
-    const kind = (own || builtIn) && kindOf(p.card, ctx.cards);
-    if (!kind) {
-      problems.push(`panel ${id}: ${p.card === 'app' ? 'there is no "app" card here: MCP Apps are off in this window; show the result with the cards'
-        : CARDS.includes(p.card as CardName) ? `there is no "${p.card}" card here; cards: ${offered.join(', ')}` : noCard(String(p.card), raw, offered)}`);
-      continue;
-    }
-    // group changes what is shown, so a card that cannot show it refuses it, before what it does not read is left out
-    if (p.group && kind.noGroup) { problems.push(`panel ${id}: ${kind.noGroup(p)}`); continue; }
-    for (const alias of ALIASES) if (p.from === undefined && typeof raw[alias] === 'string') { p.from = raw[alias]; notes.push(`read "${alias}" as "from"`); }
-    const reads = new Set([...COMMON_FIELDS, ...ALIASES, ...kind.reads]);
-    for (const k of Object.keys(raw)) if (!reads.has(k) && raw[k] !== undefined) { // left out, so it does nothing, as said
-      const by = cardsReading(k, offered);
-      ignored.push(`panel ${id}: "${k}" does nothing on a ${p.card}${by.length ? ` (${by.join(', ')} ${by.length > 1 ? 'read' : 'reads'} it)` : ''}`);
-      delete raw[k];
-    }
-    if (Array.isArray(p.rows)) { p.data = p.rows; delete p.rows; }
-    const d = p.data as { columns?: unknown[]; rows?: unknown[] } | undefined;
-    if (d && !Array.isArray(d) && typeof d === 'object' && Array.isArray(d.rows) && !kind.keepsData) { // {columns, rows}
-      const head = (d.columns ?? []).map(String);
-      p.data = d.rows.map(r => Array.isArray(r) ? Object.fromEntries(r.map((x, i) => [head[i] ?? `c${i + 1}`, x])) : r);
-      notes.push(`read {columns, rows} as ${(p.data as Row[]).length} rows`);
-    }
-  }
-  return v;
+/** How a result was seen: as its store says, an answer by who gave it, or an attachment. */
+function fidelityOf(e: Entry): string {
+  if (e.kind === 'result') return e.fidelity ?? 'reported';
+  if (e.kind !== 'answer') return 'attachment';
+  if (e.by === 'app') return 'app-reported';
+  return e.by === 'host' || e.by === 'page' ? e.by : 'person';
 }
 
 /** A panel's data: from the results (exact), or typed by the model (labelled as typed in the account). What a card
@@ -162,7 +138,7 @@ function resolve(p: PanelSpec, view: ViewSpec, ctx: ViewContext, notes: string[]
   else if (e) {
     const got = rowsOf(e, p, notes, !!kind.one); rows = got.rows;
     src = { id: e.id, pointer: got.pointer, index: new Map(rows.map((r, i) => [r, i])), of: rows.length,
-      fidelity: e.kind === 'answer' ? (e.by === 'app' ? 'app-reported' : e.by === 'host' ? 'host' : e.by === 'page' ? 'page' : 'person') : e.kind === 'result' ? e.fidelity ?? 'reported' : 'attachment',
+      fidelity: fidelityOf(e),
       ...(e.kind === 'result' && e.digest ? { digest: e.digest } : {}), ...(got.columns ? { columns: true } : {}) };
   }
   else if (Array.isArray(p.data)) rows = p.data as Row[];
@@ -190,7 +166,8 @@ function resolve(p: PanelSpec, view: ViewSpec, ctx: ViewContext, notes: string[]
     steps.push({ dates: p.dates, ...(holidays.length ? { holidays: holidays.length } : {}), ...(Object.keys(got.empty).length ? { empty: got.empty } : {}) });
     for (const [k, n] of Object.entries(got.empty)) notes.push(`panel ${p.id}: ${k} is empty in ${n} of ${rows.length} rows (its date field holds no date)`);
   }
-  const before = p.group && src ? (p.where ? rows.filter(r => Object.entries(p.where!).every(([k, x]) => matcher(k, x).test(r[k]))) : rows) : undefined;
+  let before: Row[] | undefined; // what is grouped, for the groups' pointers to the rows behind them
+  if (p.group && src) before = p.where ? rows.filter(r => Object.entries(p.where!).every(([k, x]) => matcher(k, x).test(r[k]))) : rows;
   kind.infer?.(p, rows, notes); // first: a timeline is sorted by its time
   rows = shape(rows, p, notes, steps, inputs, kind); // where, then group, then sort and limit
   const behind = before && src ? groupsBehind(before, p.group!, src.index) : undefined;
@@ -217,12 +194,18 @@ function reindex(at: { index: Map<Row, number> } | undefined, before: Row[], row
   at.index = new Map(rows.map((r, i) => [r, idx.get(r) ?? idx.get(sourceRow(r)) ?? idx.get(before[i]) ?? i]));
 }
 
+/** An input's number: a number, an input's own { value }, or what Number makes of it. */
+function inputNumber(v: unknown): number {
+  if (typeof v === 'number') return v;
+  return typeof v === 'object' && v && typeof (v as { value?: unknown }).value === 'number' ? (v as { value: number }).value : Number(v);
+}
+
 /** A panel's inputs (what-ifs): the model's values, unless the person set one in the window. */
 function inputsOf(p: PanelSpec, view: ViewSpec, ctx: ViewContext): Record<string, number> {
   const raw = (p.inputs ?? {}) as Record<string, unknown>;
   const defaults: Record<string, number> = {};
   for (const [k, v] of Object.entries(raw)) {
-    const n = typeof v === 'number' ? v : typeof v === 'object' && v && typeof (v as { value?: unknown }).value === 'number' ? (v as { value: number }).value : Number(v);
+    const n = inputNumber(v);
     if (!Number.isFinite(n)) throw new Refusal(`panel ${p.id}: input ${k} needs a number`);
     defaults[k] = n;
   }

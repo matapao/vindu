@@ -1,4 +1,4 @@
-import { MESSAGE } from '../blocks.js';
+import { MESSAGE } from '../blocks-text.js';
 import { EVENTS } from '../block-events.js';
 import type { CardDef } from '../cards.js';
 import { Views } from '../views/views.js';
@@ -13,8 +13,10 @@ export const hasOf = (v?: Views): Has => ({
   pages: !!v?.browsers,
   run: !!(v?.terminals && v.setup.terminal && v.setup.terminal.run),
 });
-export const either = (h: Has, t: string, p: string, both = `${t}, or ${p}`) =>
-  h.terminals && h.pages ? both : h.terminals ? t : p;
+export const either = (h: Has, t: string, p: string, both = `${t}, or ${p}`) => {
+  if (h.terminals && h.pages) return both;
+  return h.terminals ? t : p;
+};
 export const noteViews = (h: Has) =>
   !h.terminals && !h.pages
     ? ''

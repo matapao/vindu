@@ -1,7 +1,8 @@
 // What the shell's state is made of, as a renderer draws it and the window reports back (shell.ts keeps it): each view
 // as the shell knows it, the shelf, the layout, how the views are shown (as cards or as their content), and the
 // window's events. Types alone.
-import type { LayoutNode, LayoutOptions, Place, Slot } from './layout.js';
+import type { LayoutNode, LayoutOptions, Place } from './layout.js';
+import type { Slot } from './layout-edit.js';
 import type { Sight } from './shell-resize.js';
 import type { ViewRole } from './shell-roles.js';
 import type { ViewSummary } from './view-summary.js';

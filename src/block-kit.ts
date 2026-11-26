@@ -2,7 +2,8 @@
 // names), the layouts it has, and what it works out from its rows, given to its component and its account and never
 // kept on the panel.
 import { z } from 'zod';
-import { panelOption, rowFields, type CardAction, type CardDef, type PanelSpec, type Shaped } from './cards.js';
+import { rowFields, type CardAction, type CardDef, type PanelSpec, type Shaped } from './cards.js';
+import { panelOption } from './card-schema.js';
 import type { DraftContext } from './block-drafts.js';
 import type { Entry, Row } from './results.js';
 import { asText } from './format.js';

@@ -19,14 +19,22 @@ export function fieldNames(body: string | undefined, contentType = ''): string[]
   if (!body) return [];
   const ct = contentType.toLowerCase();
   if (ct.includes('multipart/form-data')) return [...new Set([...body.matchAll(/(?:^|[;\s])name="([^"]+)"/g)].map(m => m[1]))];
-  if (ct.includes('json') || /^\s*[{[]/.test(body)) { try { const v = JSON.parse(body); return Array.isArray(v) ? ['(a list)'] : v && typeof v === 'object' ? Object.keys(v) : ['(a value)']; } catch { /* not JSON */ } }
+  if (ct.includes('json') || /^\s*[{[]/.test(body)) {
+    try {
+      const v: unknown = JSON.parse(body);
+      if (Array.isArray(v)) return ['(a list)'];
+      return v && typeof v === 'object' ? Object.keys(v) : ['(a value)'];
+    } catch { /* not JSON */ }
+  }
   if (ct.includes('x-www-form-urlencoded') || /^[^=&\s]+=[^&]*(&[^=&\s]+=[^&]*)*$/.test(body)) return [...new Set(body.split('&').map(kv => { try { return decodeURIComponent(kv.split('=')[0].replace(/\+/g, ' ')); } catch { return kv.split('=')[0]; } }))];
   return [`(a body of ${body.length} characters)`];
 }
 
-/** A request the browser paused (CDP's Fetch.requestPaused), as what it wants to send: the secret fields are those of
- *  the page's known secret fields that its body names. */
-export function outgoing(paused: { request?: { url?: unknown; method?: unknown; headers?: Record<string, unknown>; postData?: string; postDataEntries?: { bytes?: string }[] }; resourceType?: unknown }, knownSecret: string[]): Outgoing {
+/** A request the browser paused (CDP's Fetch.requestPaused): where it goes, how, and what it holds. */
+export type Paused = { request?: { url?: unknown; method?: unknown; headers?: Record<string, unknown>; postData?: string; postDataEntries?: { bytes?: string }[] }; resourceType?: string };
+/** A paused request as what it wants to send: the secret fields are those of the page's known secret fields that its
+ *  body names. */
+export function outgoing(paused: Paused, knownSecret: string[]): Outgoing {
   const req = paused.request ?? {};
   const headers = Object.fromEntries(Object.entries(req.headers ?? {}).map(([k, v]) => [k.toLowerCase(), String(v)]));
   const body = req.postData ?? (Array.isArray(req.postDataEntries) ? req.postDataEntries.map(e => (e.bytes ? Buffer.from(e.bytes, 'base64').toString('utf8') : '')).join('') : undefined);

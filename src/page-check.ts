@@ -10,8 +10,10 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { amountsIn, unknownAmounts } from './amounts.js';
 import { scriptJson } from './escape.js';
-import { asText, ellipsis } from './format.js';
-import { MEASURES, type Measures } from './page-runtime.js';
+import { asText } from './format.js';
+import { MEASURES } from './page-measures.js';
+import { collect, type Collected } from './page-collect.js';
+import { cut, few, first, LIMITS, readOne, runSteps, Unanswered } from './page-steps.js';
 
 const need = createRequire(import.meta.url);
 let AXE: { source: string; version: string } | null | undefined;
@@ -68,21 +70,11 @@ export type CheckOptions = {
 };
 
 const DESKTOP = { width: 1024, height: 768 }, PHONE = { width: 390, height: 844 };
-/** How long a step may take: a wait or a held key 10 s, a step's JavaScript 5 s, all the steps 40 s; and how long the
- *  host waits for any one call to the browser (call) before it closes the page, and for the audit (audit). */
-export const LIMITS = { wait: 10_000, js: 5_000, steps: 40_000, read: 2_000, call: 15_000, audit: 30_000 };
 const OVERFLOW = 'Math.max(0, document.documentElement.scrollWidth - window.innerWidth)';
-const first = (s: unknown) => String((s as Error)?.message ?? s).split('\n')[0].slice(0, 200);
-/** Every string in a report has a length limit, and every list a count limit. */
-const cut = (s: unknown, n: number) => ellipsis(asText(s ?? ''), n);
 /** A long URL keeps its start and its end, where the file name is, so different files stay different. */
 const cutMiddle = (s: unknown, n: number) => { const t = asText(s ?? ''); return t.length > n ? `${t.slice(0, Math.ceil(n / 2) - 1)}…${t.slice(t.length - Math.floor(n / 2))}` : t; };
-const few = (xs: unknown[], count: number, chars: number, shorten = cut) => [...new Set(xs.map(x => shorten(x, chars)))].slice(0, count);
-
-/** A page that stopped answering: the host waited for the browser, and closed the page. */
-class Unanswered extends Error {}
 /** A driver's page as a check uses it: an evaluation may be given longer than a call (the audit). */
-type Bounded = Omit<DriverPage, 'eval'> & { eval<T = unknown>(expression: string, ms?: number): Promise<T> };
+export type Bounded = Omit<DriverPage, 'eval'> & { eval<T = unknown>(expression: string, ms?: number): Promise<T> };
 /** A driver's page, every call held to a time on this side, whatever the page does to its own timers: a call that
  *  takes longer closes the page (the driver closes its context), and every later call fails at once. */
 function bounded(page: DriverPage): Bounded {
@@ -187,110 +179,9 @@ async function audit(page: Bounded, totals: Record<string, number>): Promise<Non
   } catch (e) { if (e instanceof Unanswered) throw e; return { engine, note: `the audit did not run: ${first(e)}` }; }
 }
 
-async function runSteps(page: Bounded, steps: Step[], at: string): Promise<StepResult[]> {
-  const out: StepResult[] = []; const until = Date.now() + LIMITS.steps; const held = new Set<string>();
-  for (const s of steps.slice(0, 50)) {
-    if (Date.now() > until) { out.push({ step: describe(s), ok: false, note: `not run: the steps took over ${LIMITS.steps / 1000} s` }); continue; }
-    const before = await page.eval<number>('window.__task ? window.__task.errors.length : 0');
-    let ok = true, note: string | undefined;
-    const target = s.click ?? (s.type !== undefined ? s.into : undefined);
-    const state = target === undefined ? 'there' : await page.eval<string>(`(() => { try { const e = document.querySelector(${scriptJson(target)}); if (!e) return 'missing'; return e.getClientRects().length === 0 || getComputedStyle(e).visibility === 'hidden' ? 'hidden' : 'there'; } catch { return 'missing'; } })()`);
-    try {
-      if (state === 'missing') { ok = false; note = `no element matches ${target}`; }
-      else if (state === 'hidden') { ok = false; note = `${target} is there but not visible ${at}`; }
-      else if (s.press) for (let i = 0; i < Math.min(s.times ?? 1, 100); i++) await page.press(s.press);
-      else if (s.hold !== undefined || s.down !== undefined || s.up !== undefined) {
-        if (!page.down || !page.up) { ok = false; note = 'this host\'s browser cannot hold keys; press is down and up at once'; }
-        else if (s.hold !== undefined) { const ms = Math.min(Math.max(s.ms ?? 500, 0), LIMITS.wait); await page.down(s.hold); await page.wait(ms); await page.up(s.hold); }
-        else if (s.down !== undefined) { await page.down(s.down); held.add(s.down); }
-        else { await page.up(s.up!); held.delete(s.up!); }
-      }
-      else if (s.click) await page.click(s.click);
-      else if (s.type !== undefined) await page.type(s.type, s.into);
-      else if (s.js !== undefined) { const v = await evalIn(page, s.js); ok = !v.startsWith('error: '); note = v; }
-      else if (typeof s.wait === 'number') await page.wait(Math.min(s.wait, LIMITS.wait));
-      else if (typeof s.wait === 'string') { ok = await page.waitFor(s.wait, LIMITS.wait); if (!ok) note = `did not appear within ${LIMITS.wait / 1000} s`; }
-      else { ok = false; note = 'a step is press, hold, down, up, click, type, js or wait'; }
-    } catch (e) { if (e instanceof Unanswered) throw e; ok = false; note = first(e); }
-    const errors = await page.eval<string[]>(`window.__task ? window.__task.errors.slice(${before}) : []`);
-    out.push({ step: cut(describe(s), 120), ok, ...(note ? { note: cut(note, 300) } : {}), ...(errors.length ? { errors: few(errors, 5, 300) } : {}) });
-  }
-  for (const k of held) await page.up?.(k).catch(() => {}); // a key left down goes up before the page is read
-  return out;
-}
-const describe = (s: Step) => s.press ? `press ${s.press}${(s.times ?? 1) > 1 ? ` ×${s.times}` : ''}` : s.hold !== undefined ? `hold ${s.hold} ${Math.min(Math.max(s.ms ?? 500, 0), LIMITS.wait)} ms` : s.down !== undefined ? `down ${s.down}` : s.up !== undefined ? `up ${s.up}`
-  : s.click ? `click ${s.click}` : s.type !== undefined ? `type "${s.type.slice(0, 40)}"${s.into ? ` into ${s.into}` : ''}` : s.js !== undefined ? `js ${s.js.slice(0, 80)}` : s.wait !== undefined ? `wait ${typeof s.wait === 'number' ? `${s.wait} ms` : `for ${s.wait}`}` : JSON.stringify(s);
-
-/** A value as a report says it: text as it is, anything else as JSON, a long one cut and said to be. */
-const said = (v: unknown, max = LIMITS.read): string | null => { if (v === undefined || v === null) return null; const t = typeof v === 'string' ? v : JSON.stringify(v) ?? asText(v); return t.length > max ? `${t.slice(0, max)}… (cut: ${max} of ${t.length} characters; read something narrower for the rest)` : t; };
-/** An expression evaluated in the page, a promise it gives awaited (5 s at most): its value, or why there is none. */
-async function evalIn(page: Bounded, expr: string): Promise<string> {
-  const js = `(async () => { const v = await Promise.race([(async () => (${expr}))(), new Promise((_, no) => setTimeout(() => no(new Error('still pending after ${LIMITS.js / 1000} s')), ${LIMITS.js}))]); return v === undefined ? null : typeof v === 'string' ? v : JSON.stringify(v); })().catch(e => 'error: ' + (e && e.message || e))`;
-  try { return said(await page.eval<string | null>(js)) ?? 'undefined'; } catch (e) { return `error: ${first(e)}`; }
-}
-/** A CSS selector's text (a form field's value), or "js:<expression>" evaluated in the page, a promise awaited. */
-async function readOne(page: Bounded, q: string): Promise<string | null> {
-  if (q.startsWith('js:')) { const v = await evalIn(page, q.slice(3)); return v === 'undefined' ? null : v; }
-  const js = `(() => { try { const els = [...document.querySelectorAll(${scriptJson(q)})]; return els.length ? els.slice(0, 5).map(e => e.matches('input, textarea, select') ? e.value : (e.textContent || '').replace(/\\s+/g, ' ').trim()).join(' | ') : null; } catch (e) { return 'error: ' + e.message; } })()`;
-  try { return said(await page.eval<string | null>(js)); } catch (e) { return `error: ${first(e)}`; }
-}
-
 async function phoneOverflow(driver: PageDriver, url: string): Promise<number> {
   const p = await opened(driver, url, PHONE);
   try { await p.wait(300); return await p.eval<number>(OVERFLOW); } finally { await p.close(); }
 }
 
 const shortUrl = (u: string, page: string) => { try { const x = new URL(u); return x.origin === new URL(page).origin ? x.pathname : x.href; } catch { return u; } };
-
-type Collected = {
-  title: string; text: string; texts: string[]; characters: number; headings: string[]; fetched: string[]; sent: string[];
-  counts: { errors: number; warnings: number; charts: number; three: number; canvases: number; headings: number; sent: number }; errors: string[]; warnings: string[]; failed: string[]; blocked: string[]; computed: number[]; libraries: string[];
-  charts: { library: string; type?: string; labels?: string[]; series?: { name?: string; count: number; values: number[] }[]; error?: string }[];
-  three: Record<string, unknown>[]; canvases: Record<string, unknown>[];
-};
-
-// Runs in the page after it settles. It must stand alone: it is sent as source.
-/* eslint-disable @typescript-eslint/no-explicit-any */
-function collect(withTexts: boolean, measure: Measures): Collected {
-  const t: any = (window as any).__task ?? { errors: [], warnings: [], failed: [], blocked: [], charts: [], three: [], computed: [], libraries: [], fetched: [], contexts: new WeakMap(), counts: { errors: 0, warnings: 0, charts: 0, three: 0 } };
-  const num = (v: any): number => typeof v === 'number' ? v : Array.isArray(v) ? num(v[v.length - 1]) : v && typeof v === 'object' ? num(v.value ?? v.y) : Number(v);
-  const charts: any[] = [];
-  for (const { chart } of t.charts.slice(0, 12)) {
-    try {
-      const o = chart.getOption();
-      const axis = o.xAxis?.[0]?.data ? o.xAxis[0] : o.yAxis?.[0]?.data ? o.yAxis[0] : undefined;
-      charts.push({ library: 'echarts', type: [...new Set((o.series ?? []).map((s: any) => s.type))].join(', '), labels: (axis?.data ?? []).slice(0, 12).map((x: any) => String(x?.value ?? x)), series: (o.series ?? []).slice(0, 12).map((s: any) => ({ name: s.name, count: (s.data ?? []).length, values: (s.data ?? []).slice(0, 5000).map(num) })) });
-    } catch (e) { charts.push({ library: 'echarts', error: String(e) }); }
-  }
-  if (t.chartjs) for (const c of Object.values<any>(t.chartjs.instances).slice(0, 12)) charts.push({ library: 'chart.js', type: c.config.type, labels: (c.data.labels ?? []).slice(0, 12).map(String), series: c.data.datasets.slice(0, 12).map((d: any) => ({ name: d.label, count: (d.data ?? []).length, values: (d.data ?? []).slice(0, 5000).map(num) })) });
-  // each renderer's main scene, the one with the most in it: a post-processing pass draws a quad of its own after it
-  const three = t.three.slice(0, 4).map((r: any) => {
-    const s = measure.scene(r, 12), f: any = s.frame;
-    return { frames: s.frames, draw_calls: f?.calls ?? r.info.render.calls, triangles: f?.triangles ?? r.info.render.triangles, objects: s.objects, ...(s.named.length ? { named: s.named } : {}), ...(s.camera ? { camera: String(s.camera.type).slice(0, 40) } : {}),
-      ...(f?.renders > 1 ? { renders_per_frame: f.renders } : {}), ...(s.scenes > 1 ? { scenes: s.scenes, note: 'the scene with the most objects is described; the others are drawn too, such as post-processing passes. draw_calls and triangles are for one frame, all renders together' } : {}) };
-  });
-  const all = [...document.querySelectorAll('canvas')];
-  const canvases = all.slice(0, 8).map(c => {
-    const k = t.contexts.get(c); const o: any = { size: `${c.width}×${c.height}`, context: k?.type ?? 'none' };
-    if (k?.type === '2d') {
-      try { const p = measure.paint(k.ctx, c.width, c.height); o.painted = `${p.painted}%`; o.colors = p.colors; } catch { o.painted = 'unreadable'; }
-    }
-    if (k?.draws !== undefined) o.draw_calls = k.draws;
-    return o;
-  });
-  const text = (document.body?.innerText ?? '').replace(/\s+/g, ' ').trim();
-  // the text of each element on its own, as drawn, for its numbers: labels side by side are separate numbers
-  const texts: string[] = []; let total = 0;
-  const walk = withTexts && document.body ? document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT) : null; // only a check of the data reads them
-  for (let n = walk?.nextNode(); n && total < 200_000; n = walk!.nextNode()) {
-    const el = n.parentElement, t = (n.textContent ?? '').trim();
-    if (!t || !el || /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE)$/.test(el.tagName) || ((el as any).checkVisibility && !(el as any).checkVisibility())) continue;
-    texts.push(t.slice(0, 4000)); total += t.length;
-  }
-  return {
-    title: document.title.slice(0, 200), text: text.slice(0, 161), texts, characters: text.length, // the report shows the first 160; the numbers in up to 200,000 characters of texts are checked
-    headings: [...document.querySelectorAll('h1, h2, h3')].map(h => (h.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 200)).filter(Boolean).slice(0, 8), fetched: t.fetched,
-    errors: t.errors, warnings: t.warnings, failed: t.failed, blocked: t.blocked, computed: t.computed, libraries: t.libraries, charts, three, canvases, sent: t.sent ?? [],
-    counts: { errors: t.counts.errors, warnings: t.counts.warnings, charts: t.counts.charts + (t.chartjs ? Object.keys(t.chartjs.instances).length : 0), three: t.counts.three, canvases: all.length, headings: [...document.querySelectorAll('h1, h2, h3')].filter(h => (h.textContent ?? '').trim()).length, sent: t.counts.sent ?? 0 },
-  };
-}

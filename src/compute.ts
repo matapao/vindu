@@ -17,6 +17,7 @@ export type Expr =
 export function makeCompute() {
   const AGG = ['count', 'sum', 'avg', 'median', 'min', 'max'];
   const FN = ['round', 'abs', 'floor', 'ceil', 'min', 'max'];
+  const TIMES = { '*': '*', '/': '/', '×': '*', '÷': '/' } as const; // × and ÷ read as * and /
   const LONGEST = 2000, DEEPEST = 64; // the longest expression read, and how deep its parentheses and functions go
   const fail = (msg: string): never => { throw new Error(msg); };
   /** Why a function cannot take this many values, or null: count takes none or one, round one or two, min and max one
@@ -34,7 +35,7 @@ export function makeCompute() {
     const ws = () => { while (i < s.length && /\s/.test(s[i])) i++; };
     const peek = () => { ws(); return s[i]; };
     const expr = (): Expr => { let a = term(); for (;;) { const c = peek(); if (c === '+' || c === '-') { i++; a = { k: 'bin', op: c, a, b: term() }; } else return a; } };
-    const term = (): Expr => { let a = unary(); for (;;) { const c = peek(); if (c === '*' || c === '/' || c === '×' || c === '÷') { i++; a = { k: 'bin', op: c === '×' ? '*' : c === '÷' ? '/' : c, a, b: unary() }; } else return a; } };
+    const term = (): Expr => { let a = unary(); for (;;) { const c = peek(); if (c === '*' || c === '/' || c === '×' || c === '÷') { i++; a = { k: 'bin', op: TIMES[c], a, b: unary() }; } else return a; } };
     const unary = (): Expr => { const c = peek(); if (c === '-' || c === '−') { i++; return { k: 'neg', a: nested(unary) }; } if (c === '+') { i++; return nested(unary); } return atom(); };
     const atom = (): Expr => {
       const c = peek();
@@ -78,8 +79,13 @@ export function makeCompute() {
   };
   const arith = (op: string, a: number | null, b: number | null): number | null => {
     if (a === null || b === null) return null;
-    const v = op === '+' ? a + b : op === '-' ? a - b : op === '*' ? a * b : b === 0 ? null : a / b;
-    return v === null || !Number.isFinite(v) ? null : clean(v);
+    let v: number;
+    if (op === '+') v = a + b;
+    else if (op === '-') v = a - b;
+    else if (op === '*') v = a * b;
+    else if (b === 0) return null;
+    else v = a / b;
+    return !Number.isFinite(v) ? null : clean(v);
   };
   const own = (o: Record<string, unknown> | undefined, k: string) => (o && Object.hasOwn(o, k) ? o[k] : undefined); // never what objects inherit
   const least = (xs: number[]) => xs.reduce((a, b) => (b < a ? b : a)), most = (xs: number[]) => xs.reduce((a, b) => (b > a ? b : a)); // any number of them
@@ -120,7 +126,9 @@ export function makeCompute() {
         if (!xs.length) return null;
         if (e.fn === 'median') { const o = [...xs].sort((a, b) => a - b), mid = o.length >> 1; return o.length % 2 ? o[mid] : clean((o[mid - 1] + o[mid]) / 2); }
         const sum = clean(xs.reduce((a, b) => a + b, 0));
-        return e.fn === 'sum' ? sum : e.fn === 'avg' ? clean(sum / xs.length) : e.fn === 'min' ? least(xs) : most(xs);
+        if (e.fn === 'sum') return sum;
+        if (e.fn === 'avg') return clean(sum / xs.length);
+        return e.fn === 'min' ? least(xs) : most(xs);
       }
     }
   }

@@ -23,8 +23,9 @@ export function pageMessageGuard(): (message: PageMessageCheck) => string | unde
     if (kind === 'read') return typeof value === 'number' && value >= 0 && value <= 1 ? undefined : 'a read is a share of the page, from 0 to 1';
     const key = `${kind} ${view}`;
     const { recent, why: limited } = checkSend(sentAt.get(key) ?? [], value, now);
-    const why = !view || (kind === 'send' && !panel) ? 'this page is in no view'
-      : !using ? 'a page sends only while the person is using it: on their click or key in it' : limited;
+    let why = limited;
+    if (!view || (kind === 'send' && !panel)) why = 'this page is in no view';
+    else if (!using) why = 'a page sends only while the person is using it: on their click or key in it';
     if (!why) { recent.push(now); sentAt.set(key, recent); }
     return why;
   };

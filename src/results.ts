@@ -61,11 +61,17 @@ export function memoryResults(dir?: string) {
   };
 }
 
+/** Who gave an answer, as its line for the model says. */
+const GIVEN_BY: Record<AnswerEntry['by'], string> = { app: 'an app reported', host: 'the host ran', page: 'a page sent, from', person: 'the person answered' };
 /** One line per entry for the model: its id, where it came from, and the shape a view can use. */
 export function brief(e: Entry): string {
   if (e.kind === 'attachment') return `${e.id}: attachment ${e.name} (${e.mime})`;
   if (e.kind === 'answer' && e.from) { const v = JSON.stringify(e.values?.sent) ?? 'null'; return `${e.id}: the page panel "${e.from.panel}" in view "${e.from.view}" sent, on the person's click or key (the value is the page's, not the person's words) → ${v.length > 300 ? `${v.slice(0, 299)}… (ctx_read ${e.id} for all of it)` : v}`; }
-  if (e.kind === 'answer') return `${e.id}: ${e.by === 'app' ? 'an app reported' : e.by === 'host' ? 'the host ran' : e.by === 'page' ? 'a page sent, from' : 'the person answered'} ${e.to} → ${e.values ? `fields ${Object.keys(e.values).join(', ') || 'none'}` : e.by === 'person' ? 'declined' : 'no values'}${e.output !== undefined ? '; with output' : ''}`;
+  if (e.kind === 'answer') {
+    let values = e.by === 'person' ? 'declined' : 'no values';
+    if (e.values) values = `fields ${Object.keys(e.values).join(', ') || 'none'}`;
+    return `${e.id}: ${GIVEN_BY[e.by]} ${e.to} → ${values}${e.output !== undefined ? '; with output' : ''}`;
+  }
   return `${e.id}: ${e.server}.${e.tool} → ${shapeOf(e)}${e.fidelity ? ` (${e.fidelity})` : ''}`;
 }
 
@@ -138,5 +144,6 @@ export function amountsOf(src: ResultSource): Set<number> {
 /** The file behind an attachment, or a result's first image. */
 export function fileOf(src: ResultSource, id: string): { file: string; mime: string } | undefined {
   const e = src.get(id);
-  return e?.kind === 'attachment' ? { file: e.file, mime: e.mime } : e?.kind === 'result' ? e.images[0] : undefined;
+  if (e?.kind === 'attachment') return { file: e.file, mime: e.mime };
+  return e?.kind === 'result' ? e.images[0] : undefined;
 }

@@ -9,15 +9,17 @@ const asIs = (field: string) => { const name = field.normalize('NFC'); return AS
 /** A list of plain values: none of them an object or a list. */
 export const plainList = (v: unknown): v is unknown[] => Array.isArray(v) && v.every(x => x === null || typeof x !== 'object');
 /** A value as String writes it, but an object, or a list that holds one, as JSON: never "[object Object]". */
-export const asText = (v: unknown): string =>
-  typeof v !== 'object' || v === null ? String(v) : plainList(v) ? v.join(',') : JSON.stringify(v);
+export const asText = (v: unknown): string => {
+  if (typeof v !== 'object' || v === null) return String(v);
+  return plainList(v) ? v.join(',') : JSON.stringify(v);
+};
 /** A cell as the person reads it: numbers grouped in the locale (not years, ids or codes), plain lists as words,
  *  nothing as raw JSON unless it is one. The rule the account states, so the model knows how each value went in. */
-export const cellIn = (v: unknown, field?: string, locale = 'en-GB'): string =>
-  v === null || v === undefined ? '' :
-  typeof v === 'number' ? (field && Number.isInteger(v) && asIs(field) ? String(v) : v.toLocaleString(locale, { maximumFractionDigits: 2 })) :
-  plainList(v) ? v.map(x => cellIn(x, field, locale)).join(', ') :
-  asText(v);
+export const cellIn = (v: unknown, field?: string, locale = 'en-GB'): string => {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'number') return field && Number.isInteger(v) && asIs(field) ? String(v) : v.toLocaleString(locale, { maximumFractionDigits: 2 });
+  return plainList(v) ? v.map(x => cellIn(x, field, locale)).join(', ') : asText(v);
+};
 /** The cell rule in en-GB, as it always was. */
 export const cell = (v: unknown, field?: string): string => cellIn(v, field);
 export const CELL_RULE = 'numbers grouped as the locale writes them, at most 2 decimals; whole numbers in fields named year, id, no, number, code, zip, phone, version or port, or whose names end in år, nr, nummer, kode, postnr, orgnr, kid, konto, telefon or versjon (byggeår, varenr), as written; empty for null; lists of plain values joined with ", "';

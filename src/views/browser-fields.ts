@@ -3,7 +3,7 @@
 // page's code; a field it cannot read counts as one that may hold a secret. A field is an input, a select, a textarea
 // or an element the person can edit (contenteditable), each marked by type="password" or a secret autocomplete.
 import { SECRET_AUTOCOMPLETE, SECRET_FIELDS } from './browser-requests.js';
-import type { Cdp } from './browser.js';
+import { ask, type Cdp } from './browser-protocol.js';
 
 export type FieldReference = { backendNodeId: number } | { objectId: string };
 const FIELD_INSPECTION_FAILED = 'The browser could not verify whether this field contains private information.';
@@ -11,7 +11,7 @@ export const SECRET_REFUSED = 'this is a secret field (a password, card number o
 
 /** The names (or ids) of the secret fields on the page now. */
 export async function secretFieldNames(cdp: Cdp): Promise<string[]> {
-  const r = await cdp.send('Runtime.evaluate', { expression: `[...document.querySelectorAll(${JSON.stringify(SECRET_FIELDS)})].map(e => e.name || e.id || e.getAttribute('autocomplete') || e.type)`, returnByValue: true }).catch(() => null);
+  const r = await ask(cdp, 'Runtime.evaluate', { expression: `[...document.querySelectorAll(${JSON.stringify(SECRET_FIELDS)})].map(e => e.name || e.id || e.getAttribute('autocomplete') || e.type)`, returnByValue: true }).catch(() => null);
   if (!Array.isArray(r?.result?.value)) throw new Error(FIELD_INSPECTION_FAILED);
   return r.result.value.map(String);
 }
@@ -19,7 +19,7 @@ export async function secretFieldNames(cdp: Cdp): Promise<string[]> {
 /** Read native element attributes without running page code. A missing or detached field has unknown sensitivity. */
 export async function fieldPrivacy(cdp: Cdp, reference: FieldReference): Promise<'public' | 'secret' | 'unknown'> {
   if ('backendNodeId' in reference && !reference.backendNodeId) return 'unknown';
-  const response = await cdp.send('DOM.describeNode', reference).catch(() => undefined);
+  const response = await ask(cdp, 'DOM.describeNode', reference).catch(() => undefined);
   const node = response?.node;
   if (!node || typeof node.nodeName !== 'string') return 'unknown';
   const tag = node.nodeName.toLowerCase(), attributes = node.attributes;
@@ -51,7 +51,7 @@ export async function checkFocusedField(cdp: Cdp): Promise<void> {
       else return element;
     }
   })()`;
-  const focused = await cdp.send('Runtime.evaluate', { expression }).catch(() => undefined);
+  const focused = await ask(cdp, 'Runtime.evaluate', { expression }).catch(() => undefined);
   const objectId = focused?.result?.objectId;
   if (!objectId) throw new Error(FIELD_INSPECTION_FAILED);
   try {

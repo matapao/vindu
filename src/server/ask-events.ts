@@ -63,7 +63,7 @@ export function answerFromWindow(session: Session, x: Record<string, unknown>): 
         now: true,
       });
     } catch (error) {
-      picking = Promise.reject(error); // a host that fails at once is told in the ask too, not thrown at the window
+      picking = Promise.reject(error instanceof Error ? error : new Error(String(error))); // a host that fails at once is told in the ask too, not thrown at the window
     }
     void Promise.resolve(picking)
       .then((got) => {

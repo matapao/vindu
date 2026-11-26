@@ -26,7 +26,8 @@ export function connectShellFrames(root: HTMLElement, emit: (event: ShellEvent) 
     !!(win.navigator as Navigator & { userActivation?: { isActive: boolean } }).userActivation?.isActive && doc.activeElement === frame;
   const fromPage = (frame: HTMLIFrameElement, ev: MessageEvent, said: PageMessage) => {
     const view = viewOf(frame) ?? '', panel = frame.dataset.pagePanel ?? '', kind = said.vindu as PageAsk;
-    const value = kind === 'send' ? said.value : kind === 'select' ? { items: said.items, note: said.note } : said.prompt;
+    let value: unknown = said.prompt; // what it sends: a value, a selection, or a prompt
+    if (kind === 'send') value = said.value; else if (kind === 'select') value = { items: said.items, note: said.note };
     const why = guard({ kind, view, panel, value, using: using(frame) });
     if (!why) {
       if (kind === 'send') emit({ type: 'send', view, panel, value: said.value });

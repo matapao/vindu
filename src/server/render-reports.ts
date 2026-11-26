@@ -146,18 +146,16 @@ export const compare = (
     else if (!g.visible) out.add(at);
   });
   const tabName = (k: number) => (k < 0 ? 'not read' : `"${want.tabs[k] ?? `tab ${k + 1}`}"`);
+  let found: { drift?: typeof drift; same?: string } = {}; // what differs from what was sent, or that nothing does
+  if (drift.length) found = { drift };
+  else if (checked) found = { same: 'every value checked is drawn as sent' };
+  else if (!Object.keys(pages).length) found = { same: 'nothing here is text to check (charts, media)' };
   const v = {
     by: 'the window',
     surface: e.surface,
     ...(tab !== undefined && want.tabs.length ? { tab_open: want.tabs[tab] ?? `tab ${tab + 1}` } : {}),
     checked,
-    ...(drift.length
-      ? { drift }
-      : checked
-        ? { same: 'every value checked is drawn as sent' }
-        : Object.keys(pages).length
-          ? {}
-          : { same: 'nothing here is text to check (charts, media)' }),
+    ...found,
     ...(out.size
       ? {
           out_of_sight: {
@@ -202,13 +200,11 @@ export const inSight = (session: Session, view: string, got: Record<string, Sigh
       const v = r?.title ?? r?.name ?? r?.number ?? r?.id ?? r?.key ?? r?.subject;
       return v === undefined || v === null || typeof v === 'object' ? undefined : asText(v).slice(0, 60);
     };
-    const words = !g.n
-      ? g.of
-        ? `none of its ${total} rows: scrolled out of sight`
-        : ''
-      : g.n >= total
-        ? `all ${total} rows`
-        : `rows ${g.first + 1} to ${g.last + 1} of ${total}${g.n < g.last - g.first + 1 ? ` (${g.n} of them)` : ''}${name(g.first) && name(g.last) ? `: ${name(g.first)} to ${name(g.last)}` : ''}`;
+    let words: string;
+    if (!g.n) words = g.of ? `none of its ${total} rows: scrolled out of sight` : '';
+    else if (g.n >= total) words = `all ${total} rows`;
+    else
+      words = `rows ${g.first + 1} to ${g.last + 1} of ${total}${g.n < g.last - g.first + 1 ? ` (${g.n} of them)` : ''}${name(g.first) && name(g.last) ? `: ${name(g.first)} to ${name(g.last)}` : ''}`;
     const all = [words, g.nodes !== undefined ? `${g.nodes} nodes` : ''].filter(Boolean).join('; ');
     if (all) out[p.id] = all;
   }

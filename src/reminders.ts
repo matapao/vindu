@@ -24,6 +24,11 @@ export const DEFAULT_TIME = '09:00'; // a day alone: its morning
 const UNIT: ReadonlyMap<string, DateExpr['unit'] | 'minute' | 'hour'> = new Map([...Object.entries({ minute: 'minute', minutes: 'minute', min: 'minute', mins: 'minute', hour: 'hour', hours: 'hour' } as const), ...DATE_UNIT]);
 const MOST_CLOCK = { minute: 52_560_000, hour: 876_000 }; // a hundred years, as for days (dates.ts)
 const ISO_TIME = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/i;
+/** A time's offset as Date.parse reads it: Z, or ±hh:mm (given as ±hhmm or ±hh:mm). */
+const offsetOf = (o: string) => {
+  if (/^z$/i.test(o)) return 'Z';
+  return o.length === 5 ? `${o.slice(0, 3)}:${o.slice(3)}` : o;
+};
 const pad = (n: number) => String(n).padStart(2, '0');
 
 /** A wall-clock time's parts in a time zone. */
@@ -63,7 +68,8 @@ export function whenOf(src: string, o: { timeZone: string; locale?: string; now?
   if (!m) return { refusal: `"${text.slice(0, 80)}" is not a time the system can work out: ${form}` };
   const unit = m[2] ? UNIT.get(m[4].toLowerCase().replace(/\s+/g, ' ')) : undefined;
   if (m[2] && !unit) return { refusal: `"${m[4]}" is not a length of time: minutes, hours, days, weeks, months or working days` };
-  const most = unit === 'minute' || unit === 'hour' ? MOST_CLOCK[unit] : unit ? MOST[unit] : Infinity;
+  let most = Infinity; // how many of the unit at most
+  if (unit === 'minute' || unit === 'hour') most = MOST_CLOCK[unit]; else if (unit) most = MOST[unit];
   if (Number(m[3]) > most) return { refusal: `${m[3]} ${unit}s is too far: at most ${most} ${unit}s` };
   if (m[5] !== undefined && (Number(m[5]) > 23 || Number(m[6]) > 59)) return { refusal: `${m[5]}:${m[6]} is not a time of day` };
   const at = m[5] !== undefined ? `${pad(Number(m[5]))}:${m[6]}` : undefined;
@@ -72,7 +78,7 @@ export function whenOf(src: string, o: { timeZone: string; locale?: string; now?
   const fromText = (t: string, said: string, name = said): From | { refusal: string } => {
     const iso = ISO_TIME.exec(t);
     if (iso) {
-      const ms = iso[5] ? Date.parse(`${iso[1]}T${iso[2]}:${iso[3]}:${iso[4] ?? '00'}${/^z$/i.test(iso[5]) ? 'Z' : iso[5].length === 5 ? `${iso[5].slice(0, 3)}:${iso[5].slice(3)}` : iso[5]}`) : instantOf(iso[1], `${iso[2]}:${iso[3]}`, tz);
+      const ms = iso[5] ? Date.parse(`${iso[1]}T${iso[2]}:${iso[3]}:${iso[4] ?? '00'}${offsetOf(iso[5])}`) : instantOf(iso[1], `${iso[2]}:${iso[3]}`, tz);
       if (!Number.isFinite(ms) || dayOf(iso[1]) === null || Number(iso[2]) > 23 || Number(iso[3]) > 59) return { refusal: `${t} is not a time of the calendar` };
       return { kind: 'instant', ms, said: `${said}${iso[5] ? '' : ` (${tz})`}` };
     }
@@ -103,7 +109,8 @@ export function whenOf(src: string, o: { timeZone: string; locale?: string; now?
   try { if (unit) day = addTime(startDay, { sign, n, unit }, holidaySet(o.holidays)); } catch (e) { return { refusal: `${from.said}${step}: ${(e as Error).message}` }; }
   const hm = at ?? (from.kind === 'instant' ? localOf(from.ms, tz).hm : DEFAULT_TIME);
   const ms = from.kind === 'instant' && !unit && !at ? from.ms : instantOf(day, hm, tz);
-  const timeSaid = at ? `at ${at}` : from.kind === 'instant' ? (unit ? `at ${hm}, its own time of day` : '') : `at ${DEFAULT_TIME}, as a day alone is`;
+  let timeSaid = `at ${DEFAULT_TIME}, as a day alone is`; // what time of day it is at, and why
+  if (at) timeSaid = `at ${at}`; else if (from.kind === 'instant') timeSaid = unit ? `at ${hm}, its own time of day` : '';
   return { ms, how: [`${from.said}${step}${unit ? ` = ${day}` : ''}`, timeSaid].filter(Boolean).join(', ') + `: ${sayTime(ms, o.locale ?? 'en-GB', tz)}, ${tz}${unit === 'working day' && !(o.holidays ?? []).length ? ' (Saturdays and Sundays skipped; no holidays given)' : ''}` };
 }
 
@@ -118,7 +125,7 @@ export type ReminderWords = { title: string; none: string; add: string; done: st
   state: (r: Reminder) => string; byWho: (r: Reminder) => string };
 export const REMINDER_WORDS: ReminderWords = {
   title: 'Reminders', none: 'No reminders. The model can set one, and so can you.', add: 'New reminder', done: 'Done', hour: 'In an hour', tomorrow: 'Tomorrow', drop: 'Drop', ask: 'Ask about it',
-  state: r => (r.state === 'due' ? 'Due now' : r.state === 'done' ? 'Done' : 'Set'),
+  state: r => { if (r.state === 'due') return 'Due now'; return r.state === 'done' ? 'Done' : 'Set'; },
   byWho: r => (r.by === 'model' ? 'set by the model' : `set by ${r.who ?? 'you'}`),
 };
 
@@ -130,8 +137,9 @@ export function remindersSurface(rs: Reminder[], w: ReminderWords = REMINDER_WOR
   if (!order.length) kids.push(text('none', w.none, 'caption'));
   for (const r of order) {
     const i = r.id;
-    const acts = r.state === 'due' ? [button(`${i}_done`, w.done, 'reminder', { id: r.id, do: 'done' }, true), button(`${i}_hour`, w.hour, 'reminder', { id: r.id, do: 'hour' }), button(`${i}_tomorrow`, w.tomorrow, 'reminder', { id: r.id, do: 'tomorrow' }), button(`${i}_ask`, w.ask, 'reminder', { id: r.id, do: 'ask' })]
-      : r.state === 'set' ? [button(`${i}_drop`, w.drop, 'reminder', { id: r.id, do: 'drop' })] : [];
+    let acts: string[] = []; // what the person can do with it: a due one is done, moved or asked about; one set is dropped
+    if (r.state === 'due') acts = [button(`${i}_done`, w.done, 'reminder', { id: r.id, do: 'done' }, true), button(`${i}_hour`, w.hour, 'reminder', { id: r.id, do: 'hour' }), button(`${i}_tomorrow`, w.tomorrow, 'reminder', { id: r.id, do: 'tomorrow' }), button(`${i}_ask`, w.ask, 'reminder', { id: r.id, do: 'ask' })];
+    else if (r.state === 'set') acts = [button(`${i}_drop`, w.drop, 'reminder', { id: r.id, do: 'drop' })];
     const line = add({ id: `${i}_text`, component: 'Column', children: [text(`${i}_what`, r.what, r.state === 'done' ? 'caption' : 'body'), text(`${i}_when`, `${w.state(r)} · ${r.said} · ${w.byWho(r)}${r.about ? ` · ${r.about}` : ''}`, 'caption')] });
     kids.push(add({ id: i, component: 'Row', children: acts.length ? [line, add({ id: `${i}_acts`, component: 'Row', children: acts })] : [line] }));
   }

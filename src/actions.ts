@@ -30,13 +30,18 @@ export function applyAction(args: Json, data: Record<string, Resolved> | undefin
   const panels = [...(Array.isArray(next.panels) ? next.panels : []), ...tabs.flatMap(t => (Array.isArray(t?.panels) ? t.panels : []))] as Json[]; // a page's, or each tab's
   const ids = panelIdsOf(panels), idOf = (x: Json) => ids[panels.indexOf(x)]; // as show_view gave them: what its data and the window name
   const withRows = panels.filter(p => typeof p.from === 'string' || p.data !== undefined);
-  const p = a.panel !== undefined ? panels.find(x => idOf(x) === a.panel || x.id === a.panel || pidFor(idOf(x)) === a.panel) : withRows.length === 1 ? withRows[0] : undefined; // a window names a panel by its id, or by its components' (p_…)
+  let p: Json | undefined; // a window names a panel by its id, or by its components' (p_…); one with rows needs no name
+  if (a.panel !== undefined) p = panels.find(x => idOf(x) === a.panel || x.id === a.panel || pidFor(idOf(x)) === a.panel);
+  else if (withRows.length === 1) p = withRows[0];
   if (!p) return { refusal: a.panel !== undefined ? `"${title}" has no panel "${a.panel}"; its panels: ${ids.join(', ')}` : `say which panel of "${title}": ${withRows.map(idOf).join(', ') || 'it has none with rows'}` };
   const pid = idOf(p);
   const rows = (data?.[pid]?.rows ?? []) as Row[];
   const fields = rowFields(rows);
   const where = `${title}${panels.length > 1 ? ` (${pid})` : ''}`;
-  const needField = (): string | undefined => (!a.field ? `${a.action} needs a field: ${fields.join(', ')}` : fields.length && !fields.includes(a.field) ? `"${a.field}" is not a field of ${where}; its fields: ${fields.join(', ')}` : undefined);
+  const needField = (): string | undefined => {
+    if (!a.field) return `${a.action} needs a field: ${fields.join(', ')}`;
+    return fields.length && !fields.includes(a.field) ? `"${a.field}" is not a field of ${where}; its fields: ${fields.join(', ')}` : undefined;
+  };
   switch (a.action) {
     case 'sort': {
       const bad = needField(); if (bad) return { refusal: bad };

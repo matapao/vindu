@@ -2,7 +2,8 @@
 // result says, and what each call was about as a person reads it: from its input, by the names of its fields.
 import { z } from 'zod';
 import { block } from './block-kit.js';
-import { countIds, resultIds, resultRef } from './cards.js';
+import { countIds, resultIds } from './cards.js';
+import { resultRef } from './card-schema.js';
 import { readableName, nameWords } from './field-names.js';
 import { asText, ellipsis } from './format.js';
 import type { Row } from './results.js';

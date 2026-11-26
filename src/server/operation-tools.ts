@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { type Field, FieldSchema, type Form, HINTS } from '../operations.js';
+import { type Form, HINTS } from '../operations.js';
+import { type Field, FieldSchema } from '../field-values.js';
 import { answered, openAsk, within } from './asks.js';
 import { operationInput, registerOp, runFor } from './operations.js';
 import { nextSent } from './page-messages.js';

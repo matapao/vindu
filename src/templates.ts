@@ -12,9 +12,10 @@
 // own arrangement. A template whose source could change something is refused when it loads.
 import { BLOCKS } from './blocks.js';
 import { kindOf } from './card-kinds/registry.js';
-import { fieldRoles, type CardDef } from './cards.js';
+import type { CardDef } from './cards.js';
+import { fieldRoles } from './card-schema.js';
 import { asText } from './format.js';
-import { FieldSchema } from './operations.js';
+import { FieldSchema } from './field-values.js';
 import { z } from 'zod';
 import type { Row } from './results.js';
 
@@ -115,17 +116,29 @@ export function fitSlot(name: string, slot: Slot, args: Record<string, unknown>)
 /** A read of a slot's source, as the one panel that fills it: the slot's block (the first it may choose, or a table where
  *  it is free), made to fit it. */
 export const fitRead = (name: string, slot: Slot, id: string) => fitSlot(name, { ...slot, source: undefined },
-  { panels: [{ id: name, card: slot.block === 'choose' ? slot.of![0] : slot.block === 'free' ? 'table' : slot.block, from: id }] });
+  { panels: [{ id: name, card: readCard(slot), from: id }] });
+/** The card a read fills a slot with: the first it may choose, a table where it is free, or its own block. */
+function readCard(slot: Slot) {
+  if (slot.block === 'choose') return slot.of![0];
+  return slot.block === 'free' ? 'table' : slot.block;
+}
 
 /** A slot not filled yet: what it needs, and who fills it. */
 export function waitingPanel(slot: Slot, why?: string): Record<string, unknown> {
-  const who = slot.source ? `filled from ${sourceName(slot.source)}` : slot.by === 'person' ? 'the person fills it' : 'the model fills it';
+  let who = slot.by === 'person' ? 'the person fills it' : 'the model fills it';
+  if (slot.source) who = `filled from ${sourceName(slot.source)}`;
   return { id: 'waiting', card: 'text', text: `${why ?? 'Not filled yet'}. ${slot.needs ? `Needs: ${slot.needs}. ` : ''}${who[0].toUpperCase()}${who.slice(1)}.` };
 }
 
+/** A slot's state, as the model is told it: what fills it now, that the person fills it, or what it needs. */
+function slotState(s: Slot, filled: string | undefined): string {
+  if (filled) return `: ${filled}`;
+  if (s.by === 'person') return ': the person fills it';
+  return s.needs ? `: ${s.needs}` : '';
+}
 /** What the model is told when a static view starts: the template, its slots, and what it may do. */
 export function templateNote(t: Template, filled: Record<string, string>): string {
-  const slots = Object.entries(t.slots).map(([n, s]) => `${n} (${s.block === 'choose' ? `one of ${s.of!.join(', ')}` : s.block})${filled[n] ? `: ${filled[n]}` : s.by === 'person' ? ': the person fills it' : s.needs ? `: ${s.needs}` : ''}`);
+  const slots = Object.entries(t.slots).map(([n, s]) => `${n} (${s.block === 'choose' ? `one of ${s.of!.join(', ')}` : s.block})${slotState(s, filled[n])}`);
   return ` This task uses the static view "${t.name}". Fill each slot with show_view and "slot": ${slots.join('; ')}. You can't add, move or restyle panes, and arrange is not offered; the template's options in a slot are fixed. If something doesn't fit, say so in the chat: the person may let you change the view.`;
 }
 

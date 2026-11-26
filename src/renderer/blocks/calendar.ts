@@ -33,6 +33,11 @@ const clock = (props: BlockProps, v: unknown) => {
         timeZone: props.timeZone,
       }).format(d);
 };
+/** The hour an event ends at on its day: half an hour on with no end, the day's end when it ends at midnight. */
+const endHourOf = (startHour: number, end: number) => {
+  if (!Number.isFinite(end)) return startHour + 0.5;
+  return end === 0 && startHour > 0 ? 24 : end;
+};
 const hourOf = (props: BlockProps, v: unknown) => {
   const d = new Date(String(v));
   if (Number.isNaN(d.getTime())) return NaN; // no time: nowhere on the day's hours
@@ -162,7 +167,7 @@ function weekCalendar(props: RowBlockProps, words: EventWords) {
           if (dayKey(props, fieldValue(props, row, 'start')) !== d) return nothing;
           const startHour = hourOf(props, fieldValue(props, row, 'start')),
             end = hourOf(props, fieldValue(props, row, 'end') ?? fieldValue(props, row, 'start')),
-            endHour = !Number.isFinite(end) ? startHour + 0.5 : end === 0 && startHour > 0 ? 24 : end; // ending at midnight: the day's end
+            endHour = endHourOf(startHour, end);
           if (!Number.isFinite(startHour)) return nothing;
           const moved = row.planned_from !== undefined,
             clash = Array.isArray(row.clashes) && row.clashes.length > 0;

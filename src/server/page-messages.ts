@@ -88,12 +88,9 @@ export const pageSaid = (session: Session, x: Record<string, unknown>): boolean 
     panel = asText(x.panel ?? '');
   if (!session.views.get(view)?.includes(panel)) return false; // a page panel of a view that was shown
   const note = typeof x.note === 'string' ? x.note : undefined;
-  const said =
-    x.kind === 'select'
-      ? { items: x.items, ...(note !== undefined ? { note } : {}) }
-      : x.kind === 'ask' && typeof x.prompt === 'string'
-        ? x.prompt
-        : undefined;
+  let said: { items: unknown; note?: string } | string | undefined; // a selection, or a prompt to propose
+  if (x.kind === 'select') said = { items: x.items, ...(note !== undefined ? { note } : {}) };
+  else if (x.kind === 'ask' && typeof x.prompt === 'string') said = x.prompt;
   if (said === undefined || (note?.length ?? 0) > NOTE_MAX) return false;
   if (typeof said === 'string' && (!said.trim() || said.length > PROMPT_MAX)) return false;
   const now = Date.now(),

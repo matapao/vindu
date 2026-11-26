@@ -7,6 +7,11 @@ import { BLOCK_WORDS, wordsGiven, wordWith } from '../../block-words.js';
 import { VIEW_WORDS } from '../../view-words.js';
 
 const ON = /^(on|true|yes|enabled|running|active|open|1)$/i;
+/** A call's outcome, as its mark: it went, it failed, or it is not known. */
+const outcomeMark = (outcome: unknown) => {
+  if (outcome === 'ok') return '✓';
+  return outcome === 'failed' ? '✗' : '?';
+};
 type DeviceWords = Pick<typeof VIEW_WORDS, 'on' | 'off' | 'turnOn' | 'turnOff'>;
 /** The words it draws: the view's, where the surface gives them, and English for each one it does not. */
 const deviceWords = (given: unknown): DeviceWords => {
@@ -24,6 +29,9 @@ export const VDevices = defineBlock(
       const state = fieldValue(props, row, 'state');
       const on = state === true || ON.test(asText(state ?? ''));
       const turn = on ? words.turnOff : words.turnOn;
+      let said: unknown; // a yes or no in the view's words, any other state as written
+      if (typeof state === 'boolean') said = state ? words.on : words.off;
+      else said = formatCell(props, state);
       const act = (e: Event) =>
         sendBlockAction(e.currentTarget as HTMLElement, {
           type: 'operation',
@@ -43,7 +51,7 @@ export const VDevices = defineBlock(
               }</span>`
             : nothing
         }</span><span class=${`vb-pill ${on ? 'vb-on' : ''}`}>${
-          typeof state === 'boolean' ? (state ? words.on : words.off) : formatCell(props, state)
+          said
         }</span>${
           props.operation
             ? html`<button class="vb-btn" aria-label=${`${turn} ${asText(fieldValue(props, row, 'name') ?? '')}`.trim()} @click=${act}>${
@@ -78,7 +86,7 @@ export const VBatch = defineBlock('VBatch', 'vindu-batch', { words: 'value' }, (
         html`<span class=${
           `vb-mark ${row.outcome === 'ok' ? '' : 'vb-warn'}`
         }>${
-          row.outcome === 'ok' ? '✓' : row.outcome === 'failed' ? '✗' : '?'
+          outcomeMark(row.outcome)
         }</span><span class="vb-name">${asText(row.for ?? '')}</span><span class="vb-muted">${row.detail}</span>`,
       ),
     )

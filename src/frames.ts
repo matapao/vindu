@@ -52,7 +52,10 @@ export function describeChange(r: Row): string {
   }
   return Object.entries(r).filter(([, v]) => v === null || typeof v !== 'object').slice(0, 5).map(([k, v]) => `${k} ${fmt(v)}`).join(', ');
 }
-const fmt = (v: unknown) => (v === null || v === undefined || v === '' ? '—' : typeof v === 'object' ? JSON.stringify(v) : asText(v));
+const fmt = (v: unknown) => {
+  if (v === null || v === undefined || v === '') return '—';
+  return typeof v === 'object' ? JSON.stringify(v) : asText(v);
+};
 /** The rows the person kept ticked. */
 export const acceptedRows = <T>(rows: T[], answer: Record<string, unknown> | null): T[] => (answer ? rows.filter((_, i) => answer[`row_${i}`] !== false) : []);
 

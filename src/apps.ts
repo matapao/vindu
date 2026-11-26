@@ -92,7 +92,9 @@ export function resultFor(p: AppsProvider | undefined, e: Entry): unknown {
   const exact = p?.result?.(e.id); if (exact !== undefined) return exact;
   if (e.kind !== 'result') return { content: [] };
   const data = e.rows ?? e.value;
-  return { content: [{ type: 'text', text: data !== undefined ? JSON.stringify(data) : e.text }], ...(data !== undefined && typeof data === 'object' && !Array.isArray(data) ? { structuredContent: data } : data !== undefined ? { structuredContent: { rows: data } } : {}) };
+  if (data === undefined) return { content: [{ type: 'text', text: e.text }] };
+  // structured content is an object: a list goes in one, as its rows
+  return { content: [{ type: 'text', text: JSON.stringify(data) }], structuredContent: typeof data === 'object' && !Array.isArray(data) ? data : { rows: data } };
 }
 
 /** Only what words and data say: images, audio and embedded files an app reports never reach the model. */

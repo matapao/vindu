@@ -191,14 +191,11 @@ const ctxFor = (
   gate: (view, p, spec) => gateOf(session, view, p, spec),
   step: (view) => session.steps.get(view) ?? 1,
   draft: (view, panel, model) => draftLook(session, view, panel, model, anew, mounts),
-  hookState: (view, n) =>
-    session.more.hooks === false
-      ? 'idle'
-      : !session.jobs
-        ? 'unavailable'
-        : !anew && hookIsOn(session, view, n, (drawing?.hooks as Hook[] | undefined)?.[n])
-          ? 'on'
-          : 'off',
+  hookState: (view, n) => {
+    if (session.more.hooks === false) return 'idle';
+    if (!session.jobs) return 'unavailable';
+    return !anew && hookIsOn(session, view, n, (drawing?.hooks as Hook[] | undefined)?.[n]) ? 'on' : 'off';
+  },
   // the person's what-ifs win, until the model gives that input a new value of its own
   inputs: (view, panel, defaults) => {
     const k = `${view}/${panel}`;

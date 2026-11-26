@@ -78,14 +78,14 @@ export function registerInspectionTools(server: McpServer, session: Session, has
       if (!args0) return say(`no view "${view}" is shown`, true);
       const title = session.shown.get(view)?.title ?? view;
       const last = session.vhistory.get(view)?.at(-1);
+      const undo = (): { refusal: string } | { what: string; mark: string } => {
+        if (!last) return { refusal: `nothing to undo in "${title}"` };
+        if (last.by !== 'model')
+          return { refusal: `the last change in "${title}" is the person's (${last.what}): only they undo it` };
+        return { what: `undo "${last.what}"`, mark: `Undo ${last.what}` };
+      };
       const r =
-        a.action !== 'undo'
-          ? applyAction(args0, session.data.get(view), a, title, session.runtime.cards)
-          : !last
-            ? { refusal: `nothing to undo in "${title}"` }
-            : last.by !== 'model'
-              ? { refusal: `the last change in "${title}" is the person's (${last.what}): only they undo it` }
-              : { what: `undo "${last.what}"`, mark: `Undo ${last.what}` };
+        a.action !== 'undo' ? applyAction(args0, session.data.get(view), a, title, session.runtime.cards) : undo();
       if ('refusal' in r) return say(r.refusal, true);
       session.vsuggest.set(view, { ...a, what: r.what }); // an undo, too, is the person's to take
       session.shell.mark(view, { text: r.mark, by: 'model', suggestion: true });

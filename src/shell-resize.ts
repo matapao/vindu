@@ -1,6 +1,7 @@
 // What the window reports about its panes, read against what is shown: a divider moved, and how tall each view's content
 // is and what of it is in sight. Only what is well formed is kept: what a window says is checked, as all it says.
-import { isPane, nodeAt, resize, viewsOf, type LayoutNode } from './layout.js';
+import { isPane, nodeAt, viewsOf, type LayoutNode } from './layout.js';
+import { resize } from './layout-edit.js';
 
 /** What of a panel is in sight in its pane, as the window read it from the marks it drew: rows from 0, as shown. */
 export type Sight = { first: number; last: number; n: number; of: number; nodes?: number };

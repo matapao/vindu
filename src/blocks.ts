@@ -8,90 +8,15 @@
 import { z } from 'zod';
 import { block, needOne, type Roles } from './block-kit.js';
 import { BATCH } from './block-batch.js';
-import { draftShaped } from './block-drafts.js';
 import { EVENTS } from './block-events.js';
 import { NOTICE } from './block-notice.js';
-import { panelOption, resultRef, rowFields, type CardDef } from './cards.js';
+import type { CardDef } from './cards.js';
+import { panelOption } from './card-schema.js';
 import { changedFields } from './changes.js';
 import { addFields, num, parse as parseExpr, setValue } from './compute.js';
-import { isMarkdownSection, markdownAccount } from './markdown-document.js';
-import { DRAFT_LIMITS, megabytes } from './message-draft.js';
 import type { Row } from './results.js';
-import { asText } from './format.js';
-import { DOCUMENT_FILE } from './word-document.js';
-
-const T = /^(time|date|sent|received|at|timestamp|created|when|datetime)$/i;
-export const MESSAGE = block({
-  name: 'message', component: 'VMessages', one: true,
-  about: `mail, chat or SMS: one message, a thread, or an inbox. Or, with layout draft, a mail for the person to send, as one object in data: {to, cc, subject, body, format: "text" or "markdown", in_reply_to: the original mail {from, time, subject, body, ref: the host's own reference to it, where a result gives one, which is the host's: pass it through exactly as given}, attachments: paths of files in the working folder}; at most ${DRAFT_LIMITS.addresses} addresses in to and cc, a subject of ${DRAFT_LIMITS.subject} characters, a body of ${DRAFT_LIMITS.body.toLocaleString('en-GB')}, ${DRAFT_LIMITS.attachments} attachments of ${megabytes(DRAFT_LIMITS.bytes)} in all. A mail meant to be sent is always a draft, never text in your answer: the person reads it, edits it and sends it in the window; you never press Send, and are told how it went`,
-  roles: { from: /^(from|sender|author|by|user)$/i, to: /^(to|recipients?)$/i, cc: /^cc$/i, subject: /^(subject|title|topic)$/i,
-    body: /^(body|text|content|message|preview|snippet|html)$/i, time: T, attachments: /^attach/i, thread: /^(thread|conversation|thread_?id)$/i, state: /^(state|status|read|unread|flags?)$/i,
-    format: /^(format|body_?format|markup)$/i, in_reply_to: /^(in_?reply_?to|replying_?to|original)$/i },
-  layouts: ['one', 'thread', 'inbox', 'draft'],
-  check: (rows, p, m) => {
-    if (p.layout !== 'draft') return needOne(m, ['subject', 'body'], 'a message', rows);
-    return rows.length > 1 ? `a draft is one mail: send its fields as one object in data, not ${rows.length} rows` : null;
-  },
-  rows: (rows, p, m, _read, _inputs, draft) => {
-    if (p.layout === 'draft') return draftShaped(rows, m, draft);
-    const layout = asText(p.layout || (rows.length === 1 ? 'one' : m.thread && new Set(rows.map(r => String(r[m.thread]))).size === 1 ? 'thread' : 'inbox'));
-    return { rows: layout === 'thread' && m.time ? [...rows].sort((a, b) => String(a[m.time]).localeCompare(String(b[m.time]))) : rows, props: { layout } };
-  },
-  account: (rows, _p, _m, props) => (props.layout === 'draft' ? { shows: 'a mail drafted for the person to send, which they may change in the window' } : { messages: rows.length, shows: props.layout === 'inbox' ? 'from, subject and time of each, newest as given' : props.layout === 'thread' ? 'each message in time order, with its body' : 'the whole message' }),
-  words: w => ({ ...w.message }),
-});
-
-// ── documents: sections with anchors to cite; what changed since an earlier version, as tracked changes; or a Markdown
-// file, read and parsed by the system into sections of headings, paragraphs, lists, quotes, code and tables (markdown.ts)
-const words = (t: string) => t.split(/(\s+|[.,;:!?()«»"“”])/).filter(x => x !== ''); // words, spaces and punctuation, each a token
-/** Word by word, what changed: kept, inserted, deleted (the longest common subsequence, by the system). */
-export function wordDiff(a: string, b: string): { op: '=' | '+' | '-'; t: string }[] {
-  const x = words(a), y = words(b);
-  if (x.length * y.length > 4_000_000) return [{ op: '-', t: a }, { op: '+', t: b }]; // too long to compare word by word
-  const n = x.length, m = y.length; const L = Array.from({ length: n + 1 }, () => new Uint32Array(m + 1));
-  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = x[i] === y[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
-  const out: { op: '=' | '+' | '-'; t: string }[] = []; const push = (op: '=' | '+' | '-', t: string) => { const last = out[out.length - 1]; if (last?.op === op) last.t += t; else out.push({ op, t }); };
-  let i = 0, j = 0;
-  while (i < n && j < m) { if (x[i] === y[j]) { push('=', x[i]); i++; j++; } else if (L[i + 1][j] >= L[i][j + 1]) push('-', x[i++]); else push('+', y[j++]); }
-  while (i < n) push('-', x[i++]); while (j < m) push('+', y[j++]);
-  return out;
-}
-const DOC: Roles = { anchor: /^(anchor|id|section|clause|ref|no|number|paragraph)$/i, heading: /^(heading|title|caption|name)$/i, text: /^(text|body|content|paragraph_?text|value)$/i, level: /^(level|depth)$/i, page: /^(page|p)$/i, sources: /^(sources?|cites?|citations?|refs)$/i };
-export const DOCUMENT = block({
-  name: 'document', component: 'VDocument', about: 'a document as sections or paragraphs, each with an anchor to cite (§ 4.2, page 3); with before: an earlier version\'s result id, what changed is shown as tracked changes. Or a Markdown file as it is, read and drawn by the system (headings, lists, code, tables, links), up to 512,000 bytes; or a Word document (.docx), its headings, paragraphs, lists, tables and links read and drawn by the system, each picture as [picture]: from an attachment (a1), or path: a .md or .docx file in the working folder',
-  roles: DOC, file: DOCUMENT_FILE, words: w => ({ ...w.document }),
-  fields: { before: resultRef(z.string().optional().describe('document: an earlier version (a result id with the same sections): what changed is computed word by word and shown as tracked changes')) },
-  check: (rows, _p, m) => (rows.some(isMarkdownSection) ? null : needOne(m, ['text'], 'a document', rows)), derived: ['__changes', '__new', '__gone', '__heading', '__blocks'],
-  rows: (rows, p, m, read) => {
-    if (!p.before) return rows;
-    const before = asText(p.before), e = read(before);
-    if (!e || e.kind !== 'result') throw new Error(`before: no result "${before}"`);
-    const old = (e.rows ?? (Array.isArray(e.value) ? e.value : [])) as Row[];
-    const key = (r: Row, i: number) => (m.anchor ? asText(r[m.anchor] ?? i) : String(i));
-    const was = new Map(old.map((r, i) => [key(r, i), asText(r[m.text] ?? r.text ?? '')]));
-    const out: Row[] = rows.map((r, i) => { const k = key(r, i); const now = asText(r[m.text] ?? ''); const then = was.get(k); was.delete(k);
-      return { ...r, __changes: then === undefined ? [{ op: '+', t: now }] : then === now ? [{ op: '=', t: now }] : wordDiff(then, now), __new: then === undefined }; });
-    for (const [k, t] of was) out.push({ ...(m.anchor ? { [m.anchor]: k } : {}), [m.text]: '', __changes: [{ op: '-', t }], __gone: true });
-    return out;
-  },
-  account: (rows, p) => {
-    if (rows.some(isMarkdownSection)) return markdownAccount(rows);
-    if (!p.before) return { sections: rows.length };
-    const ops = rows.flatMap(r => (r.__changes as { op: string }[]) ?? []);
-    return { sections: rows.length, tracked_changes: `computed by the system, from ${asText(p.before)} to ${p.from ?? 'these rows'}: ${ops.filter(o => o.op === '+').length} insertions, ${ops.filter(o => o.op === '-').length} deletions, ${rows.filter(r => r.__new).length} new sections, ${rows.filter(r => r.__gone).length} removed` };
-  },
-});
-
-export const TASKS = block({
-  name: 'tasks', component: 'VTasks', about: 'tasks: a checklist, a board of columns by state, or steps in order',
-  roles: { title: /^(title|name|task|summary|what|step)$/i, state: /^(state|status|done|completed|stage|column)$/i, who: /^(assignee|owner|who|assigned_?to|responsible)$/i,
-    due: /^(due|deadline|by|due_?date)$/i, priority: /^(priority|prio|severity)$/i },
-  layouts: ['checklist', 'board', 'steps'],
-  fields: { order: panelOption(z.array(z.string()).optional().describe('tasks, layout board: the columns (states) in order')) },
-  check: (rows, _p, m) => needOne(m, ['title'], 'a task', rows),
-  words: w => ({ ...w.tasks }),
-  account: (rows, p, m) => ({ tasks: rows.length, ...(m.state ? { by_state: Object.fromEntries(rows.reduce((a, r) => a.set(asText(r[m.state] ?? ''), (a.get(asText(r[m.state] ?? '')) ?? 0) + 1), new Map<string, number>())) } : {}), ...(p.layout === 'board' && p.order ? { columns: p.order } : {}) }),
-});
+import { CONTACTS, DIAGRAM, MAP_BLOCK } from './blocks-drawn.js';
+import { DOCUMENT, MESSAGE, TASKS } from './blocks-text.js';
 
 // ── money: an invoice or receipt (lines, and totals the system adds up and checks), a payment before it is made ───────
 const MONEY: Roles = { description: /^(description|item|name|text|line|product|service)$/i, quantity: /^(quantity|qty|hours|units?|count)$/i,
@@ -131,42 +56,6 @@ export const FILES = block({
     modified: /^(modified|updated|changed|mtime|last_?modified|date)$/i, owner: /^(owner|author|by|created_?by)$/i, shared: /^(shared|shared_?with|access|permissions)$/i },
   check: (rows, _p, m) => needOne(m, ['name'], 'a file', rows),
   account: rows => ({ files: rows.length }),
-});
-
-// ── map: places as points, lines or areas, drawn without map tiles (nothing is fetched from the network for it) ─────
-type Geo = { type: string; coordinates: unknown };
-const lonlats = (g: Geo): number[][] => { const out: number[][] = []; const walk = (c: unknown) => { if (Array.isArray(c) && typeof c[0] === 'number') out.push(c as number[]); else if (Array.isArray(c)) c.forEach(walk); }; walk(g.coordinates); return out; };
-const merc = (lon: number, lat: number) => [lon, (Math.log(Math.tan(Math.PI / 4 + (Math.max(-85, Math.min(85, lat)) * Math.PI) / 360)) * 180) / Math.PI];
-export const MAP_BLOCK = block({
-  name: 'map', component: 'VMap', about: 'places on a map: points (lat, lon) or shapes (GeoJSON geometry), with labels; drawn by the system without map tiles',
-  roles: { lat: /^(lat|latitude)$/i, lon: /^(lon|lng|long|longitude)$/i, geometry: /^(geometry|geojson|shape|area|route|line)$/i, label: /^(label|name|title|address|place|stop)$/i, group: /^(group|category|kind|type|status|truck|vehicle)$/i },
-  check: (rows, _p, m) => (m.geometry || (m.lat && m.lon) ? null : `a map needs lat and lon, or a geometry (GeoJSON); fields here: ${rowFields(rows).slice(0, 15).join(', ')}; say which with map`),
-  rows: (rows, _p, m) => {
-    const shapes = rows.map(r => { const g = m.geometry && r[m.geometry] && typeof r[m.geometry] === 'object' ? r[m.geometry] as Geo : null; return g ? lonlats(g) : num(r[m.lat]) !== null && num(r[m.lon]) !== null ? [[num(r[m.lon])!, num(r[m.lat])!]] : []; });
-    const all = shapes.flat().map(([lon, lat]) => merc(lon, lat));
-    if (!all.length) throw new Error('no place has numbers for lat and lon, or a geometry');
-    const xs = all.map(a => a[0]), ys = all.map(a => a[1]);
-    let [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
-    const span = Math.max(x1 - x0, y1 - y0, 0.01); x0 -= span * 0.12; x1 += span * 0.3; y0 -= span * 0.08; y1 += span * 0.08; // room for labels, right of each point
-    const W = 640, H = Math.round(Math.min(380, Math.max(220, (W * (y1 - y0)) / Math.max(x1 - x0, 1e-9))));
-    const s = Math.min(W / (x1 - x0), H / (y1 - y0)), ox = (W - s * (x1 - x0)) / 2, oy = (H - s * (y1 - y0)) / 2;
-    const at = (lon: number, lat: number) => { const [x, y] = merc(lon, lat); return [Math.round((ox + (x - x0) * s) * 10) / 10, Math.round((H - oy - (y - y0) * s) * 10) / 10]; };
-    return { rows: rows.map((r, i) => {
-      const g = m.geometry && r[m.geometry] && typeof r[m.geometry] === 'object' ? r[m.geometry] as Geo : null;
-      const kind = g ? (/Polygon/.test(g.type) ? 'area' : /LineString/.test(g.type) ? 'line' : 'point') : 'point';
-      return { ...r, __shape: { kind, points: shapes[i].map(([lon, lat]) => at(lon, lat)) } };
-    }), props: { frame: { width: W, height: H, bounds: [x0, y0, x1, y1] } } };
-  },
-  props: () => ({ frame: { width: 640, height: 320 } }), derived: ['__shape'], words: w => ({ ...w.map }),
-  account: rows => ({ places: rows.length, drawn: 'positions computed by the system (Web Mercator, fitted to the places); no map tiles' }),
-});
-
-export const CONTACTS = block({
-  name: 'contacts', component: 'VContacts', about: 'people and organizations as contact cards',
-  roles: { name: /^(name|full_?name|display_?name|contact)$/i, role: /^(role|title|job_?title|position)$/i, org: /^(org|organi[sz]ation|company|employer|department)$/i,
-    email: /^(e_?mail|mail)$/i, phone: /^(phone|mobile|tel|telephone)$/i, address: /^(address|street|location)$/i },
-  check: (rows, _p, m) => needOne(m, ['name', 'org'], 'a contact', rows),
-  account: rows => ({ contacts: rows.length }),
 });
 
 // ── a sheet: rows with formulas per column, inputs, and scenarios side by side, all computed by the system ─────────
@@ -214,34 +103,6 @@ export const SIGNATURE = block({
   roles: { who: /^(who|signer|name|by|signed_?by)$/i, when: /^(when|at|signed_?at|time|date)$/i, what: /^(what|document|subject|title)$/i, digest: /^(digest|sha256|hash)$/i, image: /^(image|png|svg|drawing|signature)$/i },
   check: (rows, _p, m) => needOne(m, ['who'], 'a signature', rows),
   account: rows => ({ signatures: rows.length }),
-});
-
-// ── a diagram: nodes and links, laid out in layers by the system ─────────────────────────────────────────────────
-/** Layers by the longest path from a root, ordered within a layer by their parents' places (a few sweeps). */
-export function layered(nodes: string[], links: [string, string][]): Map<string, { layer: number; order: number }> {
-  const parents = new Map(nodes.map(n => [n, [] as string[]])); for (const [a, b] of links) if (a !== b) parents.get(b)?.push(a);
-  const layer = new Map<string, number>(); const visiting = new Set<string>();
-  const depth = (n: string): number => { if (layer.has(n)) return layer.get(n)!; if (visiting.has(n)) return 0; visiting.add(n); const d = Math.max(-1, ...(parents.get(n) ?? []).map(depth)) + 1; visiting.delete(n); layer.set(n, d); return d; };
-  nodes.forEach(depth);
-  const byLayer: string[][] = []; for (const n of nodes) (byLayer[layer.get(n)!] ??= []).push(n);
-  const pos = new Map<string, number>(); byLayer.forEach(l => l.forEach((n, i) => pos.set(n, i)));
-  for (let sweep = 0; sweep < 4; sweep++) for (const l of byLayer.slice(1)) {
-    const bary = (n: string) => { const ps = parents.get(n)!.filter(x => pos.has(x)); return ps.length ? ps.reduce((a, x) => a + pos.get(x)!, 0) / ps.length : pos.get(n)!; };
-    l.sort((a, b) => bary(a) - bary(b)).forEach((n, i) => pos.set(n, i));
-  }
-  return new Map(nodes.map(n => [n, { layer: layer.get(n)!, order: pos.get(n)! }]));
-}
-export const DIAGRAM = block({
-  name: 'diagram', component: 'VDiagram', about: 'a diagram: links between things (from, to, label), laid out in layers by the system: a flow, a hierarchy, a network',
-  roles: { from: /^(from|source|parent|a|sender)$/i, to: /^(to|target|child|b|receiver)$/i, label: /^(label|relation|kind|amount|via)$/i },
-  check: (rows, _p, m) => (m.from && m.to ? null : `a diagram needs from and to (one link per row); fields here: ${rowFields(rows).slice(0, 15).join(', ')}`),
-  rows: (rows, _p, m) => {
-    const nodes = [...new Set(rows.flatMap(r => [String(r[m.from]), String(r[m.to])]))];
-    const place = layered(nodes, rows.map(r => [String(r[m.from]), String(r[m.to])]));
-    return { rows, props: { nodes: nodes.map(n => ({ id: n, ...place.get(n)! })) } };
-  },
-  props: () => ({ nodes: [] }),
-  account: (rows, _p, _m, props) => ({ links: rows.length, nodes: (props.nodes as unknown[]).length, laid_out: 'by the system, in layers from the first in each chain' }),
 });
 
 export const DEVICES = block({

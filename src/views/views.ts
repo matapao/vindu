@@ -10,47 +10,17 @@
 // What the model reads or does here goes to the host (record), which keeps it with the process's results.
 import path from 'node:path';
 import { cutText } from '../format.js';
-import { commandRefusal, Terminals, type TerminalInfo, type TerminalOptions } from './terminal.js';
-import { Browsers, webAddress, type BrowserPage, type Cdp, type Outgoing, type Sent } from './browser.js';
+import { Terminals, type TerminalInfo } from './terminal.js';
+import { webAddress, type BrowserPage, type Outgoing } from './browser.js';
+import { Browsers } from './browsers.js';
 import { isLocal, Sites } from './sites.js';
+import { actInPage, runInTerminal, told, type ActArgs, type ReadArgs } from './view-acts.js';
+export { BROWSER_ACTIONS, type ActArgs, type ReadArgs } from './view-acts.js';
 export { isLocal } from './sites.js';
-
-export type TerminalSetup = {
-  shell?: string; login?: boolean;        // the person's own shell, by default (a login shell on macOS)
-  env?: NodeJS.ProcessEnv;                // its whole environment: by default only what a shell needs of the host's (terminalEnvironment)
-  run?: boolean;                          // the model may run commands in a shared terminal, each after the person's yes
-  onExit?: (name: string, code: number) => void;
-  spawn?: TerminalOptions['spawn'];       // where the shell runs, when not on this machine (the processor's box)
-};
-export type BrowserSetup = {
-  /** Show a page where the person sees it (Electron: a WebContentsView over its pane) and give its CDP connection.
-   *  owner: whose page it is, so the person's sign-ins never reach the model's pages. */
-  open: (o: { name: string; owner: 'model' | 'person' }) => Promise<Cdp>;
-  close?: (name: string) => void;
-  /** The addresses the model's pages open and reach without asking: this machine's (localhost, any port), by default
-   *  (isLocal). Leave out the host's own addresses that answer without a sign-in, such as its window's server. Requests
-   *  are checked through the page's CDP connection, which does not reach a page's service workers or WebSockets: a host
-   *  that shows the model's pages in a partition of their own can check those there too (Electron: webRequest). */
-  local?: (u: URL) => boolean;
-};
-export type ViewsSetup = { terminal?: TerminalSetup | false; browser?: BrowserSetup };
-/** What a session gives the views: where they live, their panes, and the person. */
-export type ViewHost = {
-  cwd: string; dir: string;
-  pane(p: { name: string; title: string; subtitle?: string; kind: string; place?: unknown; about: () => unknown }): string[];
-  unpane(name: string): void;
-  tell(what: string): void;
-  confirm(q: { title: string; message?: string; details?: { label?: string; text: string }[] }, signal?: AbortSignal): Promise<boolean>;
-  log(e: Record<string, unknown>): void;
-};
-export type ReadArgs = { last?: number; screen?: boolean; max?: number; log?: boolean; errors_only?: boolean };
-export type ActArgs = { action: string; ref?: string; text?: string; submit?: boolean; value?: string; key?: string; url?: string; ms?: number; timeout_ms?: number; command?: string; wait_ms?: number };
-export const BROWSER_ACTIONS = ['click', 'type', 'select', 'press', 'go_to', 'back', 'forward', 'reload', 'wait'] as const;
+import type { ViewHost, ViewsSetup } from './view-setup.js';
+export type { BrowserSetup, TerminalSetup, ViewHost, ViewsSetup } from './view-setup.js';
 
 const DRIVEN_MS = 3000; // a page the model acted on in the last 3 s: what it opens next is the model's doing
-/** What the model is told of something the page wanted to send: where, which fields, and whether the person let it go. */
-const told = (s: Sent) => ({ to: `${s.method} ${s.url}`, fields: s.fields, ...(s.secret.length ? { secret_fields: s.secret } : {}),
-  ...(s.sent ? { sent: true } : { sent: false, note: 'the person did not let the page send it' }) });
 
 export class Views {
   readonly terminals?: Terminals;
@@ -196,9 +166,13 @@ export class Views {
    *  refused a site to, until the model acts in it again. */
   private reached(page: BrowserPage, url: string, kind: string, moving: boolean): Promise<boolean> | false | undefined {
     const sharing = page.shared ? page.whileShared() : undefined;
-    const question = () => this.hushed.has(page) ? undefined : moving ? this.opening(url) : { title: `Let the model's page reach ${new URL(url).host}?`,
-      message: `${this.title(page.id)}, a page of the model's, wants something from another site (${kind.toLowerCase() || 'a request'}). Pages run in this app, outside the harness's sandbox, so what the address holds goes to that site. A yes holds for this site until the task ends; after a no, the page asks nothing more until the model acts in it again.`,
-      details: [{ label: 'address', text: cutText(url, 2000) }, { label: 'page', text: page.url }] };
+    const question = () => {
+      if (this.hushed.has(page)) return undefined;
+      if (moving) return this.opening(url);
+      return { title: `Let the model's page reach ${new URL(url).host}?`,
+        message: `${this.title(page.id)}, a page of the model's, wants something from another site (${kind.toLowerCase() || 'a request'}). Pages run in this app, outside the harness's sandbox, so what the address holds goes to that site. A yes holds for this site until the task ends; after a no, the page asks nothing more until the model acts in it again.`,
+        details: [{ label: 'address', text: cutText(url, 2000) }, { label: 'page', text: page.url }] };
+    };
     const may = this.sites.reach(url, sharing && !this.hushed.has(page) ? { question, signal: sharing } : undefined);
     if (may) void may.then(yes => { if (!yes && !sharing?.aborted) this.hushed.add(page); });
     return may;
@@ -258,24 +232,8 @@ export class Views {
   }
   /** act_in_view: run a command in a terminal; or act in a page, by reference from its latest snapshot. */
   async act(name: string, a: ActArgs, signal?: AbortSignal): Promise<Record<string, unknown>> {
-    if (this.kindOf(name) === 'terminal') {
-      if (!this.setup.terminal || !this.setup.terminal.run) throw new Error('a terminal is only read here: running commands in the person\'s terminals is off in this app; the person can turn it on');
-      if (a.action !== 'run') throw new Error(`a terminal takes one action: run, with a command (not "${a.action}")`);
-      const sharing = this.terminals!.whileShared(name);
-      const i = this.terminals!.info(name);
-      if (!a.command) throw new Error('run needs a command');
-      const refused = commandRefusal(a.command);
-      if (refused) throw new Error(refused); // before the person is asked: what they approve is what runs
-      const yes = await this.h.confirm({ title: `Run this in ${i.title}?`, message: `The model wants to run a command in ${i.title}, in ${i.cwd}. It runs there as you, outside the harness's sandbox.`, details: [{ label: 'command', text: a.command }] }, signal);
-      this.h.log({ view: name, command: a.command, cwd: i.cwd, asked: true, yes });
-      if (!yes) return { view: name, ran: false, declined: 'the person said no' };
-      sharing.throwIfAborted(); // sharing may have changed while the person decided
-      const r = await this.terminals!.run(name, a.command, a.wait_ms ?? 30_000);
-      sharing.throwIfAborted(); // a running command may finish after sharing was withdrawn
-      return 'done' in r ? { view: name, ran: true, done: r.done } : { view: name, ran: true, running: r.running, note: 'still running: read the view later' };
-    }
+    if (this.kindOf(name) === 'terminal') return runInTerminal(this.terminals!, this.setup, this.h, name, a, signal);
     const p = await this.usable(name);
-    const need = (k: keyof ActArgs) => { if (a[k] === undefined || a[k] === '') throw new Error(`${a.action} needs ${k}`); return String(a[k]); }; // one act_in_view for every kind of view: a value or key may come as a number
     const sharing = p.whileShared();
     const active = signal ? AbortSignal.any([sharing, signal]) : sharing;
     active.throwIfAborted();
@@ -283,21 +241,8 @@ export class Views {
     this.driven.set(p, drive); // what the page opens while the model acts is the model's doing
     this.hushed.delete(p);     // and what it reaches for may be asked about again
     try {
-      switch (a.action) {
-        case 'click': { const ref = need('ref'); await p.acting(() => p.click(ref, active)); break; } // a page it opens, loaded
-        case 'type': { const ref = need('ref'), text = need('text'); await p.acting(() => p.type(ref, text, a.submit, active)); break; }
-        case 'select': { const ref = need('ref'), value = need('value'); await p.acting(() => p.select(ref, value, active)); break; }
-        case 'press': { const key = need('key'); await p.acting(() => p.press(key, active)); break; }
-        case 'go_to': {
-          const addr = webAddress(need('url'));
-          if (!(await this.allow(addr, active))) return { view: name, did: 'nothing', declined: `the person did not let the model open ${new URL(addr).host}` };
-          active.throwIfAborted();
-          await p.navigate(addr); break;
-        }
-        case 'back': case 'forward': case 'reload': await p.go(a.action, undefined, active); break;
-        case 'wait': { const w = await p.wait({ text: a.text, ms: a.ms, timeoutMs: a.timeout_ms }, active); return { view: name, did: 'wait', ...w, snapshot: await this.snap(p, active) }; }
-        default: throw new Error(`a browser view takes: ${BROWSER_ACTIONS.join(', ')} (not "${a.action}")`);
-      }
+      const said = await actInPage(p, name, a, active, { allow: (url, on) => this.allow(url, on), snap: on => this.snap(p, on) });
+      if (said) return said;
       active.throwIfAborted(); // each action waited for what a script draws right after (BrowserPage.settled)
       const sent = p.takeHeld();
       return { view: name, did: a.action, ...(sent.length ? { sent: sent.map(told) } : {}), snapshot: await this.snap(p, active) };

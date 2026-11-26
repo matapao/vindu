@@ -36,11 +36,14 @@ import { refetchWaiting } from './refetch-waiting.js';
 import { stopWaiting } from './render-reports.js';
 import { consumeWindowChanges, contextFor, resolved, setPicked } from './selection.js';
 import { holdResults, letGoResults, sessionFolder } from './session-folder.js';
-import type { Session } from './state.js';
+import type { Fill, Session } from './state.js';
 import { templateControls } from './templates.js';
 import { layoutServerFor, serverFor } from './tool-server.js';
 import { formatOver, sessionWords, setViewWords, type ViewFormat } from './view-words.js';
 import { dispatchEvent } from './window-events.js';
+
+/** Who filled a template's slot, as the model's note says it. */
+const FILLED_BY: Record<Fill['by'], string> = { source: 'its source', person: 'the person', model: 'you' };
 
 export function openSession(
   runtime: ServerRuntime,
@@ -210,7 +213,7 @@ export function openSession(
               Object.fromEntries(
                 [...session.mode.fills].map(([n, f]) => [
                   n,
-                  `filled by ${f.by === 'source' ? 'its source' : f.by === 'person' ? 'the person' : 'you'}`,
+                  `filled by ${FILLED_BY[f.by]}`,
                 ]),
               ),
             )

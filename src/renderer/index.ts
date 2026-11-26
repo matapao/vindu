@@ -14,7 +14,9 @@ export { guardA2uiArrays } from './a2ui-limits.js'; // for a host that checks wi
 export { pageMessageGuard, REPORT_MAX, type PageAsk, type PageMessageCheck } from '../page-message-guard.js'; // for a host that relays a page's messages itself
 export { checkSend, SEND_MAX } from '../page-send.js';
 export { html, css, nothing } from 'lit'; // the Lit a host's components render with: vindu's own, so there is one
-export { place, insert, remove, resize, readLayout, shorthand, where, openView, restore, slotOf, LAYOUT, type LayoutNode, type Placement, type LayoutOptions, type Box, type Size, type Place, type Side, type Slot } from '../layout.js';
+export { place, where, LAYOUT, type LayoutNode, type Placement, type LayoutOptions, type Box, type Size, type Place, type Side } from '../layout.js';
+export { readLayout, shorthand } from '../layout-read.js';
+export { insert, remove, resize, openView, restore, slotOf, type Slot } from '../layout-edit.js';
 export { Shell, type ShellState, type ShellEvent, type Shelved, type ShownMeta, type ViewRole, type ViewOwner } from '../shell.js';
 export { moveLine } from './shell.js';
 export { mountWorkspace, type WorkspaceOptions, type WorkspaceHandle, type WorkspaceVisibility,

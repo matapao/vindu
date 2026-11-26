@@ -19,8 +19,10 @@ type Quantifier = { length: number; choice: boolean; repeats: boolean };
 function quantifierAt(text: string): Quantifier | null {
   const m = /^(?:([*+?])|\{(\d+)(,(\d*))?\})\??/.exec(text);
   if (!m) return null;
-  const lo = m[1] ? (m[1] === '+' ? 1 : 0) : Number(m[2]);
-  const hi = m[1] ? (m[1] === '?' ? 1 : Infinity) : m[3] === undefined ? lo : m[4] ? Number(m[4]) : Infinity;
+  let lo: number, hi: number; // how many times at least, and at most
+  if (m[1]) { lo = m[1] === '+' ? 1 : 0; hi = m[1] === '?' ? 1 : Infinity; }
+  else if (m[3] === undefined) hi = lo = Number(m[2]); // {n}
+  else { lo = Number(m[2]); hi = m[4] ? Number(m[4]) : Infinity; } // {n,} and {n,m}
   return { length: m[0].length, choice: hi > lo, repeats: hi > 1 };
 }
 

@@ -31,12 +31,17 @@ export const panelRef = (ref: string, view: string): [string, string] => { const
 /** A hook in the person's words: "When Overdue is above 50000: tell you: …" (titleOf names a panel), in English unless
  *  other words are given (view-words.ts). What the model is told of a hook is always in English. */
 export function hookWords(h: Hook, titleOf: (panel: string) => string, say: HookWords = VIEW_WORDS.hook): string {
-  const w = h.when, d = h.do;
-  const when = w.changed ? say.changed(titleOf(w.changed))
-    : w.crosses ? say.crosses(titleOf(w.crosses.panel), w.crosses)
-    : w.picked ? say.picked(titleOf(w.picked)) : w.answered ? say.answered(w.answered.replace(/_/g, ' ')) : w.due ? say.due : say.when;
+  const d = h.do, when = whenWords(h.when, titleOf, say);
   const what = [d.cue ? say.cue(d.cue.label) : '', d.notify ? say.notify(d.notify) : '', d.read ? say.read(titleOf(d.read)) : '', d.job ? say.job(d.job.prompt) : ''].filter(Boolean).join('; ');
   return `${h.label ? `${h.label}: ` : ''}${when}, ${what || say.nothing}`;
+}
+/** A hook's when in the person's words: a panel changed or crossed a line, a pick, an answer, or a time due. */
+function whenWords(w: Hook['when'], titleOf: (panel: string) => string, say: HookWords): string {
+  if (w.changed) return say.changed(titleOf(w.changed));
+  if (w.crosses) return say.crosses(titleOf(w.crosses.panel), w.crosses);
+  if (w.picked) return say.picked(titleOf(w.picked));
+  if (w.answered) return say.answered(w.answered.replace(/_/g, ' '));
+  return w.due ? say.due : say.when;
 }
 /** Whether a hook's when matches what happened. */
 export function hookMatches(h: Hook, ev: HookEvent): boolean {

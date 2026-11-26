@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import { anyAppsOn } from '../apps.js';
 import { BLOCKS } from '../blocks.js';
-import { offeredKinds, showViewSchema } from '../cards.js';
+import { offeredKinds, showViewSchema } from '../card-schema.js';
 import { decisionOperation } from '../frames.js';
 import { type Binding, formBinding, type Operation, type Words, WORDS } from '../operations.js';
 import type { startPageHost } from '../pages.js';

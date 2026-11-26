@@ -93,7 +93,8 @@ export const VTasks = defineBlock('VTasks', 'vindu-tasks', { order: 'value', wor
     const handlers = drag(index);
     const state = stateOf(row);
     const completed = DONE.test(state) || fieldValue(props, row, 'state') === true;
-    const mark = props.layout === 'steps' ? `${index + 1}.` : completed ? '☑' : '☐';
+    let mark = completed ? '☑' : '☐'; // a step's number, or whether the task is done
+    if (props.layout === 'steps') mark = `${index + 1}.`;
     return html`<div class="vb-item vb-task" data-panel=${props.panel ?? ''} data-row=${String(index)} draggable="true" tabindex="0" role="group" aria-roledescription="task you can move" @dragstart=${
       handlers.start
     } @dragover=${handlers.over} @drop=${handlers.drop} @keydown=${handlers.key}>${

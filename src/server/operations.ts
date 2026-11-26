@@ -8,6 +8,11 @@ import { json, keep, text, unawaited } from './records.js';
 import type { Pending, Session } from './state.js';
 import { asText } from '../format.js';
 
+/** What is shown beside an operation's ask: its own preview, or, for one that changes things, what its input is. */
+const previewFor = (op: Operation, input: Record<string, unknown>) => {
+  if (op.preview) return op.preview(input);
+  return confirms(op.effect) ? previewOf(input) : undefined;
+};
 /** An operation, called by the model or run by the person: ask if it needs asking, then run the host's code; keep it. */
 const operate = (
   session: Session,
@@ -25,10 +30,13 @@ const operate = (
     } catch (e) {
       failed = (e as Error).message;
     }
+    let kept: Record<string, unknown> | null = null; // the person's answer, or the input of what the person ran
+    if (asked) kept = values;
+    else if (by === 'person') kept = input;
     const entry = keep(session, {
       to: op.name,
       by: asked || by === 'person' ? 'person' : 'host',
-      values: asked ? values : by === 'person' ? input : null,
+      values: kept,
       ...(output !== undefined ? { output } : {}),
       ...(approvals.length ? { who: approvals.map((a) => `${a.name} (${a.window})`) } : {}),
     });
@@ -66,7 +74,7 @@ const operate = (
       session,
       p,
       input,
-      op.preview ? op.preview(input) : confirms(op.effect) ? previewOf(input) : undefined,
+      previewFor(op, input),
       op.name,
     ),
   );

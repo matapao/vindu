@@ -31,7 +31,9 @@ export const formatTime = (props: BlockProps, v: unknown, withTime = true) =>
   whenIn(v, props.locale, props.timeZone, withTime);
 export const plainText = (v: unknown): string => {
   // mail bodies may be HTML: shown as text, never run or fetched
-  const s = v === null || v === undefined ? '' : typeof v === 'string' ? v : JSON.stringify(v);
+  let s = ''; // nothing, text as it is, anything else as JSON
+  if (typeof v === 'string') s = v;
+  else if (v !== null && v !== undefined) s = JSON.stringify(v);
   if (!/<[a-z][\s\S]*>/i.test(s)) return s;
   const d = new DOMParser().parseFromString(s, 'text/html');
   d.querySelectorAll('script,style').forEach((e) => e.remove());
@@ -52,8 +54,10 @@ const displayName = (x: unknown): string => {
   return asText(o.name ?? o.email ?? o.title ?? JSON.stringify(x));
 };
 /** The people or things a field names: a list of them, or one alone (a sender, an owner). */
-export const displayNames = (v: unknown): string[] =>
-  Array.isArray(v) ? v.map(displayName) : v === null || v === undefined || v === '' ? [] : [displayName(v)];
+export const displayNames = (v: unknown): string[] => {
+  if (Array.isArray(v)) return v.map(displayName);
+  return v === null || v === undefined || v === '' ? [] : [displayName(v)];
+};
 /** An address a block draws media from: http or https, a scheme the host serves pictures from (schemes, for a picture:
  *  picture-sources.ts), or a data: URL of the kinds given (images, base64); '' otherwise. */
 export function imageSource(v: unknown, data: RegExp = /^data:image\/(png|jpeg|gif|webp|svg\+xml);base64,/, schemes: readonly string[] = []): string {

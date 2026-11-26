@@ -1,6 +1,7 @@
 // The ids a view points at, and the same view under other ids: a view carried into another process (startFrom), or
 // restored on results read again (restore), points at that process's entries.
-import { FROM_ALIASES, fieldRoles, resultIds } from '../cards.js';
+import { FROM_ALIASES, resultIds } from '../cards.js';
+import { fieldRoles } from '../card-schema.js';
 import type { Session } from './state.js';
 
 const ID = /^[rap]\d+$/;

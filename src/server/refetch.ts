@@ -5,12 +5,17 @@
 // waits for the same call keeps the pointer, to be read again later (refetch-waiting.ts).
 import { panelIdsOf, resultIds } from '../cards.js';
 import type { Fills } from '../gates.js';
-import type { Row } from '../results.js';
+import type { ResultEntry, Row } from '../results.js';
 import type { ResultPointer } from './contracts.js';
 import { stableJson } from './records.js';
 import type { Session } from './state.js';
 import { idsIn, swapIds } from './view-ids.js';
 
+/** How a result is named for reading it again: by the host's ref, else by its input, else by its call alone. */
+const whereFrom = (e: ResultEntry) => {
+  if (e.ref !== undefined) return { ref: e.ref };
+  return e.input !== undefined ? { input: structuredClone(e.input) } : {};
+};
 /** Where each result and attachment named here came from, as the session has it: never what it held. A result the host
  *  gave a ref of its own is named by it, in place of its input. */
 export const pointersFor = (session: Session, ids: Iterable<string>): ResultPointer[] => {
@@ -23,7 +28,7 @@ export const pointersFor = (session: Session, ids: Iterable<string>): ResultPoin
         kind: 'result',
         server: e.server,
         tool: e.tool,
-        ...(e.ref !== undefined ? { ref: e.ref } : e.input !== undefined ? { input: structuredClone(e.input) } : {}),
+        ...whereFrom(e),
       });
     else if (e?.kind === 'attachment') out.push({ id, kind: 'attachment', name: e.name, mime: e.mime, file: e.file });
   }

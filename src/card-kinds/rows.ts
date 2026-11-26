@@ -48,10 +48,10 @@ function drawTable(p: PanelSpec, d: Resolved, k: DrawKit): string[] {
   // follows how long its text is (4 to 28), so a long name gets room and a short number does not
   const w = f.map((x, i) => Math.max(4, Math.min(28, Math.round(Math.max(shown.reduce((a, r) => a + r[i].length, 0) / Math.max(1, shown.length), x.length * 0.7)))));
   // each column's head sorts by it, the same action the model has (actions.ts); the arrow says how it is sorted now
-  const [sf, sd] = String(p.sort ?? '').split(/\s+/);
+  const [sf, sd] = String(p.sort ?? '').split(/\s+/), arrow = /desc/i.test(sd ?? '') ? ' ↓' : ' ↑';
   return [
     k.add({ id: `${pid}__head`, component: 'Row', children: f.map((x, i) => k.add({ id: `${pid}__hb${i}`, component: 'Button', variant: 'borderless', weight: w[i],
-      child: k.text(`${pid}__h${i}`, `${x}${sf === x ? (/desc/i.test(sd ?? '') ? ' ↓' : ' ↑') : ''}`, 'caption'),
+      child: k.text(`${pid}__h${i}`, `${x}${sf === x ? arrow : ''}`, 'caption'),
       action: { event: { name: 'view_action', context: { action: 'sort', panel: p.id, field: x } } } })) }),
     k.list(f.map((_, i) => k.text(`${pid}__c${i}`, { path: `c${i}` }, undefined, w[i])), 'Row'),
   ];

@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { pipeline } from 'node:stream/promises';
-import type { Served } from './pages.js';
+import type { Served } from './page-serve.js';
 
 export type PageFile = { file: string; headers: Record<string, string>; inject?: (html: string) => string };
 const HTML_LIMIT = 8 * 1024 * 1024;

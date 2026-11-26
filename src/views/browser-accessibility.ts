@@ -6,7 +6,8 @@ export type PageNode = { ref?: string; role: string; name?: string; value?: stri
 export type Snapshot = { page: string; url: string; title: string; tree: PageNode[]; refs: number; nodes: number; cut?: string };
 
 type ProtocolValue = { value?: unknown };
-type ProtocolNode = {
+/** A node of the page's accessibility tree, as CDP's Accessibility domain gives it. */
+export type ProtocolNode = {
   nodeId: string;
   parentId?: string;
   childIds?: string[];

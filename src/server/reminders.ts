@@ -190,11 +190,10 @@ export const doRem = (
   log(session, { reminder: { id: r.id, [d]: true, by } });
   armRem(session);
   drawRem(session);
-  const did = d === 'done' ? 'marked done' : d === 'drop' ? 'dropped' : `put off to ${r.said}`;
-  if (by === 'person')
-    session.shell.say(
-      `${who && who !== 'the person' ? who : 'the person'} ${d === 'done' ? `marked reminder ${r.id} ("${r.what}") done` : d === 'drop' ? `dropped reminder ${r.id} ("${r.what}")` : `put off reminder ${r.id} ("${r.what}") to ${r.said}`}`,
-    );
+  let did = `put off to ${r.said}`, told = `put off reminder ${r.id} ("${r.what}") to ${r.said}`; // as the model is told it
+  if (d === 'done') [did, told] = ['marked done', `marked reminder ${r.id} ("${r.what}") done`];
+  else if (d === 'drop') [did, told] = ['dropped', `dropped reminder ${r.id} ("${r.what}")`];
+  if (by === 'person') session.shell.say(`${who && who !== 'the person' ? who : 'the person'} ${told}`);
   return { did, reminder: r };
 };
 /** The person's own new reminder: what, and when, with a date-time input; a time that cannot be comes back to them. */

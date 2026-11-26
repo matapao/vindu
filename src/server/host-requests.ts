@@ -1,5 +1,6 @@
 import { previewOf } from '../frames.js';
-import { fieldsOf, permissionDetails } from '../operations.js';
+import { permissionDetails } from '../operations.js';
+import { fieldsOf } from '../field-values.js';
 import { openAsk, showPreview, until } from './asks.js';
 import { keep, unawaited } from './records.js';
 import type { Session } from './state.js';

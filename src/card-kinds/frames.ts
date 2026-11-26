@@ -34,7 +34,9 @@ export const MEDIA: CardKind = {
     const media = drawnFrom(p, d, 'media');
     k.model.url = media.url; const kind = media.mime.split('/')[0]; const url = { path: `/panels/${k.pid}/url` };
     if (d.marks?.length) { k.model.marks = d.marks; return [k.add({ id: `${k.pid}__marked`, component: 'VMediaMarks', url, kind, marks: { path: `/panels/${k.pid}/marks` }, panel: p.id })]; }
-    return [k.add({ id: `${k.pid}__media`, component: kind === 'video' ? 'Video' : kind === 'audio' ? 'AudioPlayer' : 'Image', url, ...(kind === 'image' ? { fit: 'contain' } : {}) })];
+    let component = 'Image'; // A2UI's own: a video, a sound or a picture
+    if (kind === 'video') component = 'Video'; else if (kind === 'audio') component = 'AudioPlayer';
+    return [k.add({ id: `${k.pid}__media`, component, url, ...(kind === 'image' ? { fit: 'contain' } : {}) })];
   },
   account: (o, _p, d) => { o.shows = `${d.media!.mime.split('/')[0]} ${d.media!.name}`; },
 };

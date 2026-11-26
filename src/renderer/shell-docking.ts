@@ -5,7 +5,8 @@ type Drop = { beside: string; side: Side } | { shelf: true };
 /** The side of a box a point is nearest to: where a pane dropped there goes. */
 export function sideAt(b: { x: number; y: number; w: number; h: number }, x: number, y: number): Side {
   const u = (x - b.x) / b.w, v = (y - b.y) / b.h;
-  return Math.min(u, 1 - u) < Math.min(v, 1 - v) ? (u < 0.5 ? 'left' : 'right') : (v < 0.5 ? 'above' : 'below');
+  if (Math.min(u, 1 - u) < Math.min(v, 1 - v)) return u < 0.5 ? 'left' : 'right';
+  return v < 0.5 ? 'above' : 'below';
 }
 
 type DockingOptions = {

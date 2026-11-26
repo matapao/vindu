@@ -22,8 +22,11 @@ export const RESERVED: ViewRole = { owner: 'model', checkpointed: false, pointab
 
 /** A view's role from what it is, when whoever shows it does not say: an ask, a pane of the host's (it has a kind of
  *  its own), a reservation, or the model's. */
-export const roleFor = (meta: { ask?: boolean; kind?: string; loading?: boolean }): ViewRole =>
-  meta.ask ? ROLES.ask : meta.kind ? ROLES.host : meta.loading ? RESERVED : ROLES.model;
+export const roleFor = (meta: { ask?: boolean; kind?: string; loading?: boolean }): ViewRole => {
+  if (meta.ask) return ROLES.ask;
+  if (meta.kind) return ROLES.host;
+  return meta.loading ? RESERVED : ROLES.model;
+};
 
 /** The names the window keeps for an ask's panes, by their shape, and what each is: its own (ask-k3) and exactly what
  *  it will send (preview-k3), then its receipt. No one else shows or reserves a view under either, ever. */

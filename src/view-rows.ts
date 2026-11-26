@@ -53,7 +53,8 @@ export function matcher(field: string, x: unknown): { test: (v: unknown) => bool
   if (!m) return { test: v => asText(v) === asText(x), says: `${field} = ${asText(x)}` };
   const [, op, rhs] = m, n = Number(rhs), num = rhs !== '' && Number.isFinite(n);
   const cmp = (v: unknown) => { const a = Number(v); return num && v !== null && v !== '' && Number.isFinite(a) ? a - n : asText(v ?? '').localeCompare(rhs); };
-  const test = op === '!=' ? (v: unknown) => asText(v) !== rhs : (v: unknown) => { if (v === undefined || v === null || v === '') return false; const c = cmp(v); return op === '>' ? c > 0 : op === '>=' ? c >= 0 : op === '<' ? c < 0 : c <= 0; };
+  const holds = (c: number) => { if (op === '>') return c > 0; if (op === '>=') return c >= 0; return op === '<' ? c < 0 : c <= 0; }; // as op compares
+  const test = op === '!=' ? (v: unknown) => asText(v) !== rhs : (v: unknown) => { if (v === undefined || v === null || v === '') return false; return holds(cmp(v)); };
   return { test, says: `${field} ${op} ${rhs}` };
 }
 const valuesOf = (rows: Row[], f: string) => { const vs = [...new Set(rows.map(r => asText(r[f] ?? '')))]; return `${vs.slice(0, 8).join(', ')}${vs.length > 8 ? `, … (${vs.length} values)` : ''}`; };
@@ -84,7 +85,7 @@ export function shape(rows: Row[], p: PanelSpec, notes: string[], steps: Record<
     const blank = (v: unknown) => v === undefined || v === null || v === '';
     const nums = out.every(r => blank(r[f]) || Number.isFinite(Number(r[f])));
     const rank = (v: unknown) => (blank(v) ? -Infinity : Number(v)); // a blank is below every number, and two blanks are even
-    const byNumber = (x: unknown, y: unknown) => { const a = rank(x), b = rank(y); return a === b ? 0 : a < b ? -1 : 1; };
+    const byNumber = (x: unknown, y: unknown) => { const a = rank(x), b = rank(y); if (a === b) return 0; return a < b ? -1 : 1; };
     out = [...out].sort((a, b) => s * (nums ? byNumber(a[f], b[f]) : asText(a[f] ?? '').localeCompare(asText(b[f] ?? ''))));
     steps.push({ sort: `${f} ${desc ? 'desc' : 'asc'}` });
   } else if (kind.order) out = kind.order(out, p); // the card's own order (a timeline's: in time)

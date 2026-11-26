@@ -7,13 +7,15 @@
 //   - "In the chat" on a pane: each message carries that pane;
 //   - what a block asks to do (a device's switch, a draft's Send) goes to the server too (what a page asks: shell-frames.ts).
 // Blocks mark rows with data-panel and data-row; A2UI's own components carry their data path (/panels/<pid>/rows/<i>).
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { BLOCK_ACTION, paneOf, viewOf } from './dom.js';
 
+import type { ShellEvent } from '../shell-types.js';
 import type { PointItem } from '../window-reports.js'; // one shape, the server's and the window's
 export type { PointItem };
 
-type Opts = { root: HTMLElement; emit: (e: any) => void; picked: () => PointItem[]; masters?: (view: string) => string[] };
+type Opts = { root: HTMLElement; emit: (e: ShellEvent) => void; picked: () => PointItem[]; masters?: (view: string) => string[] };
+/** An element A2UI drew: its component's data path and id, on the element itself. */
+type Drawn = Element & { context?: { dataContext?: { path?: string }; componentModel?: { id?: string } } };
 const ROW = /^\/panels\/(p_[^/]+)\/rows\/(\d+)/;
 
 /** What the element at hand stands for, as the window drew it. */
@@ -22,8 +24,8 @@ export function itemOf(el: Element | null): PointItem | null {
   const view = pane.dataset.view;
   const mark = el.closest<HTMLElement>('[data-row],[data-node]');
   if (mark?.dataset.panel !== undefined && pane.contains(mark)) return mark.dataset.node !== undefined ? { view, panel: mark.dataset.panel, node: mark.dataset.node } : { view, panel: mark.dataset.panel, row: Number(mark.dataset.row) };
-  for (let e: any = el; e && e !== pane; e = e.parentElement) { // A2UI's own components: their data path and component id
-    const path: string | undefined = e.context?.dataContext?.path; const id: string | undefined = e.context?.componentModel?.id;
+  for (let e: Drawn | null = el; e && e !== pane; e = e.parentElement) { // A2UI's own components: their data path and component id
+    const path = e.context?.dataContext?.path; const id = e.context?.componentModel?.id;
     const m = path ? ROW.exec(path) : null; if (m) return { view, pid: m[1], row: Number(m[2]) };
     const v = id ? /^(p_.+)__value$/.exec(id) : null; if (v) return { view, pid: v[1], value: true };
     const f = id ? /^(p_.+)__v(\d+)$/.exec(id) : null; if (f) return { view, pid: f[1], field: Number(f[2]) };

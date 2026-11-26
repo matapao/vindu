@@ -33,7 +33,7 @@ export function niceScale(min: number, max: number): { lo: number; hi: number; t
   if (!Number.isFinite(min) || !Number.isFinite(max)) [min, max] = [0, 1]; // nothing to scale: an axis from 0 to 1
   if (!(max > min)) max = min + (Math.abs(min) / 10 || 1); // one value: room around it, at any size (1e16 + 1 is 1e16)
   const raw = (max - min) / 4, mag = 10 ** Math.floor(Math.log10(raw)), f = raw / mag;
-  const step = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * mag;
+  const step = ([1, 2, 2.5, 5].find(n => f <= n) ?? 10) * mag; // the least of them at or above f
   const lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step;
   const ticks: number[] = []; for (let k = 0; lo + k * step <= hi + step / 2; k++) ticks.push(Number((lo + k * step).toPrecision(12)));
   return { lo, hi, ticks };

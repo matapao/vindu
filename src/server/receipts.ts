@@ -79,7 +79,8 @@ export const settle = async (session: Session, id: string) => {
   }
   const diff = differences(r.input ?? {}, e.input ?? {});
   const failed = !!e.error; // a call that failed may still have gone otherwise than approved: what differs is shown either way
-  r.state = diff.length ? 'differs' : failed ? 'failed' : 'went';
+  if (diff.length) r.state = 'differs';
+  else r.state = failed ? 'failed' : 'went';
   r.went = id;
   const base = ((args.panels ?? []) as Record<string, unknown>[]).slice(0, 1);
   let panels = base;
@@ -100,14 +101,9 @@ export const settle = async (session: Session, id: string) => {
       },
     ];
   }
-  const title =
-    r.state === 'went'
-      ? 'Went exactly as approved'
-      : r.state === 'differs'
-        ? failed
-          ? 'Not as approved, and it failed'
-          : 'Went, but not as approved'
-        : 'Approved, but it failed';
+  let title = 'Approved, but it failed';
+  if (r.state === 'went') title = 'Went exactly as approved';
+  else if (r.state === 'differs') title = failed ? 'Not as approved, and it failed' : 'Went, but not as approved';
   if (r.state !== 'went')
     session.cues.set(r.view, [
       r.state === 'differs'
@@ -121,13 +117,11 @@ export const settle = async (session: Session, id: string) => {
           },
     ]);
   const told = () => {
-    session.shell.say(
-      r.state === 'went'
-        ? `${id} went exactly as the person approved it (${r.entry})`
-        : r.state === 'differs'
-          ? `${id} is not what the person approved (${r.entry}): ${diff.map((x) => String(x.field)).join(', ')} differ${failed ? ', and the call failed' : ''}; the window shows both`
-          : `${id} failed, after the person's yes (${r.entry})`,
-    );
+    let said = `${id} failed, after the person's yes (${r.entry})`;
+    if (r.state === 'went') said = `${id} went exactly as the person approved it (${r.entry})`;
+    else if (r.state === 'differs')
+      said = `${id} is not what the person approved (${r.entry}): ${diff.map((x) => String(x.field)).join(', ')} differ${failed ? ', and the call failed' : ''}; the window shows both`;
+    session.shell.say(said);
     log(session, {
       receipt: {
         ticket: r.ticket,
