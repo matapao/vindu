@@ -45,9 +45,15 @@ const live = process.argv.includes('--live');
 
 const installed = (tool) => spawnSync(process.platform === 'win32' ? 'where' : 'which', [tool], { stdio: 'ignore' }).status === 0;
 const run = (cmd, args, cwd = root) => spawnSync(cmd, args, { cwd, stdio: 'inherit' }).status === 0;
-// pnpm is a .cmd on Windows, which starts only through a shell: its own script runs on this Node instead.
-const pnpm = (args) => (process.env.npm_execpath ? run(process.execPath, [process.env.npm_execpath, ...args]) : run('pnpm', args));
-const pnpmOut = (args) => spawnSync(process.env.npm_execpath ? process.execPath : 'pnpm', process.env.npm_execpath ? [process.env.npm_execpath, ...args] : args, { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+// pnpm is a .cmd on Windows, which starts only through a shell: the pnpm that runs this script runs instead. pnpm 12
+// is a program of its own (npm_execpath names it); an earlier pnpm is a script for this Node to run.
+const exec = process.env.npm_execpath;
+const pnpmCommand = (args) => {
+  if (exec && !/\.[cm]?js$/.test(exec)) return [exec, args];
+  return exec ? [process.execPath, [exec, ...args]] : ['pnpm', args];
+};
+const pnpm = (args) => run(...pnpmCommand(args));
+const pnpmOut = (args) => spawnSync(...pnpmCommand(args), { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 
 // Characters that change what a line shows, or show nothing: every format character (bidirectional controls, zero
 // widths, the tag characters a hidden message is written in) and every default-ignorable one (variation selectors,
@@ -84,7 +90,7 @@ function sources() {
     if (!text.test(f) || !existsSync(path.join(root, f))) continue;
     readFileSync(path.join(root, f), 'utf8').split('\n').forEach((line, i) => {
       if (!HIDDEN.test(line)) return;
-      const chars = [...line];
+      const chars = Array.from(line); // by code point, as the check reads them
       const at = chars.findIndex((ch, j) => HIDDEN.test(ch) && !emojiPart(chars, j));
       if (at >= 0) problems.push(`${f}:${i + 1} has U+${chars[at].codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}`);
     });

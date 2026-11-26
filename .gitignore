@@ -1,5 +1,12 @@
 node_modules/
 dist/
 out/
+coverage/
 *.tsbuildinfo
 .DS_Store
+
+# Coding agents' own files: never part of the repository.
+.claude/
+.codex/
+.cursor/
+CLAUDE.local.md

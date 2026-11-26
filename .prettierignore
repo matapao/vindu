@@ -1,5 +1,6 @@
 dist/
 out/
+coverage/
 node_modules/
 pnpm-lock.yaml
 scripts/fixtures/pnpm-lock.yaml

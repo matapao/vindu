@@ -5,6 +5,10 @@ blockExoticSubdeps: true
 strictDepBuilds: true
 allowBuilds:
   esbuild: false
+# pnpm 12 otherwise writes the lockfile as two YAML documents, pnpm's own first, and GitHub's dependency graph,
+# Dependabot alerts and OSV-Scanner then read only pnpm (tested: 16 packages of 304). pnpm still switches to
+# packageManager's version, and engines.pnpm stops pnpm 11. The lockfile stays one document (check:security holds it).
+pmOnFail: ignore
 
 # pdf.js renders PDFs in the window, never in Node: its optional native canvas for Node is not installed, so no native
 # binary or install script comes with it.
