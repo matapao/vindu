@@ -7,9 +7,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { startVindu, memoryResults, fieldsOf, formBinding, checkValue, checkDigits, readAnswer, WORDS, type Shown, type Ask } from '../src/index.js';
-import { sleep } from './helpers.js';
+import { sleep, componentsIn, type SurfaceComponent } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const until = async (f: () => boolean, ms = 8000) => { const end = Date.now() + ms; while (!f()) { if (Date.now() > end) throw new Error('timed out'); await sleep(20); } };
 
@@ -60,8 +59,8 @@ test("an elicitation's schema keeps its kinds; the form draws a date picker, an 
   const ask: Ask = { ticket: 'k1', kind: 'elicitation', op: 'a form', title: 'Follow-up', required: ['due'], fields: {
     due: { type: 'string', format: 'date', title: 'Due', min: '2026-11-11' }, sum: { type: 'string', format: 'money', currency: 'NOK', title: 'Sum' },
     note: { type: 'string', format: 'file', title: 'Delivery note' } }, files: { note: { ids: ['a1'], names: ['delivery-note.pdf'] } } };
-  const comps = (formBinding(ask, WORDS)[1] as any).updateComponents.components as any[];
-  const by = (id: string) => comps.find(c => c.id === id);
+  const comps = componentsIn<SurfaceComponent & { action: { event: unknown } }>([formBinding(ask, WORDS)[1]]);
+  const by = (id: string) => { const c = comps.find(x => x.id === id); assert.ok(c, id); return c; };
   assert.deepEqual([by('f0').component, by('f0').enableDate, by('f0').enableTime, by('f0').min], ['DateTimeInput', true, false, '2026-11-11']);
   assert.equal(by('f1').variant, 'number'); assert.equal(by('f1_form').text, 'an amount in NOK');
   assert.equal(by('f2_got').text, 'Delivery note: delivery-note.pdf');
@@ -99,7 +98,7 @@ test("a template's inputs may be dates, amounts and ids: the start asks for them
     void ui.useTemplate(t).catch(() => undefined);
     await until(() => shown.some(v => v.ask));
     const a = shown.filter(v => v.ask).at(-1)!;
-    const comps = (a.wide.find((m: any) => m.updateComponents) as any).updateComponents.components as any[];
+    const comps = componentsIn(a.wide);
     assert.ok(comps.some(c => c.component === 'DateTimeInput'));
     ui.event({ type: 'action', view: a.name, name: 'answer', context: { ticket: a.ask!.ticket, 'f:due': '2026-12-01', 'f:orgnr': '974760674' } });
     await until(() => shown.filter(v => v.ask).at(-1)!.ask!.error !== undefined);

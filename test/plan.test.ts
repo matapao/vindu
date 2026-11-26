@@ -9,9 +9,8 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { startVindu, memoryResults, addDates, addTime, dayOf, parseDateExpr, whenIn, applyAction, type Shown, type ShellState } from '../src/index.js';
-import { chromium, mcpClient, sleep } from './helpers.js';
+import { chromium, mcpClient, sleep, panelsIn, type AccountPanel } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const until = async (f: () => boolean, ms = 8000) => { const end = Date.now() + ms; while (!f()) { if (Date.now() > end) throw new Error('timed out'); await sleep(20); } };
 
@@ -57,7 +56,7 @@ async function windowWith() {
   const ui = vindu.open({ results, dir }, { onView: v => shown.push(v), onState: s => { st.s = s; } });
   const c = await mcpClient(ui.url);
   const last = (name: string) => shown.filter(v => v.name === name).at(-1)!;
-  const rowsOf = (name: string, pid: string) => ((last(name).wide.find((m: any) => m.updateDataModel) as any).updateDataModel.value.panels[pid].rows as any[]);
+  const rowsOf = (name: string, pid: string) => panelsIn(last(name).wide)[pid].rows;
   const markOf = (name: string) => st.s!.views.find(v => v.name === name)?.mark;
   return { vindu, ui, ...c, shown, st, last, rowsOf, markOf, close: async () => { await c.mcp.close(); ui.close(); await vindu.close(); } };
 }
@@ -66,8 +65,8 @@ test("a deadline in a view is the system's: worked out for each row, with the ho
   const w = await windowWith();
   try {
     const acc = await w.json('show_view', { name: 'inv', title: 'Invoices', panels: [{ id: 'rows', card: 'table', from: 'r2', dates: { remind: 'invoice_date + 10 working days' } }] });
-    const p = acc.panels.find((x: any) => x.id === 'rows');
-    assert.deepEqual(p.steps.find((x: any) => x.dates), { dates: { remind: 'invoice_date + 10 working days' }, holidays: 1 });
+    const p = acc.panels.find((x: AccountPanel) => x.id === 'rows');
+    assert.deepEqual(p.steps.find((x: { dates?: unknown }) => x.dates), { dates: { remind: 'invoice_date + 10 working days' }, holidays: 1 });
     assert.ok(JSON.stringify(w.last('inv').wide).includes('2026-10-30')); // 15 October + 10 working days, past 26 October
   } finally { await w.close(); }
 });
@@ -78,7 +77,7 @@ test('a calendar to plan in: the model moves an event, the system marks the clas
     await w.json('show_view', { name: 'cal', title: 'This week', panels: [{ id: 'wk', card: 'events', from: 'r1', layout: 'week' }] });
     const r = await w.json('act_in_view', { view: 'cal', action: 'plan', key: 'e2', start: '2026-11-17T09:30:00Z' });
     assert.equal(r.did, 'moved Havgap review to 2026-11-17T09:30:00Z in This week (a plan, not saved)');
-    const p = r.view.panels.find((x: any) => x.id === 'wk');
+    const p = r.view.panels.find((x: AccountPanel) => x.id === 'wk');
     assert.match(p.planned, /^1 moved by hand in the window, not saved: to save, run the operation that saves events with these changes, which asks the person$/);
     assert.deepEqual(p.changes, [{ key: 'e2', title: 'Havgap review', before: { start: '2026-11-16T10:00:00Z' }, after: { start: '2026-11-17T09:30:00Z', end: '2026-11-17T10:30:00.000Z' } }]); // its length kept
     assert.deepEqual(p.clashes, ['Havgap review overlaps Audit prep']);
@@ -121,15 +120,15 @@ test('in Chromium: an event is dragged to another time and day, and moved with A
     const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
     const errors: string[] = []; page.on('pageerror', (e: Error) => errors.push(e.message));
     await page.goto(`http://127.0.0.1:${(app.address() as { port: number }).port}/shell.html`);
-    await page.evaluate(() => (window as any).app.shell('light'));
+    await page.evaluate(() => window.app.shell('light'));
     const draw = async () => {
       const latest = new Map<string, Shown>(); for (const v of w.shown) latest.set(v.name, v);
-      for (const v of latest.values()) await page.evaluate((x: Shown) => (window as any).app.view(x), v);
-      await page.evaluate((s: ShellState) => (window as any).app.state(s), w.st.s!);
+      for (const v of latest.values()) await page.evaluate((x: Shown) => window.app.view(x), v);
+      await page.evaluate((s: ShellState) => window.app.state(s), w.st.s!);
       await page.waitForTimeout(400);
     };
     await draw();
-    const events = async () => (await page.evaluate(() => (window as any).app.events())) as any[];
+    const events = async () => page.evaluate(() => window.app.events());
     await events();
     const slots = page.locator('.vindu-pane[data-view="cal"] .vb-slot');
     assert.equal(await slots.count(), 3);

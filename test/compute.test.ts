@@ -7,13 +7,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import type { BrowserType } from 'playwright';
 import { startVindu, memoryResults, type Shown } from '../src/index.js';
 import { parse, rowValue, setValue, addFields, computedName, round } from '../src/compute.js';
 import { playwrightDriver } from '../src/drivers/playwright.js';
-import { mcpClient, sleep } from './helpers.js';
+import { mcpClient, sleep, answerOf, componentIn, componentsIn, panelsIn, type SurfaceComponent } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-const chromium: any = createRequire(import.meta.url)('playwright').chromium;
+const chromium: BrowserType = createRequire(import.meta.url)('playwright').chromium;
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const until = async (f: () => boolean, ms = 8000) => { const end = Date.now() + ms; while (!f()) { if (Date.now() > end) throw new Error('timed out'); await sleep(20); } };
 const hours = [ // synthetic: a freelancer's hours this month
@@ -96,16 +96,17 @@ test('what-ifs: the person changes an input in the window; the system computes a
     const a = await json('show_view', spec);
     assert.equal(a.panels[0].shows, '53,001'); assert.deepEqual(a.panels[0].inputs, { growth: 0.04 });
     const first = w.shown.at(-1)!;
-    const comps = (first.wide.find((m: any) => m.updateComponents) as any).updateComponents.components;
-    assert.ok(comps.some((c: any) => c.component === 'TextField' && c.label === 'Growth'));
-    assert.deepEqual(comps.find((c: any) => c.component === 'Button' && c.action?.event?.name === 'set_inputs').action.event.context, { panel: 'total', 'in:growth': { path: '/panels/p_total/inputs/growth' } });
+    type Control = SurfaceComponent & { label?: string; action?: { event?: { name?: string; context?: unknown } } };
+    const comps = componentsIn<Control>(first.wide);
+    assert.ok(comps.some(c => c.component === 'TextField' && c.label === 'Growth'));
+    assert.deepEqual(componentIn<Control>(first.wide, c => c.component === 'Button' && c.action?.event?.name === 'set_inputs').action?.event?.context, { panel: 'total', 'in:growth': { path: '/panels/p_total/inputs/growth' } });
     // the person types 0,1 (a comma, as many locales write it) and presses Recompute
     assert.equal(w.ui.event({ type: 'action', view: 'next-year', name: 'set_inputs', context: { panel: 'total', 'in:growth': '0,1' } }), true);
     await until(() => w.shown.length > 1);
-    const model = (w.shown.at(-1)!.wide.find((m: any) => m.updateDataModel) as any).updateDataModel.value.panels.p_total;
+    const model = panelsIn<{ value: string; inputs: Record<string, string> }>(w.shown.at(-1)!.wide).p_total;
     assert.equal(model.value, '56,058.75'); assert.equal(model.inputs.growth, '0.1');
     await until(() => w.ui.answers().length === 1);
-    assert.deepEqual((w.ui.answers()[0] as any).values, { growth: 0.1 });
+    assert.deepEqual(answerOf(w.ui.answers()[0])?.values, { growth: 0.1 });
     assert.match(w.ui.delta(), /set growth to 0\.1 in Next year \(total\); it shows 56,058\.75 now/);
     assert.equal(w.ui.event({ type: 'action', view: 'next-year', name: 'set_inputs', context: { panel: 'nope', 'in:growth': '1' } }), false); // no such panel
     assert.equal(w.ui.event({ type: 'action', view: 'next-year', name: 'set_inputs', context: { panel: 'total', 'in:other': '1' } }), false); // no such input

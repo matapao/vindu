@@ -1,6 +1,6 @@
 // A host's renderer code using Vindu's public browser entry and a component of its own.
 // Bundled for the browser tests by pnpm build:test. app.html draws one view, shell.html a whole shell.
-import { css, html, defineComponent, drawSurface, mountView, mountShell, vinduCatalog, type View, type ShellHandle, type ShellState, type ShellCommand, type PaneDrawer } from '@matapao/vindu';
+import { css, html, defineComponent, drawSurface, mountView, mountShell, vinduCatalog, type View, type ShellHandle, type ShellState, type ShellCommand, type ShellEvent, type PaneDrawer } from '@matapao/vindu';
 import { mountFjord, NYNORSK } from '../../examples/own-look.js';
 import { Progress } from '../../examples/progress-component.js';
 import { mountWorkspace, type ShellSkin } from '@matapao/vindu';
@@ -33,8 +33,8 @@ const browserIO: BrowserIO = {
 const catalogMounts = new Map<string, () => void>();
 let unmount: (() => void) | undefined;
 let shell: ShellHandle | undefined;
-const events: unknown[] = [], asked: string[] = [];
-(window as unknown as { app: unknown }).app = {
+const events: ShellEvent[] = [], asked: string[] = [];
+const app = {
   mountWorkspace, drawSurface, vinduCatalog,
   mount(view: View) { unmount?.(); unmount = mountView(document.getElementById('view')!, view, { components: [Heat] }); },
   catalog(id: string, view: View, options: Parameters<typeof mountView>[2]) {
@@ -70,3 +70,6 @@ const events: unknown[] = [], asked: string[] = [];
   events() { return events.splice(0); },
   placement() { return shell!.placement(); },
 };
+/** What the browser tests reach on the fixtures' pages, as window.app (test/globals.d.ts). */
+export type FixtureApp = typeof app;
+window.app = app;

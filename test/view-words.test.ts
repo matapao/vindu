@@ -8,13 +8,12 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { compile, memoryResults, startVindu, VIEW_WORDS, VIEW_WORDS_NB, VIEW_WORDS_NN, type PartialViewWords, type Resolved, type Shown, type ShellState, type Surface, type ViewSpec, type ViewWords } from '../src/index.js';
-import { chromium, mcpClient, sleep } from './helpers.js';
+import { chromium, mcpClient, sleep, componentIn, componentsIn, panelsIn, type AccountPanel, type SurfaceComponent } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const until = async (f: () => boolean, ms = 8000) => { const end = Date.now() + ms; while (!f()) { if (Date.now() > end) throw new Error('timed out'); await sleep(20); } };
 /** Every text a surface draws, in order. */
-const texts = (s: Surface): string[] => ((s.find(m => m.updateComponents) as any).updateComponents.components as any[]).filter(c => c.component === 'Text').map(c => c.text);
+const texts = (s: Surface): string[] => componentsIn<SurfaceComponent & { text: string }>(s).filter(c => c.component === 'Text').map(c => c.text);
 
 // a view after a drill, at its second step, with what the system says of its panels, its suggestions and a hook in each state
 const VIEW: ViewSpec = {
@@ -121,13 +120,13 @@ for (const [language, words, said] of [
       assert.ok(w.said('onboard').includes(said.changes));
       assert.ok(w.said('onboard').includes(`${said.chase} · av`) && w.said('onboard').includes('Slå på'));
       // the account is the model's, in English: the hooks, the mark, the suggestion
-      assert.deepEqual(acc.hooks.map((h: any) => [h.does, h.state]), [
+      assert.deepEqual(acc.hooks.map((h: { does: string; state: string }) => [h.does, h.state]), [
         ['Changes: When Customers changes, tell you: Customers changed', 'on: the system does it by itself'],
         ['Chase: When you pick a row in Customers, start a job: Draft a welcome letter.', 'off until the person turns it on, in the window'],
       ]);
-      assert.equal(acc.panels.find((p: any) => p.id === 'plan').marked, 'Written by the model');
+      assert.equal(acc.panels.find((p: AccountPanel) => p.id === 'plan').marked, 'Written by the model');
       assert.deepEqual(acc.typed_numbers_not_in_any_result, [48250]);
-      assert.ok(acc.suggestions.some((s: any) => s.label === 'Check the typed numbers' && s.by === 'system'));
+      assert.ok(acc.suggestions.some((s: { label: string; by: string }) => s.label === 'Check the typed numbers' && s.by === 'system'));
       w.ui.event({ type: 'action', view: 'onboard', name: 'step', context: { to: 2 } });
       await until(() => w.said('onboard').includes(said.second));
       assert.ok(['‹ Tilbake', 'Neste ›', said.written, said.check].every(t => w.said('onboard').includes(t)));
@@ -197,7 +196,7 @@ test('the devices block takes its states and switch from the view\'s words: as i
   const english = await windowWith();
   try {
     await english.json('show_view', { name: 'kit', title: 'Kit', panels: [panel] });
-    const custom = ((english.last('kit').wide.find(m => m.updateComponents) as any).updateComponents.components as any[]).find(c => c.component === 'VDevices');
+    const custom = componentIn(english.last('kit').wide, c => c.component === 'VDevices');
     assert.equal(custom.words, undefined); // its component's own English: nothing more on the surface
   } finally { await english.close(); }
   const w = await windowWith(VIEW_WORDS_NB);
@@ -209,14 +208,14 @@ test('the devices block takes its states and switch from the view\'s words: as i
   const browser = await chromium.launch();
   try {
     await w.json('show_view', { name: 'kit', title: 'Kit', panels: [panel] });
-    const model = (w.last('kit').wide.find(m => m.updateDataModel) as any).updateDataModel.value.panels;
+    const model = panelsIn(w.last('kit').wide);
     assert.deepEqual(model.p_line.props.words, { on: 'på', off: 'av', turnOn: 'Slå på', turnOff: 'Slå av' });
     const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
     const errors: string[] = []; page.on('pageerror', (e: Error) => errors.push(e.message));
     await page.goto(`http://127.0.0.1:${(app.address() as { port: number }).port}/shell.html`);
-    await page.evaluate(() => (window as any).app.shell('light'));
-    await page.evaluate((x: Shown) => (window as any).app.view(x), w.last('kit'));
-    await page.evaluate((s: ShellState) => (window as any).app.state({ ...s, tree: { view: 'kit' }, maximized: null }), w.st.s!);
+    await page.evaluate(() => window.app.shell('light'));
+    await page.evaluate((x: Shown) => window.app.view(x), w.last('kit'));
+    await page.evaluate((s: ShellState) => window.app.state({ ...s, tree: { view: 'kit', size: 1 }, maximized: null }), w.st.s!);
     const pane = page.locator('.vindu-pane[data-view="kit"]');
     await pane.locator('[data-panel="line"][data-row="1"] button').waitFor();
     assert.deepEqual(await pane.locator('.vb-pill').allInnerTexts(), ['på', 'av']);

@@ -11,11 +11,11 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { startVindu, memoryResults, fieldNames, type Cdp, type Shown } from '../src/index.js';
-import { mcpClient, sleep } from './helpers.js';
+import type { BrowserType, Page } from 'playwright';
+import { startVindu, memoryResults, fieldNames, type PageNode, type Shown } from '../src/index.js';
+import { cdpOf, mcpClient, sleep } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-const chromium: any = createRequire(import.meta.url)('playwright').chromium;
+const chromium: BrowserType = createRequire(import.meta.url)('playwright').chromium;
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const until = async (f: () => boolean, ms = 8000) => { const end = Date.now() + ms; while (!f()) { if (Date.now() > end) throw new Error('timed out'); await sleep(20); } };
 const posts: { path: string; fields: string[] }[] = [];
@@ -41,16 +41,22 @@ const vindu = await startVindu({ waitMs: 400 });
 afterAll(async () => { await browser.close(); site.close(); await vindu.close(); });
 
 function window() {
-  const dir = tmp('task-'), work = tmp('work-'), shown: Shown[] = [], tabs: any[] = [];
+  const dir = tmp('task-'), work = tmp('work-'), shown: Shown[] = [], tabs: Page[] = [];
   const ui = vindu.open({ results: memoryResults(dir), dir, work }, { onView: v => shown.push(v),
-    views: { terminal: false, browser: { open: async () => { const tab = await browser.newPage(); tabs.push(tab); const s = await tab.context().newCDPSession(tab); return { send: (m, p) => s.send(m, p), on: (e, f) => { s.on(e, f); return () => s.off(e, f); } } satisfies Cdp; } } },
+    views: { terminal: false, browser: { open: async () => { const tab = await browser.newPage(); tabs.push(tab); const s = await tab.context().newCDPSession(tab); return cdpOf(s); } } },
     record: () => `r${Date.now() % 100000}`,
   });
   const askShown = async () => { await until(() => shown.some(v => v.ask)); return shown.splice(0).filter(v => v.ask).at(-1)!; };
   const answer = (a: Shown, yes: boolean) => ui.event({ type: 'action', view: a.name, name: yes ? 'answer' : 'decline', context: { ticket: a.ask!.ticket } });
   return { ui, shown, tabs, askShown, answer };
 }
-const find = (snap: any, role: string, name: string): any => { const walk = (ns: any[] = []): any => { for (const n of ns) { if (n.role === role && (n.name ?? '').includes(name)) return n; const k = walk(n.children); if (k) return k; } }; return walk(snap.tree); };
+/** The node of a page's snapshot with the role and a name that includes the name: the test fails if it has none. */
+const find = (snap: { tree: PageNode[] }, role: string, name: string): PageNode => {
+  const walk = (ns: PageNode[] = []): PageNode | undefined => { for (const n of ns) { if (n.role === role && (n.name ?? '').includes(name)) return n; const k = walk(n.children); if (k) return k; } return undefined; };
+  const found = walk(snap.tree);
+  assert.ok(found, `no ${role} named ${name}`);
+  return found;
+};
 
 test('the names of the fields a page sends, never their values: a form, JSON, multipart', () => {
   assert.deepEqual(fieldNames('holder=Kari+N&card=4111&password=x', 'application/x-www-form-urlencoded'), ['holder', 'card', 'password']);
@@ -136,7 +142,7 @@ test('the person points at an element of a page: the click picks it and never re
     const opened = await json('show_view', { name: 'shop', title: 'Airline checkout', browser: { url: base } });
     const pay = find(opened.snapshot, 'button', 'Pay');
     await w.tabs[0].fill('input[name=card]', '4111 1111 1111 1111'); // the person's
-    const at = async (sel: string) => { const b = await w.tabs[0].locator(sel).boundingBox(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; };
+    const at = async (sel: string) => { const b = await w.tabs[0].locator(sel).boundingBox(); if (!b) throw new Error(`${sel} is not drawn`); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; };
     const pointAt = async (sel: string) => {
       const picked = w.ui.pointInPage('shop'); await sleep(250); const p = await at(sel);
       await w.tabs[0].mouse.click(p.x, p.y); return picked;

@@ -10,7 +10,6 @@ import type { Page as BrowserPage } from 'playwright';
 import { startVindu, memoryResults, VIEW_WORDS_NB, type Shown } from '../src/index.js';
 import { chromium, mcpClient, shellServer } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'money-narrow-'));
 const results = memoryResults(dir);
 const invoice = results.add({ server: 'accounting', tool: 'get_invoice', value: {
@@ -39,7 +38,7 @@ async function drawn(width: number, size: number): Promise<BrowserPage> {
   const page: BrowserPage = await browser.newPage({ viewport: { width: 1000, height: 1400 } });
   await page.goto(server.url);
   await page.addStyleTag({ content: `#view{--v-font-size:${size}px}` });
-  await page.evaluate(([v, w]: readonly [Shown, number]) => { (window as any).app.width(w); (window as any).app.catalog('view', v, { theme: true }); }, [view, width] as const);
+  await page.evaluate(([v, w]: readonly [Shown, number]) => { window.app.width(w); window.app.catalog('view', v, { theme: true }); }, [view, width] as const);
   await page.locator('vindu-sheet td').first().waitFor();
   return page;
 }
@@ -70,7 +69,9 @@ test('lines and a sheet\'s rows that do not fit fade at the edge they scroll pas
       await page.evaluate((w: string) => {
         for (const box of document.querySelectorAll<HTMLElement>('vindu-money .vb-scroll, vindu-sheet .vb-sheet')) {
           const most = box.scrollWidth - box.clientWidth;
-          box.scrollLeft = w === 'start' ? 0 : w === 'end' ? most : most / 2;
+          if (w === 'start') box.scrollLeft = 0;
+          else if (w === 'end') box.scrollLeft = most;
+          else box.scrollLeft = most / 2;
         }
       }, where);
       await page.evaluate(frames);

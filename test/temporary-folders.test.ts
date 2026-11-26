@@ -10,7 +10,6 @@ import path from 'node:path';
 import { startVindu, memoryResults, type Shown } from '../src/index.js';
 import { mcpClient } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
 const VIEW = (photo: string) => ({

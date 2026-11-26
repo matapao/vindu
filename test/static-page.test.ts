@@ -10,9 +10,8 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { startVindu, memoryResults, type Shown, type ShellState } from '../src/index.js';
-import { chromium, get, mcpClient } from './helpers.js';
+import { chromium, get, mcpClient, componentIn, panelsIn } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const write = (root: string, files: Record<string, string>) => { for (const [f, s] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(root, f)), { recursive: true }); fs.writeFileSync(path.join(root, f), s); } };
 const STATIC_CSP = "default-src 'self' data:; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; font-src 'self' data:; connect-src 'none'; worker-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'self'; sandbox";
@@ -33,8 +32,8 @@ const shown: Shown[] = []; let state: ShellState | undefined;
 const ui = vindu.open({ results, dir, work }, { onView: v => shown.push(v), onState: s => { state = s; } });
 const { mcp, call, json } = await mcpClient(ui.url);
 afterAll(async () => { await mcp.close(); ui.close(); await vindu.close(); });
-const urlOf = (view: string, pid: string) => (shown.filter(v => v.name === view).at(-1)!.wide.find(m => m.updateDataModel) as any).updateDataModel.value.panels[pid].url as string;
-const pageOf = (view: string) => ((shown.filter(v => v.name === view).at(-1)!.wide.find(m => m.updateComponents) as any).updateComponents.components as any[]).find(c => c.component === 'Page');
+const urlOf = (view: string, pid: string) => panelsIn(shown.filter(v => v.name === view).at(-1)!.wide)[pid].url as string;
+const pageOf = (view: string) => componentIn(shown.filter(v => v.name === view).at(-1)!.wide, c => c.component === 'Page');
 const CHECKED = 'nothing in it runs, so it was not run: only whether it loaded, and its size';
 
 test('a static page you write: served as it is written, with no import map or boot script, under a policy that runs none of it; its check says it loaded and its size', async () => {
@@ -106,18 +105,18 @@ test('in Chromium: a static page\'s frame is sandbox="", its script and onerror 
     const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
     const errors: string[] = [], requested: string[] = [], failed: string[] = [];
     page.on('pageerror', (e: Error) => errors.push(e.message));
-    page.on('request', (r: any) => requested.push(new URL(r.url()).pathname));
-    page.on('requestfailed', (r: any) => failed.push(new URL(r.url()).pathname));
+    page.on('request', r => requested.push(new URL(r.url()).pathname));
+    page.on('requestfailed', r => failed.push(new URL(r.url()).pathname));
     await page.goto(`http://127.0.0.1:${(app.address() as { port: number }).port}/shell.html`);
-    await page.evaluate(() => (window as any).app.shell('light'));
-    for (const name of ['note', 'site']) await page.evaluate((x: Shown) => (window as any).app.view(x), shown.filter(v => v.name === name).at(-1)!);
-    await page.evaluate((s: ShellState) => (window as any).app.state({ ...s, maximized: null }), state!);
+    await page.evaluate(() => window.app.shell('light'));
+    for (const name of ['note', 'site']) await page.evaluate((x: Shown) => window.app.view(x), shown.filter(v => v.name === name).at(-1)!);
+    await page.evaluate((s: ShellState) => window.app.state({ ...s, maximized: null }), state!);
     for (const [name, url] of [['note', urlOf('note', 'p_note')], ['site', urlOf('site', 'p_site')]]) {
       const frame = page.locator(`.vindu-pane[data-view="${name}"] iframe[data-page-panel="${name}"]`);
       await frame.and(page.locator('[data-loaded="1"]')).waitFor({ timeout: 10_000 });
       assert.equal(await frame.getAttribute('sandbox'), '', name);
       assert.equal(await frame.getAttribute('src'), url, name);
-      const inner = page.frames().find((f: any) => f.url() === url);
+      const inner = page.frames().find(f => f.url() === url);
       assert.ok(inner, `${name}: its frame`);
       // asked from here, as the page itself runs nothing that could wait: both its pictures settled
       for (let i = 0; i < 50 && !(await inner.evaluate(() => [...document.querySelectorAll('img')].every(x => x.complete))); i++) await page.waitForTimeout(100);

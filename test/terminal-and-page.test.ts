@@ -9,11 +9,11 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import type { BrowserType } from 'playwright';
 import { startVindu, memoryResults, BROWSER_ACTIONS, ACTIONS, type Cdp, type Shown } from '../src/index.js';
-import { mcpClient, sleep } from './helpers.js';
+import { cdpOf, mcpClient, nodeOf, schemaOf, sleep } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-const chromium: any = createRequire(import.meta.url)('playwright').chromium; // from the machine, as in browser.test
+const chromium: BrowserType = createRequire(import.meta.url)('playwright').chromium; // from the machine, as in browser.test
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const until = async (f: () => boolean, ms = 8000) => { const end = Date.now() + ms; while (!f()) { if (Date.now() > end) throw new Error('timed out'); await sleep(20); } };
 const site = http.createServer((_q, res) => res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end('<!doctype html><title>Ledger (synthetic)</title><h1>Invoices</h1><p>INV-2026-0412 · 31 050 kr · overdue</p><button onclick="this.textContent=\'Paid\'">Pay INV-2026-0412</button><a href="http://elsewhere.test:' + '0/">elsewhere</a>'));
@@ -25,14 +25,15 @@ afterAll(async () => { await browser.close(); site.close(); await vindu.close();
 
 /** A window with terminals and pages: what the host gives (a shell; a page shown in a tab, its CDP), and its record. */
 function window(o: { run?: boolean; slow?: number } = {}) {
-  const dir = tmp('task-'), work = tmp('work-'), shown: Shown[] = [], kept: { tool: string; input: unknown; result: any }[] = [], opened: { name: string; owner: string }[] = [];
+  const dir = tmp('task-'), work = tmp('work-'), shown: Shown[] = [], kept: { tool: string; input: unknown; result: unknown }[] = [], opened: { name: string; owner: string }[] = [];
   const ui = vindu.open({ results: memoryResults(dir), dir, work }, { onView: v => shown.push(v),
     views: {
       terminal: { shell: 'bash', login: false, env: { PATH: process.env.PATH, HOME: tmp('home-'), HISTFILE: '/dev/null' }, run: o.run },
       browser: { open: async ({ name, owner }) => {
         opened.push({ name, owner }); const tab = await browser.newPage(); const s = await tab.context().newCDPSession(tab);
         const delay = () => (o.slow ? sleep(o.slow) : Promise.resolve());
-        return { send: async (m, p) => { await delay(); return s.send(m, p); }, on: (e, f) => { s.on(e, f); return () => s.off(e, f); } } satisfies Cdp;
+        const c = cdpOf(s);
+        return { send: async (m, p) => { await delay(); return c.send(m, p); }, on: (e, f) => c.on(e, f) } satisfies Cdp;
       } },
     },
     record: e => { kept.push(e); return `r${kept.length}`; },
@@ -66,7 +67,7 @@ test('a terminal is a view: the person opens it; the model reads it through read
     assert.equal(r.id, 'r1'); assert.equal(r.kind, 'terminal'); // kept under an id, which a view can point at
     assert.deepEqual(r.commands.map((c: { command: string; exit: number; output: string }) => [c.command, c.exit, c.output]),
       [['echo synthetic-$((6*7))', 0, 'synthetic-42'], ['ls /nope-synthetic', ls.exit, ls.says]]);
-    assert.equal(w.kept[0].tool, 'read_view'); assert.deepEqual(w.kept[0].input, { view: 't1', last: 2 }); assert.deepEqual(w.kept[0].result.commands, r.commands);
+    assert.equal(w.kept[0].tool, 'read_view'); assert.deepEqual(w.kept[0].input, { view: 't1', last: 2 }); assert.deepEqual((w.kept[0].result as { commands: unknown }).commands, r.commands);
     assert.match((await call('act_in_view', { view: 't1', action: 'run', command: 'echo x' })).text, /Invalid arguments for tool act_in_view: action/); // not offered here
     assert.match((await call('act_in_view', { view: 't1', action: 'click', ref: 'e1' })).text, /a terminal is only read here: running commands in the person's terminals is off in this app/);
     await w.views.share('t1', false);
@@ -147,17 +148,17 @@ test('a browser view is placed like any view: show_view\'s place; collapsed by t
     await json('show_view', { name: 'totals', title: 'Totals', panels: [{ card: 'text', text: 'Synthetic totals.' }] });
     const opened = await json('show_view', { name: 'docs', title: 'Docs', browser: { url: base }, place: { beside: 'totals', side: 'below' } });
     assert.equal(opened.snapshot.title, 'Ledger (synthetic)');
-    const where = () => (w.ui.shell().tree as any);
-    assert.equal(where().dir, 'column'); assert.deepEqual(where().children.map((c: any) => c.view), ['totals', 'docs']); // below, as asked
+    const where = () => nodeOf(w.ui.shell().tree);
+    assert.equal(where().dir, 'column'); assert.deepEqual(where().children, ['totals', 'docs']); // below, as asked
     assert.equal(w.ui.event({ type: 'collapse', view: 'docs' }), true); // the person puts it in the shelf
     const again = await json('show_view', { name: 'docs', title: 'Docs', browser: { url: `${base}?v=2` }, place: { beside: 'totals', side: 'right' } });
     assert.equal(again.snapshot.url, `${base}?v=2`); // the page goes on where it is, in the shelf
     assert.equal(where().view, 'totals'); assert.equal(w.ui.shell().shelf.docs?.updated, true); // the person's shelf holds: marked as updated, not opened
     assert.match(again.notes.join(' '), /"docs" is collapsed in the shelf, where the person put it/);
     await json('arrange', { open: 'docs' });
-    assert.equal(where().dir, 'column'); assert.deepEqual(where().children.map((c: any) => c.view), ['totals', 'docs']); // opened: back where it was, below
+    assert.equal(where().dir, 'column'); assert.deepEqual(where().children, ['totals', 'docs']); // opened: back where it was, below
     await json('show_view', { name: 'docs', title: 'Docs', browser: { url: `${base}?v=3` }, place: { beside: 'totals', side: 'right' } });
-    assert.equal(where().dir, 'row'); assert.deepEqual(where().children.map((c: any) => c.view), ['totals', 'docs']); // in a pane, place moves it
+    assert.equal(where().dir, 'row'); assert.deepEqual(where().children, ['totals', 'docs']); // in a pane, place moves it
   } finally { await mcp.close(); w.ui.close(); }
 });
 
@@ -183,7 +184,7 @@ test('the model is told of terminals and pages only where the window has them: i
   const told = async (url: string) => {
     const { mcp } = await mcpClient(url);
     const { tools } = await mcp.listTools();
-    const r = { words: mcp.getInstructions() ?? '', tools: Object.fromEntries(tools.map(t => [t.name, t.inputSchema as any])), about: Object.fromEntries(tools.map(t => [t.name, t.description ?? ''])) };
+    const r = { words: mcp.getInstructions() ?? '', tools: Object.fromEntries(tools.map(t => [t.name, schemaOf(t)])), about: Object.fromEntries(tools.map(t => [t.name, t.description ?? ''])) };
     await mcp.close(); return r;
   };
   try {

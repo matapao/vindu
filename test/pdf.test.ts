@@ -9,7 +9,6 @@ import path from 'node:path';
 import { startVindu, memoryResults, type Shown, type ShellState } from '../src/index.js';
 import { chromium, mcpClient, shellServer, tinyPdf } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const dir = tmp('pdf-task-'), work = tmp('pdf-work-');
 const write = (file: string, body: string | Uint8Array) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, body); return file; };
@@ -72,12 +71,14 @@ test('in Chromium: the window draws its first page in a sandboxed frame, says "p
   const browser = await chromium.launch();
   try {
     const context = await browser.newContext({ viewport: { width: 1000, height: 760 } }), page = await context.newPage();
-    const asked: string[] = []; context.on('request', (r: any) => asked.push(r.url()));
+    const asked: string[] = []; context.on('request', r => asked.push(r.url()));
     const errors: string[] = []; page.on('pageerror', (e: Error) => errors.push(e.message));
     await page.goto(shell.url);
-    await page.evaluate(() => (window as any).app.shell('light'));
-    await page.evaluate((x: Shown) => (window as any).app.view(x), shown.findLast(v => v.name === 'report'));
-    await page.evaluate((s: ShellState) => (window as any).app.state(s), st.s!);
+    await page.evaluate(() => window.app.shell('light'));
+    const report = shown.findLast(v => v.name === 'report');
+    assert.ok(report, 'the report is shown');
+    await page.evaluate((x: Shown) => window.app.view(x), report);
+    await page.evaluate((s: ShellState) => window.app.state(s), st.s!);
     const frame = await page.waitForSelector('.vindu-pane[data-view="report"] iframe[data-page-panel="doc"]');
     assert.equal(await frame.getAttribute('sandbox'), 'allow-scripts allow-same-origin allow-forms allow-pointer-lock');
     const doc = (await frame.contentFrame())!;
@@ -91,7 +92,7 @@ test('in Chromium: the window draws its first page in a sandboxed frame, says "p
       return dark;
     });
     assert.ok(inked > 100, `the first page is drawn: ${inked} dark pixels`);
-    assert.ok(page.workers().some((w: any) => String(w.url()).endsWith('/lib/pdfjs-dist/build/pdf.worker.min.mjs')), JSON.stringify(page.workers().map((w: any) => w.url())));
+    assert.ok(page.workers().some(w => String(w.url()).endsWith('/lib/pdfjs-dist/build/pdf.worker.min.mjs')), JSON.stringify(page.workers().map(w => w.url())));
     const hostOrigin = new URL(ui.pages).origin, shellOrigin = new URL(shell.url).origin;
     const elsewhere = asked.filter(u => !/^(data|blob):/.test(u) && ![hostOrigin, shellOrigin].includes(new URL(u).origin));
     assert.deepEqual(elsewhere, []);

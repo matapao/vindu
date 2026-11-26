@@ -127,10 +127,10 @@ for (const [name, width, height] of [['desktop', 1280, 850], ['phone', 390, 844]
     try {
       await open(page);
       const view = catalogView();
-      const tags: Record<string, string> = await page.evaluate(view => (window as any).app.catalog('stock', view, { theme: true }), view);
+      const tags: Record<string, string> = await page.evaluate(view => window.app.catalog('stock', view, { theme: true }), view);
       assert.deepEqual(Object.keys(examples).sort(), Object.keys(tags).sort(), 'every registered catalog element needs a rendered example');
       const stock = await readParts(page, 'stock', tags);
-      await page.evaluate(view => (window as any).app.catalog('custom', view, { theme: true, metrics: { spacing: '16px', fontSize: '19px', density: 0.75 } }), view);
+      await page.evaluate(view => window.app.catalog('custom', view, { theme: true, metrics: { spacing: '16px', fontSize: '19px', density: 0.75 } }), view);
       const custom = await readParts(page, 'custom', tags);
       const chartFont = name === 'phone' ? 12 : 11;
       await page.waitForFunction(({ chartFont }) => {
@@ -172,9 +172,9 @@ test('a live shell updates and resets type roles and density without remounting'
     await page.evaluate(({ view, state }) => {
       const shellHost = document.getElementById('shell')!;
       shellHost.style.cssText = 'position:fixed;inset:0';
-      (window as any).app.shell('light', false, { fontSize: '19px' });
-      (window as any).app.view(view);
-      (window as any).app.state(state);
+      window.app.shell('light', false, { fontSize: '19px' });
+      window.app.view(view);
+      window.app.state(state);
     }, { view, state: shell.state() });
     const provider = page.frameLocator('#shell vindu-app iframe').locator('body');
     const received = await provider.evaluate(() => new Promise<string | undefined>((resolve, reject) => {
@@ -195,7 +195,7 @@ test('a live shell updates and resets type roles and density without remounting'
       parent.postMessage({ jsonrpc: '2.0', id: 17, method: 'ui/initialize', params: {} }, '*');
     }));
     assert.equal(received, '19px');
-    await page.evaluate(() => (window as any).app.metrics({}));
+    await page.evaluate(() => window.app.metrics({}));
     await page.frameLocator('#shell vindu-app iframe').locator('body[data-font=""]').waitFor();
     const stock = await read();
     const roles = () => page.locator('#shell').evaluate(host => {
@@ -204,23 +204,23 @@ test('a live shell updates and resets type roles and density without remounting'
     });
     const stockRoles = await roles();
     const frame = page.frameLocator('#shell vindu-app iframe');
-    await page.evaluate(() => (window as any).app.metrics({ headingSize: '2rem' }));
+    await page.evaluate(() => window.app.metrics({ headingSize: '2rem' }));
     assert.deepEqual(await roles(), ['32px', '32px', stockRoles[2]]);
     await frame.locator('body[data-heading="32px"]').waitFor();
-    await page.evaluate(() => (window as any).app.metrics({ captionSize: '17px' }));
+    await page.evaluate(() => window.app.metrics({ captionSize: '17px' }));
     assert.deepEqual(await roles(), [stockRoles[0], stockRoles[1], '17px']);
     await frame.locator('body[data-heading=""][data-caption="17px"]').waitFor();
     assert.deepEqual(await read(), stock, 'body text, row spacing and density keep their defaults');
     const field = page.locator('#shell a2ui-basic-textfield input');
     await field.fill('Draft input');
-    await page.evaluate(() => (window as any).app.metrics({ density: 0.5 }));
+    await page.evaluate(() => window.app.metrics({ density: 0.5 }));
     await frame.locator('body[data-caption=""]').waitFor();
     assert.deepEqual(await roles(), stockRoles);
     const compact = await read();
     assert.ok(parseFloat(compact.padding) < parseFloat(stock.padding));
     assert.equal(compact.gap, stock.gap);
     assert.equal(compact.type, stock.type);
-    await page.evaluate(() => (window as any).app.metrics({}));
+    await page.evaluate(() => window.app.metrics({}));
     assert.deepEqual(await read(), stock);
     assert.equal(await field.inputValue(), 'Draft input');
     assert.ok(await field.evaluate(input => input === document.activeElement), 'the focused input survives both changes');
@@ -237,7 +237,7 @@ test('a standalone host can set spacing in rem and bring its own stylesheet', as
       const host = document.getElementById('custom')!;
       host.style.setProperty('--v-spacing', '7px', 'important');
       host.style.color = 'rgb(40, 20, 10)';
-      (window as any).app.catalog('custom', view, {});
+      window.app.catalog('custom', view, {});
     }, view);
     const field = page.locator('#custom a2ui-basic-textfield input');
     const read = () => field.evaluate(input => {
@@ -245,12 +245,12 @@ test('a standalone host can set spacing in rem and bring its own stylesheet', as
       return { padding: style.paddingLeft, font: style.fontSize };
     });
     const stock = await read();
-    await page.evaluate(view => (window as any).app.catalog('custom', view, { metrics: { spacing: '0.5rem' } }), view);
+    await page.evaluate(view => window.app.catalog('custom', view, { metrics: { spacing: '0.5rem' } }), view);
     assert.deepEqual(await read(), { padding: '10px', font: stock.font });
     assert.ok(await page.locator('#custom').evaluate(el =>
       getComputedStyle(el).color === 'rgb(40, 20, 10)' && !el.classList.contains('vindu-theme') && !document.querySelector('style[data-vindu="theme"]')
     ));
-    await page.evaluate(view => (window as any).app.catalog('custom', view, {}), view);
+    await page.evaluate(view => window.app.catalog('custom', view, {}), view);
     assert.deepEqual(await read(), stock);
     const host = page.locator('#custom');
     assert.deepEqual(await host.evaluate(el => [el.style.getPropertyValue('--v-spacing'), el.style.getPropertyPriority('--v-spacing'), el.hasAttribute('data-vindu-metrics')]), ['7px', 'important', false]);

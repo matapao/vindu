@@ -54,16 +54,16 @@ test('in Chromium: a page in the window tells how it runs there, the page itself
   try {
     const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
     await page.goto(`http://127.0.0.1:${(app.address() as { port: number }).port}/shell.html`);
-    await page.evaluate(() => (window as any).app.shell('light'));
+    await page.evaluate(() => window.app.shell('light'));
     // the host's part: what is shown goes to the window, and what the window says goes to the UI server
     let drawn = 0, state: ShellState | undefined, busy = false;
     pump = setInterval(() => {
       if (busy) return; busy = true;
       void (async () => {
-        for (const v of shown.slice(drawn)) if (!v.ask) await page.evaluate((x: Shown) => (window as any).app.view(x), v);
+        for (const v of shown.slice(drawn)) if (!v.ask) await page.evaluate((x: Shown) => window.app.view(x), v);
         drawn = shown.length;
-        if (st.s && st.s !== state) { state = st.s; await page.evaluate((s: ShellState) => (window as any).app.state(s), state); }
-        for (const e of (await page.evaluate(() => (window as any).app.events())) as Record<string, unknown>[]) ui.event(e);
+        if (st.s && st.s !== state) { state = st.s; await page.evaluate((s: ShellState) => window.app.state(s), state); }
+        for (const e of (await page.evaluate(() => window.app.events())) as Record<string, unknown>[]) ui.event(e);
       })().catch(() => undefined).finally(() => { busy = false; });
     }, 50);
     // a page the model writes: a name and a sum on it, a canvas it paints, an error it logs with that text, one it throws

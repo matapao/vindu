@@ -8,9 +8,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { startVindu, memoryResults, type Shown, type ShellState } from '../src/index.js';
-import { mcpClient, sleep } from './helpers.js';
+import { mcpClient, sleep, panelsIn, type AccountPanel } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const until = async (f: () => boolean, ms = 8000) => { const end = Date.now() + ms; while (!f()) { if (Date.now() > end) throw new Error('timed out'); await sleep(20); } };
 const customers = [{ customer: 'Havgap Media', city: 'Bergen' }, { customer: 'Brattli Verksted', city: 'Voss' }];
@@ -23,7 +22,7 @@ async function windowWith() {
   const shown: Shown[] = []; const st: { s?: ShellState } = {};
   const ui = vindu.open({ results, dir }, { onView: v => shown.push(v), onState: s => { st.s = s; } });
   const c = await mcpClient(ui.url);
-  const model = (name: string) => (shown.filter(v => v.name === name).at(-1)!.wide.find((m: any) => m.updateDataModel) as any).updateDataModel.value.panels;
+  const model = (name: string) => panelsIn(shown.filter(v => v.name === name).at(-1)!.wide);
   const drawn = (name: string) => JSON.stringify(shown.filter(v => v.name === name).at(-1)?.wide ?? null);
   const arrive = (x: Parameters<typeof results.add>[0]) => { const r = results.add(x); ui.result(r.id); return r; }; // as a host reports each result captured
   return { vindu, ui, results, arrive, ...c, shown, st, model, drawn, close: async () => { await c.mcp.close(); ui.close(); await vindu.close(); } };
@@ -37,7 +36,7 @@ test('a panel that awaits a result: it says what it waits for, and the system fi
       { id: 'inv', card: 'table', title: 'Invoices', awaits: { server: 'accounts', tool: 'list_invoices' }, columns: ['number', 'amount'] },
       { id: 'mail', card: 'table', title: 'Sent', awaits: { tool: 'send_reminders' } },
     ] });
-    const inv = acc.panels.find((p: any) => p.id === 'inv');
+    const inv = acc.panels.find((p: AccountPanel) => p.id === 'inv');
     assert.deepEqual([inv.card, inv.from, inv.waiting], ['table', 'waiting', 'Waiting for accounts.list_invoices: it fills in here when it comes. The system fills it when that happens, without you']);
     assert.ok(w.drawn('chase').includes('Waiting for accounts.list_invoices: it fills in here when it comes.'));
     w.arrive({ server: 'other', tool: 'list_invoices', value: [] }); // another server's tool of the same name: not it
@@ -46,12 +45,12 @@ test('a panel that awaits a result: it says what it waits for, and the system fi
     const n = w.shown.length;
     const r = w.arrive({ server: 'accounts', tool: 'list_invoices', input: { status: 'overdue' }, value: invoices });
     await until(() => w.shown.length > n && !!w.model('chase').p_inv?.rows);
-    assert.deepEqual(w.model('chase').p_inv.rows.map((x: any) => x.c0), ['INV-2026-0412', 'INV-2026-0418']); // exactly as it came
+    assert.deepEqual(w.model('chase').p_inv.rows.map(x => x.c0), ['INV-2026-0412', 'INV-2026-0418']); // exactly as it came
     const look = await w.json('look', {});
     assert.ok(JSON.stringify(look).length > 0);
     assert.match(w.ui.delta(), new RegExp(`Chase overdue invoices \\(inv\\): filled from ${r.id}, exactly as it came`));
     // a call that fails: the panel shows the server's own answer
-    const failed = w.results.add({ server: 'mailer', tool: 'send_reminders', text: 'SMTP 550: mailbox unavailable', value: undefined }) as any;
+    const failed = w.results.add({ server: 'mailer', tool: 'send_reminders', text: 'SMTP 550: mailbox unavailable', value: undefined });
     failed.error = true; w.ui.result(failed.id);
     await until(() => w.drawn('chase').includes('send_reminders failed'));
     assert.ok(w.drawn('chase').includes(`send_reminders failed (${failed.id}): SMTP 550: mailbox unavailable`));
@@ -69,7 +68,7 @@ test('after the person picks or answers: a panel shown then, and a view written 
       { id: 'cust', card: 'table', from: 'r1', columns: ['customer', 'city'] },
       { id: 'inv', card: 'table', from: 'r2', detail: { of: 'cust', by: 'customer' }, after: { picked: 'cust' } },
     ] });
-    assert.equal(acc.panels.find((p: any) => p.id === 'inv').waiting, 'After you pick a row in cust. The system fills it when that happens, without you');
+    assert.equal(acc.panels.find((p: AccountPanel) => p.id === 'inv').waiting, 'After you pick a row in cust. The system fills it when that happens, without you');
     // a view written up front, after the person picks: held, not shown
     const held = await w.json('show_view', { name: 'next', title: 'Next steps', after: { picked: 'crm/cust' }, panels: [{ card: 'text', text: 'Call them before Friday.' }], place: { into: 'crm' } });
     assert.match(held.held, /^not shown yet: the system shows it, without you, after you pick a row in cust; then you are told once$/);
@@ -77,7 +76,7 @@ test('after the person picks or answers: a panel shown then, and a view written 
     const n = w.shown.length;
     w.ui.event({ type: 'view', view: 'crm', action: 'select', panel: 'p_cust', from: 1 });
     await until(() => w.shown.length > n && !!w.model('crm').p_inv?.rows && w.st.s!.views.some(v => v.name === 'next'));
-    assert.deepEqual(w.model('crm').p_inv.rows.map((x: any) => x.c0), ['INV-2026-0418']);
+    assert.deepEqual(w.model('crm').p_inv.rows.map(x => x.c0), ['INV-2026-0418']);
     const look = await w.json('look', {});
     assert.deepEqual(look.layout, { stack: ['crm', 'next'], front: 'next' }); // where it was written to go: in front of crm
     assert.match(w.ui.delta(), /Next steps is shown now, by the system/);

@@ -10,10 +10,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
-import { startVindu, memoryResults, type Shown, type ShellState, type Operation } from '../src/index.js';
-import { mcpClient, sleep } from './helpers.js';
+import { startVindu, memoryResults, type Shown, type ShellState, type Operation, type ViewCheckpoint } from '../src/index.js';
+import { answerOf, mcpClient, sleep } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const until = async (f: () => boolean, ms = 8000) => { const end = Date.now() + ms; while (!f()) { if (Date.now() > end) throw new Error('timed out'); await sleep(20); } };
 const rows = [{ number: 'INV-2026-0412', customer: 'Havgap Media', amount: 31050 }, { number: 'INV-2026-0418', customer: 'Brattli Verksted', amount: 19800 }];
@@ -114,7 +113,7 @@ test('several yeses are to one thing: each after the first approves what it chos
     answer('Pay later', 1, 'Ola', 'phone');
     const r = await paid;
     assert.deepEqual(r.answer, { choice: 'Pay later' });
-    assert.deepEqual((ui.answers().at(-1) as any).who, ['Kari (main)', 'Ola (phone)']);
+    assert.deepEqual(answerOf(ui.answers().at(-1))?.who, ['Kari (main)', 'Ola (phone)']);
     const counted = await json('count_stock', {}); // it only reads, but two must say yes: it asks
     assert.equal(counted.pending, true);
   } finally { await mcp.close(); ui.close(); await vindu.close(); }
@@ -132,7 +131,7 @@ test("a receipt shows what went otherwise though the call failed; only the perso
     ui.event({ type: 'action', view: 'ask-k1', name: 'answer', context: { ticket: 'k1', choice: 'Yes', n: 0 } });
     assert.equal(await asked, 0);
     const went = results.add({ server: 'mail', tool: 'send', input: { ...letter, to: 'someone@else.example' }, value: { error: 'bounced' } });
-    (went as any).error = true;
+    went.error = true;
     ui.result(went.id);
     await until(() => ui.shell().views.find(v => v.name === 'preview-k1')?.title === 'Not as approved, and it failed');
     assert.deepEqual(ui.receipts().map(r => r.state), ['differs']);
@@ -162,7 +161,8 @@ test('the model suggests its undo where the person takes its changes; a checkpoi
     assert.match(undo.text, /suggested to the person, who takes it or not: undo "sorted/);
     assert.equal(st.s!.views.find(v => v.name === 'inv')?.mark?.suggestion, true); // nothing undone yet: the person takes it, or not
     const other = vindu.open({ results: memoryResults(tmp('life-restore-')), dir: tmp('life-restore-') }, { onView: () => undefined });
-    await assert.rejects(Promise.resolve().then(() => other.restore({ views: 'all of them' } as any)), /Not a task checkpoint/);
+    const notOne: unknown = { views: 'all of them' }; // as a host might read back a file that is not a checkpoint
+    await assert.rejects(Promise.resolve().then(() => other.restore(notOne as ViewCheckpoint)), /Not a task checkpoint/);
     const real = ui.checkpoint();
     await assert.rejects(Promise.resolve().then(() => other.restore({ ...real, views: [{ ...real.views[0], name: 'reminders' }] })), /shown under another name/);
     other.close();
@@ -194,10 +194,10 @@ test('reminders the model sets and drops are so many a day; two live panels on r
 
 test('a static view\'s source stops refilling its slot once the model may change the view; closing an ask in the shelf answers it', async () => {
   const vindu = await startVindu({ waitMs: 300 });
-  const dir = tmp('life-fresh-'), results = memoryResults(dir); const stops: string[] = [];
+  const dir = tmp('life-fresh-'), results = memoryResults(dir); const stops: (string | undefined)[] = [];
   const ui = vindu.open({ results, dir }, { onView: () => undefined, isRead: () => true,
-    source: async (src: any) => results.add({ server: src.server, tool: src.tool, input: src.args, value: rows }).id,
-    watch: (what: any) => () => stops.push(what.tool) });
+    source: async src => results.add({ server: src.server, tool: src.tool ?? '', input: src.args, value: rows }).id,
+    watch: what => () => stops.push(what.tool) });
   try {
     const t = { name: 'Fresh', version: 1, slots: { inv: { title: 'Invoices', block: 'table', source: { server: 'accounts', tool: 'list_invoices', every: 30 } } }, layout: ['inv'] };
     assert.equal((await ui.useTemplate(t, {})).started, true);

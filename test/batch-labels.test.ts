@@ -8,9 +8,8 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Page as BrowserPage } from 'playwright';
 import { callLabel, memoryResults, startVindu, type Shown, type ShellState } from '../src/index.js';
-import { chromium, mcpClient, shellServer } from './helpers.js';
+import { chromium, mcpClient, shellServer, panelsIn } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 test('a call\'s label: its number and its name, by the names of its fields, else the tool\'s name in words', () => {
   for (const [input, tool, label] of [
     [{ invoice_number: 10233 }, 'send_reminder', 'invoice 10233'],
@@ -37,13 +36,13 @@ test('drawn in Chromium, each row of a batch says what its call was about, and t
   try {
     const a = await c.json('show_view', { name: 'sent', title: 'Reminders', panels: [{ id: 'sent', card: 'batch', results: ids }] });
     assert.deepEqual([a.panels[0].calls, a.panels[0].ok, a.panels[0].failed], [3, 2, [ids[1]]]); // the account, by id
-    const model = (shown.at(-1)!.wide.find(m => (m as any).updateDataModel) as any).updateDataModel.value.panels;
-    assert.deepEqual(model.p_sent.rows.map((r: any) => [r.id, r.for]), ids.map((id, i) => [id, `invoice ${10231 + i}`])); // pointed at by id
+    const model = panelsIn(shown.at(-1)!.wide);
+    assert.deepEqual(model.p_sent.rows.map(r => [r.id, r.for]), ids.map((id, i) => [id, `invoice ${10231 + i}`])); // pointed at by id
     const page: BrowserPage = await browser.newPage({ viewport: { width: 1000, height: 800 } });
     await page.goto(shell.url);
-    await page.evaluate(() => (window as any).app.shell('light'));
-    await page.evaluate((x: Shown) => (window as any).app.view(x), shown.at(-1)!);
-    await page.evaluate((s: ShellState) => (window as any).app.state(s), st.s!);
+    await page.evaluate(() => window.app.shell('light'));
+    await page.evaluate((x: Shown) => window.app.view(x), shown.at(-1)!);
+    await page.evaluate((s: ShellState) => window.app.state(s), st.s!);
     await page.locator('[data-panel="sent"][data-row="2"]').waitFor();
     const rows = await page.locator('vindu-batch .vb-call').allInnerTexts();
     assert.deepEqual(rows.map(r => r.replace(/\s+/g, ' ').trim()), ['✓ invoice 10231', '✗ invoice 10232 mailbox full', '✓ invoice 10233']);

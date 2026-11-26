@@ -11,7 +11,6 @@ import type { Page as BrowserPage } from 'playwright';
 import { memoryResults, startVindu, VIEW_WORDS_NB, type Shown } from '../src/index.js';
 import { chromium, mcpClient, shellServer } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'week-'));
 const results = memoryResults(dir);
 const events = results.add({ server: 'calendar', tool: 'list_events', value: [
@@ -50,7 +49,7 @@ const PANEL = { id: 'week', card: 'events', from: events, forecast, warnings, ta
 async function drawn(view: Shown): Promise<BrowserPage> {
   const page: BrowserPage = await browser.newPage({ viewport: { width: 1100, height: 1000 } });
   await page.goto(server.url);
-  await page.evaluate(v => { (window as any).app.width(1040); (window as any).app.catalog('view', v, { theme: true }); }, view);
+  await page.evaluate(v => { window.app.width(1040); window.app.catalog('view', v, { theme: true }); }, view);
   await page.locator('vindu-events .vb-dayhead').first().waitFor();
   return page;
 }

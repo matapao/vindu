@@ -9,7 +9,6 @@ import path from 'node:path';
 import { startVindu, memoryResults, VIEW_WORDS_NB, type Shown } from '../src/index.js';
 import { chromium, mcpClient, shellServer } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'resize-loop-'));
 const results = memoryResults(dir);
 const days = ['23', '24', '25', '26', '27', '28', '29'];
@@ -37,11 +36,11 @@ const look = () => ({
 async function drawnAt(view: Shown, width: number) {
   const page = await browser.newPage({ viewport: { width: 1300, height: 1400 } });
   await page.addInitScript(() => {
-    (window as any).errors = [];
-    window.addEventListener('error', (e) => { (window as any).errors.push(e.message); });
+    window.errors = [];
+    window.addEventListener('error', (e) => { window.errors.push(e.message); });
   });
   await page.goto(server.url);
-  await page.evaluate(([v, w]: readonly [Shown, number]) => { (window as any).app.width(w); (window as any).app.catalog('view', v, { theme: true }); }, [view, width] as const);
+  await page.evaluate(([v, w]: readonly [Shown, number]) => { window.app.width(w); window.app.catalog('view', v, { theme: true }); }, [view, width] as const);
   await page.locator('vindu-events .vb-slot').first().waitFor();
   return page;
 }
@@ -56,11 +55,11 @@ test('a fitted week and a chart at its width, in a pane resized ten times, repor
   const resized = await drawnAt(view, 1200), fresh = await drawnAt(view, 640);
   try {
     for (const width of [460, 900, 380, 1200, 520, 1000, 300, 760, 460, 640]) {
-      await resized.evaluate((w: number) => (window as any).app.width(w), width);
+      await resized.evaluate((w: number) => window.app.width(w), width);
       await resized.evaluate(frames(2));
     }
     await resized.evaluate(frames(4)); await fresh.evaluate(frames(4));
-    assert.deepEqual(await resized.evaluate(() => (window as any).errors), [], 'no ResizeObserver loop');
+    assert.deepEqual(await resized.evaluate(() => window.errors), [], 'no ResizeObserver loop');
     const [after, direct] = [await resized.evaluate(look), await fresh.evaluate(look)];
     assert.equal(after.wide, 0, 'every title fits its slot');
     assert.ok(direct.titles.some((t: string) => t.endsWith('…')) && direct.titles.some((t: string) => t.length > 1), JSON.stringify(direct.titles)); // some cut, some words kept

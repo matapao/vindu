@@ -11,7 +11,6 @@ import type { Page as BrowserPage } from 'playwright';
 import { startVindu, memoryResults, type Shown } from '../src/index.js';
 import { chromium, mcpClient, shellServer } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'narrow-'));
 const results = memoryResults(dir);
 const invoice = results.add({ server: 'accounting', tool: 'get_invoice', value: {
@@ -39,7 +38,7 @@ async function drawn(view: Shown, width: number, ready: string): Promise<Browser
   const page: BrowserPage = await browser.newPage({ viewport: { width: Math.max(width + 40, 480), height: 1400 } });
   await page.goto(server.url);
   await page.addStyleTag({ content: HOST_CSS });
-  await page.evaluate(([v, w]) => { (window as any).app.width(w); (window as any).app.catalog('view', v, { theme: true }); }, [view, width] as const);
+  await page.evaluate(([v, w]) => { window.app.width(w); window.app.catalog('view', v, { theme: true }); }, [view, width] as const);
   await page.locator(ready).first().waitFor();
   return page;
 }

@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { checkPage, memoryResults, startPageHost, startVindu } from '../src/index.js';
-import { LIMITS } from '../src/page-check.js';
+import { LIMITS } from '../src/page-steps.js';
 import { playwrightDriver } from '../src/drivers/playwright.js';
 import { chromium, mcpClient, sleep } from './helpers.js';
 

@@ -8,9 +8,8 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { startVindu, memoryResults, whenOf, instantOf, localOf, type Shown, type ShellState, type Reminder, type ViewCheckpoint } from '../src/index.js';
-import { chromium, mcpClient, sleep } from './helpers.js';
+import { chromium, mcpClient, sleep, componentsIn, type SurfaceComponent } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const until = async (f: () => boolean, ms = 8000) => { const end = Date.now() + ms; while (!f()) { if (Date.now() > end) throw new Error('timed out'); await sleep(20); } };
 const TZ = 'Europe/Oslo';
@@ -18,8 +17,8 @@ const iso = (ms: number) => new Date(ms).toISOString();
 
 test('the system works out when, exactly: a time, a day, working days, a value read, minutes before; and says how', () => {
   const now = new Date('2026-11-12T09:00:00Z'); // a Thursday, 10:00 in Oslo
-  const read = (ref: string) => (ref === 'ctx:r1#/0/due' ? { ok: true as const, value: '2026-11-30' } : ref === 'ctx:r1#/0/start' ? { ok: true as const, value: '2026-11-30T14:00:00+01:00' }
-    : ref === 'ctx:r1#/0/customer' ? { ok: true as const, value: 'Havgap Media' } : { ok: false as const, why: 'no such value' });
+  const values: Record<string, string> = { 'ctx:r1#/0/due': '2026-11-30', 'ctx:r1#/0/start': '2026-11-30T14:00:00+01:00', 'ctx:r1#/0/customer': 'Havgap Media' };
+  const read = (ref: string) => (Object.hasOwn(values, ref) ? { ok: true as const, value: values[ref] } : { ok: false as const, why: 'no such value' });
   const at = (q: string, holidays?: string[]) => { const w = whenOf(q, { timeZone: TZ, now, read, holidays }); if ('refusal' in w) throw new Error(w.refusal); return w; };
   assert.equal(iso(at('2026-11-30T14:00').ms), '2026-11-30T13:00:00.000Z'); // in the process's time zone
   assert.equal(iso(at('2026-11-30T13:00:00Z').ms), '2026-11-30T13:00:00.000Z'); // with its own offset
@@ -38,7 +37,7 @@ test('the system works out when, exactly: a time, a day, working days, a value r
   // where the clocks change: a time the clock skips moves on by the gap; a time it shows twice is the first
   assert.deepEqual(localOf(instantOf('2026-03-29', '02:30', TZ), TZ), { day: '2026-03-29', hm: '03:30' });
   assert.equal(iso(instantOf('2026-10-25', '02:30', TZ)), '2026-10-25T00:30:00.000Z');
-  const no = (q: string) => { const w = whenOf(q, { timeZone: TZ, now, read }); assert.ok('refusal' in w, q); return (w as { refusal: string }).refusal; };
+  const no = (q: string) => { const w = whenOf(q, { timeZone: TZ, now, read }); assert.ok('refusal' in w, q); return w.refusal; };
   assert.match(no('next friday'), /is not a time the system can work out/);
   assert.match(no('2026-02-30'), /not a day of the calendar/);
   assert.match(no('2026-11-30T25:00'), /not a time of the calendar/);
@@ -57,7 +56,10 @@ async function windowWith(o: { dir?: string; arrange?: 'allow' | 'suggest' | 'of
   const ui = vindu.open({ results, dir }, { onView: v => shown.push(v), onState: s => { st.s = s; }, onReminder: r => o.notices?.push(r), onSuggest: t => suggested.push(t) });
   const c = await mcpClient(ui.url);
   const last = (name: string) => shown.filter(v => v.name === name).at(-1);
-  const texts = (name: string): string[] => ((last(name)?.wide.find((m: any) => m.updateComponents) as any)?.updateComponents.components ?? []).filter((x: any) => x.component === 'Text').map((x: any) => x.text as string);
+  const texts = (name: string): string[] => {
+    const surface = last(name)?.wide;
+    return (surface?.some(m => m.updateComponents) ? componentsIn<SurfaceComponent & { text: string }>(surface) : []).filter(x => x.component === 'Text').map(x => x.text);
+  };
   return { vindu, ui, dir, ...c, shown, st, last, texts, suggested, close: async () => { await c.mcp.close(); ui.close(); await vindu.close(); } };
 }
 
@@ -83,7 +85,7 @@ test('the model sets a reminder from a value read: the system works out when, th
     assert.equal(w.ui.event({ type: 'action', view: 'reminders', name: 'reminder_new', context: {} }), true);
     await until(() => w.shown.some(v => v.ask?.op === 'remind'));
     const a = w.shown.filter(v => v.ask?.op === 'remind').at(-1)!;
-    const comps = (a.wide.find((m: any) => m.updateComponents) as any).updateComponents.components as any[];
+    const comps = componentsIn(a.wide);
     assert.deepEqual(comps.filter(x => x.component === 'DateTimeInput').map(x => [x.enableDate, x.enableTime]), [[true, true]]);
     w.ui.event({ type: 'action', view: a.name, name: 'answer', context: { ticket: a.ask!.ticket, 'f:what': 'Too late', 'f:when': '2020-01-01T10:00' } });
     await until(() => w.shown.filter(v => v.ask?.op === 'remind').at(-1)!.ask!.error !== undefined);
@@ -119,7 +121,7 @@ test('a reminder comes due: the host is told (its notice), the bar and the pane 
     assert.equal(w.ui.event({ type: 'reminders' }), true); // the bar's chip: the pane comes
     await until(() => !!w.last('reminders'));
     assert.deepEqual(w.texts('reminders').filter(t => t.startsWith('Due now')).length, 2);
-    const buttons = ((w.last('reminders')!.wide.find((m: any) => m.updateComponents) as any).updateComponents.components as any[]).filter(x => x.component === 'Button').map(x => x.action.event);
+    const buttons = componentsIn<SurfaceComponent & { action: { event: { context: Record<string, unknown> } } }>(w.last('reminders')!.wide).filter(x => x.component === 'Button').map(x => x.action.event);
     assert.deepEqual(buttons.filter(b => b.context.id === 'm1').map(b => b.context.do), ['done', 'hour', 'tomorrow', 'ask']);
     assert.equal(w.ui.event({ type: 'action', view: 'reminders', name: 'reminder', context: { id: 'm1', do: 'ask' } }), true); // into the prompt box, unsent
     assert.deepEqual(w.suggested, ['Reminder m1 is due: "Send the VAT report". What should be done now?']);
@@ -168,15 +170,15 @@ test('in Chromium: the bar has a chip for the reminders, the pane has their butt
     const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
     const errors: string[] = []; page.on('pageerror', (e: Error) => errors.push(e.message));
     await page.goto(`http://127.0.0.1:${(app.address() as { port: number }).port}/shell.html`);
-    await page.evaluate(() => (window as any).app.shell('light'));
+    await page.evaluate(() => window.app.shell('light'));
     const draw = async () => {
       const latest = new Map<string, Shown>(); for (const v of w.shown) latest.set(v.name, v);
-      for (const v of latest.values()) await page.evaluate((x: Shown) => (window as any).app.view(x), v);
-      await page.evaluate((s: ShellState) => (window as any).app.state(s), w.st.s!);
+      for (const v of latest.values()) await page.evaluate((x: Shown) => window.app.view(x), v);
+      await page.evaluate((s: ShellState) => window.app.state(s), w.st.s!);
       await page.waitForTimeout(300);
     };
     await draw();
-    const events = async () => (await page.evaluate(() => (window as any).app.events())) as any[];
+    const events = async () => page.evaluate(() => window.app.events());
     await events();
     const chip = page.locator('.vindu-bar-rem');
     assert.equal(await chip.textContent(), '1 reminder due'); assert.equal(await chip.evaluate((e: Element) => e.classList.contains('is-due')), true);

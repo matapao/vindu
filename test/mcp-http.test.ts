@@ -10,7 +10,9 @@ import { getRaw, mcpClient } from './helpers.js';
 test('a failed MCP bind rejects startup and closes the page listener', async () => {
   const error = new Error('Local listener unavailable');
   const listeners: Server[] = [];
-  const listen = Server.prototype.listen;
+  // the original, called below with each server as this: read as a function of the server it is called on
+  const prototype: { listen: (this: Server, ...args: Parameters<Server['listen']>) => Server } = Server.prototype;
+  const listen = prototype.listen;
   const spy = vi.spyOn(Server.prototype, 'listen').mockImplementation(function (this: Server, ...args: Parameters<typeof listen>) {
     listeners.push(this);
     if (listeners.length === 1) return listen.apply(this, args);
@@ -52,7 +54,7 @@ test('a layout client learns only geometry and leaves the task’s private conte
   const dir = mkdtempSync(join(tmpdir(), 'vindu-layout-client-'));
   const provider = await startVindu();
   const results = memoryResults(dir);
-  const about = vi.fn(() => ({ text: 'private pane contents' }));
+  const about = vi.fn<() => { text: string }>(() => ({ text: 'private pane contents' }));
   const task = provider.open({ dir, results });
   const otherDir = mkdtempSync(join(dir, 'other-'));
   const other = provider.open({ dir: otherDir, results: memoryResults(otherDir) });

@@ -102,7 +102,7 @@ test('a view drilled into says so to a host that draws it itself: the way in, an
     assert.deepEqual(drilled.back, { event: 'drill_back', context: { depth: 1 } });
     assert.equal(drilled.panels[0].rows!.length, 2);
     const n = views.length; // what a host's own back control sends, as the head's button does
-    assert.equal(ui.event({ type: 'action', view: 'owed', name: drilled.back!.event, context: drilled.back!.context }), true);
+    assert.equal(ui.event({ type: 'action', view: 'owed', name: drilled.back.event, context: drilled.back.context }), true);
     await until(() => views.length > n);
     assert.equal(views.at(-1)!.path, undefined); assert.equal(views.at(-1)!.back, undefined);
     assert.equal(views.at(-1)!.panels[0].card, 'bar-chart');

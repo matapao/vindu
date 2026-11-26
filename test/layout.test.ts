@@ -1,7 +1,9 @@
 // The layout engine on its own: no server, no browser. Whole pixels, 1 px lines, every window filled exactly.
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { place, insert, remove, resize, readLayout, shorthand, distribute, where, minWindow, viewsOf, slotOf, restore, openView, fits, setStack, setFront, stackInto, type LayoutNode, type Box } from '../src/layout.js';
+import { place, distribute, where, minWindow, viewsOf, type LayoutNode, type Box } from '../src/layout.js';
+import { readLayout, shorthand } from '../src/layout-read.js';
+import { insert, remove, resize, slotOf, restore, openView, fits, setStack, setFront, stackInto } from '../src/layout-edit.js';
 
 const W = { w: 1440, h: 876 };
 const read = (x: unknown, views = 'a b c d e f g h') => readLayout(x, new Set(views.split(' ')));

@@ -8,9 +8,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { startVindu, memoryResults, resultRef, shorthand, VINDU_CATALOG, z, type Shown, type ShellState } from '../src/index.js';
-import { mcpClient, sleep } from './helpers.js';
+import type { PointItem } from '../src/pointing.js';
+import { mcpClient, sleep, panelsIn, type Row } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const until = async (f: () => boolean, ms = 8000) => { const end = Date.now() + ms; while (!f()) { if (Date.now() > end) throw new Error('timed out'); await sleep(20); } };
 const invoices = [{ number: 'INV-2026-0412', customer: 'Havgap Media', amount: 31050 }, { number: 'INV-2026-0418', customer: 'Brattli Verksted', amount: 19800 }, { number: 'INV-2026-0431', customer: 'Havgap Media', amount: 17160 }];
@@ -55,12 +55,12 @@ test('a new task from a view: carried exactly under new ids, as the person left 
       const create = surface.find(message => message.createSurface)!.createSurface;
       assert.deepEqual(create, { surfaceId: 'todo', catalogId: VINDU_CATALOG });
     }
-    const model = (name: string) => (shownB.filter(v => v.name === name).at(-1)!.wide.find((m: any) => m.updateDataModel) as any).updateDataModel.value.panels;
-    assert.deepEqual(model('inv').p_rows.rows.map((r: any) => r.c0), ['INV-2026-0431', 'INV-2026-0418', 'INV-2026-0412']); // as the person sorted it
+    const model = (name: string) => panelsIn(shownB.filter(v => v.name === name).at(-1)!.wide);
+    assert.deepEqual(model('inv').p_rows.rows.map(r => r.c0), ['INV-2026-0431', 'INV-2026-0418', 'INV-2026-0412']); // as the person sorted it
     assert.deepEqual(stB.s!.views.find(v => v.name === 'inv')!.mark, { text: 'Sorted by amount, smallest or earliest first', by: 'person' });
     assert.ok(JSON.stringify(shownB.filter(v => v.name === 'who').at(-1)!.wide).includes('The largest is ctx:r2#/0/amount.')); // its references, this process's
     assert.deepEqual(shorthand(stB.s!.tree), snap.layout); // in the layout the person left
-    assert.deepEqual(((stB.s!.pointing?.picked ?? []) as any[]).map(it => [it.view, it.row]), [['todo', 1]]); // what the person pointed at, still
+    assert.deepEqual(((stB.s!.pointing?.picked ?? []) as PointItem[]).map(it => [it.view, it.row]), [['todo', 1]]); // what the person pointed at, still
     assert.match(uiB.note, /This task starts from a view of an earlier task, as the person left it: "Invoices", "To do", "Who follows up", on what that task got, carried here exactly under this task's ids: r2 \(was r1\), r3 \(was r2\), p1 \(was p1\)\. Done in it: the person sorted Invoices by amount, smallest or earliest first\. The earlier task's conversation is not part of this one/);
     const cb = await mcpClient(uiB.url);
     assert.equal((await cb.json('ctx_read', { ref: 'ctx:r2#/0/number' })).value, 'INV-2026-0412'); // the model there reads them by the new ids
@@ -87,11 +87,11 @@ test('carried too: the ids in every field that holds them, as each card marks it
     await ca.json('show_view', { name: 'one', title: 'One reply', panels: [{ id: 'r', card: 'record', source: 'r2' }] }); // another library's name for from
     const snap = uiA.snapshot();
     assert.deepEqual(snap.ids.sort(), ['r1', 'r2', 'r3']); // each call of the run, and the host card's own field
-    const carried = Object.fromEntries(['r1', 'r2', 'r3'].map(id => [id, b.add({ server: 'mail', tool: 'send_reply', input: a.get(id)!.kind === 'result' ? (a.get(id) as any).input : {}, value: { status: 'sent' } }).id]));
+    const carried = Object.fromEntries(['r1', 'r2', 'r3'].map(id => { const e = a.get(id)!; return [id, b.add({ server: 'mail', tool: 'send_reply', input: e.kind === 'result' ? e.input : {}, value: { status: 'sent' } }).id]; }));
     assert.deepEqual(carried, { r1: 'r2', r2: 'r3', r3: 'r4' });
     const got = await uiB.startFrom(JSON.parse(JSON.stringify(snap)), carried);
     assert.deepEqual(got.refused, {}); assert.deepEqual(got.shown, ['calls', 'pair', 'one']);
-    const args = (name: string) => uiB.snapshot().views.find(v => v.name === name)!.args as any;
+    const args = (name: string) => uiB.snapshot().views.find(v => v.name === name)!.args as { panels: Row[] };
     assert.deepEqual(args('calls').panels[0].results, ['r2', 'r3', 'r4']); // the run, written out under this task's ids
     assert.deepEqual([args('pair').panels[0].from, args('pair').panels[0].other], ['r2', 'r4']);
     assert.equal(args('one').panels[0].source, 'r3');

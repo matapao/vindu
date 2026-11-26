@@ -9,25 +9,24 @@ import os from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
 import { startVindu, memoryResults, type Shown, type Operation } from '../src/index.js';
-import { mcpClient, sleep } from './helpers.js';
+import { mcpClient, sleep, panelsIn, type HostJob, type HostSource, type Look } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const until = async (f: () => boolean, ms = 8000) => { const end = Date.now() + ms; while (!f()) { if (Date.now() > end) throw new Error('timed out'); await sleep(20); } };
 const invoices = (a: number, b: number) => [{ number: 'INV-2026-0412', amount: a }, { number: 'INV-2026-0418', amount: b }];
-const rowsOf = (shown: Shown[], name: string) => ((shown.filter(v => v.name === name).at(-1)!.wide.find((m: any) => m.updateDataModel) as any).updateDataModel.value.panels as Record<string, any>);
+const rowsOf = (shown: Shown[], name: string) => panelsIn(shown.filter(v => v.name === name).at(-1)!.wide);
 
 async function hooksWindow(o: { perDay?: number; refuseFirst?: boolean } = {}) {
   const vindu = await startVindu({ waitMs: 300, jobs: { perDay: o.perDay ?? 3 } });
   const dir = tmp('guard-hooks-'), results = memoryResults(dir);
   results.add({ server: 'accounts', tool: 'list_invoices', input: { status: 'overdue' }, value: invoices(31050, 19800) }); // r1
-  const watches: ((id: string) => void)[] = [], jobs: any[] = [], sourced: any[] = [], shown: Shown[] = [];
+  const watches: ((id: string) => void)[] = [], jobs: HostJob[] = [], sourced: HostSource[] = [], shown: Shown[] = [];
   const ui = vindu.open({ results, dir }, {
     onView: (v: Shown) => shown.push(v),
     isRead: (_s: string, tool: string) => tool === 'list_invoices',
-    watch: (_what: any, _seconds: number, onRead: (id: string) => void) => { watches.push(onRead); return () => undefined; },
-    source: async (what: any) => { sourced.push(what); return results.add({ server: what.server, tool: what.tool, input: what.args, value: invoices(1, 2) }).id; },
-    onJob: async (j: any) => { jobs.push(j); return o.refuseFirst && jobs.length === 1 ? { refused: 'the host is busy' } : { id: `job-${jobs.length}` }; },
+    watch: (_what, _seconds, onRead) => { watches.push(onRead); return () => undefined; },
+    source: async what => { sourced.push(what); return results.add({ server: what.server, tool: what.tool ?? '', input: what.args, value: invoices(1, 2) }).id; },
+    onJob: async j => { jobs.push(j); return o.refuseFirst && jobs.length === 1 ? { refused: 'the host is busy' } : { id: `job-${jobs.length}` }; },
   });
   const c = await mcpClient(ui.url);
   const reread = (a: number, b: number) => watches[0](results.add({ server: 'accounts', tool: 'list_invoices', input: { status: 'overdue' }, value: invoices(a, b) }).id);
@@ -181,8 +180,8 @@ test('a static view holds: no browser page or pane of its own, a template\'s opt
     const second = shown.filter(v => v.ask?.op === 'approve letter').at(-1)!;
     ui.event({ type: 'action', view: second.name, name: 'answer', context: { ticket: second.ask!.ticket }, by: { name: 'Kari', window: 'main' } });
     await until(() => ui.shell().views.every(v => !v.name.startsWith('ask-')));
-    const look = await json('look', {});
-    assert.deepEqual(look.slots.find((x: any) => x.slot === 'letter').approved_by, ['Kari']);
+    const look: Look = await json('look', {});
+    assert.deepEqual(look.slots.find(x => x.slot === 'letter')?.approved_by, ['Kari']);
     assert.match((await call('show_view', { slot: 'letter', panels: [{ card: 'text', text: 'Changed after the yes' }] })).text, /not shown: slot letter \(Letter\) is approved, by Kari; it stays as it is/);
     // what the held view waited for happens: it stays away
     const q = call('ask', { question: 'Go?', choices: ['Yes', 'No'] });

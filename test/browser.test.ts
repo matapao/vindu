@@ -4,11 +4,12 @@ import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { createRequire } from 'node:module';
+import type { BrowserType } from 'playwright';
 import { BrowserPage, Browsers, Views, webAddress, type ViewHost, type Cdp, type PageNode } from '../src/index.js';
+import { cdpOf } from './helpers.js';
 
 // playwright comes from the machine (an optional peer of vindu), so it is loaded the CommonJS way
-/* eslint-disable @typescript-eslint/no-explicit-any */
-const chromium: any = createRequire(import.meta.url)('playwright').chromium;
+const chromium: BrowserType = createRequire(import.meta.url)('playwright').chromium;
 
 const PAGE = `<!doctype html><title>Invoices (synthetic)</title><h1>Invoices</h1>
 <label>Customer <input id="c" name="customer"></label>
@@ -33,7 +34,7 @@ const find = (nodes: PageNode[], f: (n: PageNode) => boolean): PageNode | undefi
 test('a page as its accessibility tree says it is; actions by reference; what it logged and failed to load', async () => {
   const tab = await browser.newPage();
   const session = await tab.context().newCDPSession(tab);
-  const cdp: Cdp = { send: (m, p) => session.send(m, p), on: (e, f) => { session.on(e, f); return () => session.off(e, f); } };
+  const cdp: Cdp = cdpOf(session);
   const browsers = new Browsers();
   const page = await browsers.add('b1', cdp);
   assert.deepEqual(await page.navigate(base + '/'), { url: base + '/' });
@@ -79,7 +80,7 @@ test('only web addresses open', () => {
 test('an action waits for the page it opens: what the model reads next is that page, loaded', async () => {
   const tab = await browser.newPage();
   const session = await tab.context().newCDPSession(tab);
-  const cdp: Cdp = { send: (m, p) => session.send(m, p), on: (e, f) => { session.on(e, f); return () => session.off(e, f); } };
+  const cdp: Cdp = cdpOf(session);
   const page = await new Browsers().add('b1', cdp);
   await page.navigate(base + '/to-slow');
   const link = find((await page.snapshot()).tree, n => n.role === 'link')!;

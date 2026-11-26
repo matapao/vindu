@@ -8,12 +8,12 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { startVindu, memoryResults, type Shown, type ShellState, type ViewPresentation } from '../src/index.js';
+import type { Page } from 'playwright';
 import { chromium, mcpClient } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 /** The document a panel's sections are drawn in. */
-const documentOf = (page: any, panel: string) => page.locator(`.vindu-pane[data-view="notes"] [data-panel="${panel}"]`).first().locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " vb-md ")][1]');
+const documentOf = (page: Page, panel: string) => page.locator(`.vindu-pane[data-view="notes"] [data-panel="${panel}"]`).first().locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " vb-md ")][1]');
 const PLAN = `# Ferry plan
 
 The crossing from **Bergen** to *Stavanger*, with \`fare()\` and a [timetable](https://example.com/timetable).
@@ -122,9 +122,9 @@ test('drawn in Chromium: headings, a list, code, a table and links as elements, 
     const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
     const errors: string[] = []; page.on('pageerror', (e: Error) => errors.push(e.message));
     await page.goto(`http://127.0.0.1:${(app.address() as { port: number }).port}/shell.html`);
-    await page.evaluate(() => (window as any).app.shell('light'));
-    await page.evaluate((x: Shown) => (window as any).app.view(x), shown.filter(v => v.name === 'notes').at(-1)!);
-    await page.evaluate((s: ShellState) => (window as any).app.state({ ...s, tree: { view: 'notes' }, maximized: null }), state!);
+    await page.evaluate(() => window.app.shell('light'));
+    await page.evaluate((x: Shown) => window.app.view(x), shown.filter(v => v.name === 'notes').at(-1)!);
+    await page.evaluate((s: ShellState) => window.app.state({ ...s, tree: { view: 'notes', size: 1 }, maximized: null }), state!);
     await page.waitForTimeout(900);
     const doc = documentOf(page, 'plan');
     assert.deepEqual(await doc.locator('.vb-mdbody [role="heading"]').allInnerTexts(), ['Ferry plan', 'Steps', 'Code', 'Fares']);
@@ -143,7 +143,7 @@ test('drawn in Chromium: headings, a list, code, a table and links as elements, 
     // the file's HTML is its text: shown, never an element, never run
     const text = await doc.locator('.vb-mdbody').innerText();
     assert.ok(text.includes('<script>window.__ran = 1</script>'), text); assert.ok(text.includes('<img src="x" onerror="window.__ran = 2">'));
-    assert.deepEqual(await doc.evaluate((d: Element) => [d.querySelectorAll('script, img, iframe, [onerror]').length, (window as any).__ran]), [0, undefined]);
+    assert.deepEqual(await doc.evaluate((d: Element) => [d.querySelectorAll('script, img, iframe, [onerror]').length, window.__ran]), [0, undefined]);
     // a table of contents beside it, and a click on an entry brings its section into view
     assert.equal(await doc.locator('.vb-toc').isVisible(), true);
     assert.deepEqual(await doc.locator('.vb-toc button').allInnerTexts(), ['Ferry plan', 'Steps', 'Code', 'Fares']);

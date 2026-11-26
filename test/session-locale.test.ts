@@ -7,9 +7,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { CELL_RULE, memoryResults, startVindu, VIEW_WORDS_NN, type Shown } from '../src/index.js';
-import { mcpClient } from './helpers.js';
+import { componentsIn, mcpClient, panelsIn, type SurfaceComponent } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const rows = [{ kunde: 'Havgap Media', beløp: 48250.5, forfall: '2026-12-04' }];
 const VIEW = { name: 'owed', title: 'Owed', panels: [{ id: 'all', card: 'table', from: 'r1' }, { id: 'todo', card: 'tasks', from: 'r1', map: { title: 'kunde', due: 'forfall' } }] };
 
@@ -22,8 +21,8 @@ async function providerWith(more: Record<string, unknown> = {}) {
     const ui = vindu.open({ results, dir }, { onView: v => shown.push(v), ...options });
     // the view of what is owed as last drawn: its data, and its tasks block
     const owed = () => shown.filter(v => v.name === 'owed').at(-1)!;
-    const panels = () => (owed().wide.find(m => (m as any).updateDataModel) as any).updateDataModel.value.panels;
-    const tasks = () => ((owed().wide.find(m => (m as any).updateComponents) as any).updateComponents.components as any[]).find(c => c.component === 'VTasks');
+    const panels = () => panelsIn(owed().wide);
+    const tasks = (): SurfaceComponent => { const t = componentsIn(owed().wide).find(c => c.component === 'VTasks'); assert.ok(t, 'the view has its tasks block'); return t; };
     return { ui, shown, amount: () => panels().p_all.rows[0].c1 as string, tasks, panels };
   };
   return { vindu, open, first: open(more) };

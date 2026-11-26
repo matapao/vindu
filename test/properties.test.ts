@@ -6,8 +6,8 @@ import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import { MOST, parseDateExpr, UNIT, type DateExpr } from '../src/dates.js';
 import { scriptJson } from '../src/escape.js';
-import { readLayout } from '../src/layout.js';
-import { isEmail } from '../src/operations.js';
+import { readLayout } from '../src/layout-read.js';
+import { isEmail } from '../src/field-values.js';
 import { slotName } from '../src/templates.js';
 
 /** Text made of the few characters that decide what a pattern reads. */

@@ -60,7 +60,7 @@ test('the renderer draws a view with a live page, a host card, a total and an im
   const errors: string[] = [];
   const p = await browser.newPage(); p.on('pageerror', (e: Error) => errors.push(e.message)); p.on('console', (m: { type(): string; text(): string }) => { if (m.type() === 'error') errors.push(m.text()); });
   await p.goto(appUrl);
-  await p.evaluate((v: Shown) => (window as unknown as { app: { mount(v: Shown): void } }).app.mount(v), shown.at(-1));
+  await p.evaluate((v: Shown) => window.app.mount(v), shown.at(-1)!);
   await p.waitForFunction(() => document.querySelectorAll('x-heat .cell').length === 2, null, { timeout: 5000 });
   assert.deepEqual(await p.locator('x-heat .cell').allTextContents(), ['Vik Data: 31050', 'Strand Bygg: 71140']); // exact, grouped by vindu
   assert.ok((await p.locator('a2ui-surface').innerText()).includes('102,190'));
@@ -81,7 +81,7 @@ test('the renderer draws a view with a live page, a host card, a total and an im
   await g.waitForFunction(() => document.getElementById('status')?.textContent === 'Closed for winter', null, { timeout: 5000 });
 
   // a narrow window gets the compact surface, where a page frame is at most 560 px high
-  await p.evaluate(() => (window as unknown as { app: { width(px: number): void } }).app.width(390));
+  await p.evaluate(() => window.app.width(390));
   await p.waitForFunction(() => { const f = document.querySelector('vindu-page iframe'); return !!f && getComputedStyle(f).height === '560px'; }, null, { timeout: 5000 });
   assert.deepEqual(errors, []);
   await p.close();
@@ -95,7 +95,7 @@ test('a large connector table renders and the next view can recover after exceed
   const view = shown.at(-1)!, p = await browser.newPage();
   try {
     await p.goto(appUrl);
-    const mount = (v: Shown) => p.evaluate((x: Shown) => (window as any).app.mount(x), v);
+    const mount = (v: Shown) => p.evaluate((x: Shown) => window.app.mount(x), v);
     const overLimit = [{ updateDataModel: { value: Array(8193).fill(0) } }];
     await mount({ ...view, wide: overLimit, compact: overLimit });
     await p.getByText(/This view is too large to display/).waitFor();
@@ -130,7 +130,7 @@ test('refreshing a compatible surface retains its edited field and tab while rep
           } } },
         ];
         const host = document.getElementById('view')!;
-        const app = (window as unknown as { app: { drawSurface: typeof import('@matapao/vindu').drawSurface } }).app;
+        const app = window.app;
         app.drawSurface(host, { name, wide: messages, compact: messages }, 'wide', {
           onAction: (action) => { host.dataset.action = JSON.stringify({ pass, action }); },
         });
@@ -149,10 +149,12 @@ test('refreshing a compatible surface retains its edited field and tab while rep
       assert.equal(await element.evaluate((el: HTMLElement) => el.isConnected), true);
     }
     assert.equal(await page.getByText('Previous result').count(), 0);
-    assert.deepEqual(await element.evaluate((el: { surface: { componentsModel: Map<string, unknown>; dataModel: Map<string, unknown> } }) =>
-      [el.surface.componentsModel.has('retired'), el.surface.dataModel.get('/retired')]), [false, undefined]);
+    assert.deepEqual(await element.evaluate(el => {
+      const { surface } = el as HTMLElement & { surface: { componentsModel: Map<string, unknown>; dataModel: Map<string, unknown> } }; // A2UI's element
+      return [surface.componentsModel.has('retired'), surface.dataModel.get('/retired')];
+    }), [false, undefined]);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-    const sent = JSON.parse(await page.locator('#view').getAttribute('data-action'));
+    const sent = JSON.parse((await page.locator('#view').getAttribute('data-action')) ?? 'null');
     assert.equal(sent.pass, 3);
     assert.equal(sent.action.context.input, 'Unsaved local edit');
     await update(4);
@@ -171,8 +173,7 @@ test('a rejected snapshot leaves the displayed model intact and catalog changes 
   try {
     await page.goto(appUrl);
     const result = await page.evaluate(() => {
-      type SDK = typeof import('@matapao/vindu');
-      const app = (window as unknown as { app: Pick<SDK, 'drawSurface' | 'vinduCatalog'> }).app;
+      const app = window.app;
       const host = document.getElementById('view')!;
       const catalog = app.vinduCatalog();
       const id = 'source';

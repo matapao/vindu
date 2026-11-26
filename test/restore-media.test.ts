@@ -8,9 +8,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { memoryResults, startVindu, type ResultPointer, type ShellState, type Shown, type ViewCheckpoint, type ViewPresentation } from '../src/index.js';
-import { chromium, mcpClient, shellServer, sleep, tinyPdf } from './helpers.js';
+import { chromium, mcpClient, shellServer, sleep, tinyPdf, type Row } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const until = async (f: () => boolean, ms = 8000) => { const end = Date.now() + ms; while (!f()) { if (Date.now() > end) throw new Error('timed out'); await sleep(20); } };
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
 const given = fs.mkdtempSync(path.join(os.tmpdir(), 'vindu-given-'));
@@ -112,9 +111,9 @@ test('restored offline: a media panel on a tool\'s picture waits for the same ca
     waiting = JSON.parse(JSON.stringify(t.ui.checkpoint())) as ViewCheckpoint;
     assert.deepEqual(keptOf(waiting), { 'photo/shot': { pointer: VOSS, fills: { field: 'media' } }, 'pics/all': { pointer: BERGEN, fills: { field: 'media', at: 1 } } });
     assert.ok(!JSON.stringify(waiting).includes(PNG.toString('base64')));
-    const pics = waiting.views.find(v => v.name === 'pics')!.args.panels as any[];
+    const pics = waiting.views.find(v => v.name === 'pics')!.args.panels as Row[];
     assert.deepEqual(pics[0].media, [host.idOf('Alta'), host.idOf('Odda')]); // the pictures it has, on their new ids
-    const photo = (waiting.views.find(v => v.name === 'photo')!.args.panels as any[])[0];
+    const photo = (waiting.views.find(v => v.name === 'photo')!.args.panels as Row[])[0];
     assert.deepEqual([photo.card, photo.title, photo.media, photo.marks, photo.awaits], ['media', 'Voss', undefined, MARKS, { tool: 'snapshot', server: 'camera', input: { site: 'Voss' } }]);
   } finally { t.close(); }
 });
@@ -172,10 +171,10 @@ test('in Chromium: the waiting picture says why with Try again, and the person\'
     const errors: string[] = [];
     page.on('pageerror', (e: Error) => errors.push(e.message));
     await page.goto(server.url);
-    await page.evaluate(() => (window as any).app.shell('light'));
+    await page.evaluate(() => window.app.shell('light'));
     const push = async () => {
-      for (const v of t.shown.splice(0)) await page.evaluate((x: Shown) => (window as any).app.view(x), v);
-      if (state) await page.evaluate((s: ShellState) => (window as any).app.state(s), state);
+      for (const v of t.shown.splice(0)) await page.evaluate((x: Shown) => window.app.view(x), v);
+      if (state) await page.evaluate((s: ShellState) => window.app.state(s), state);
     };
     await push();
     const pane = page.locator('.vindu-pane[data-view="photo"]');
@@ -183,7 +182,7 @@ test('in Chromium: the waiting picture says why with Try again, and the person\'
     assert.equal(await pane.locator('img').count(), 0);
     host.online = true;
     await pane.getByRole('button', { name: 'Try again' }).click();
-    for (const e of await page.evaluate(() => (window as any).app.events())) t.ui.event(e);
+    for (const e of await page.evaluate(() => window.app.events())) t.ui.event(e);
     await until(() => t.shown.some(v => JSON.stringify(v.wide).includes(`/media/${host.idOf('Voss')}`)));
     await push();
     const img = pane.locator('img');

@@ -8,9 +8,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { startVindu, memoryResults, type ReadProgress, type Shown, type ShellState } from '../src/index.js';
-import { chromium, mcpClient, shellServer, tinyPdf } from './helpers.js';
+import { chromium, mcpClient, shellServer, tinyPdf, type Look, paneIn } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const invoices = Array.from({ length: 60 }, (_, i) => ({ number: `INV-2026-${String(400 + i).padStart(4, '0')}`, customer: i % 2 ? 'Havgap Media' : 'Brattli Verksted', amount: 1000 + i * 37 }));
 
@@ -33,13 +32,13 @@ test('in Chromium: how far each panel has been read goes to the host as it grows
     const page = await browser.newPage({ viewport: { width: 1200, height: 700 } });
     const errors: string[] = []; page.on('pageerror', (e: Error) => errors.push(e.message));
     await page.goto(shell.url);
-    await page.evaluate(() => (window as any).app.shell('light'));
+    await page.evaluate(() => window.app.shell('light'));
     const latest = new Map<string, Shown>(); for (const v of shown) latest.set(v.name, v);
-    for (const v of latest.values()) await page.evaluate((x: Shown) => (window as any).app.view(x), v);
-    await page.evaluate((s: ShellState) => (window as any).app.state(s), st.s!);
+    for (const v of latest.values()) await page.evaluate((x: Shown) => window.app.view(x), v);
+    await page.evaluate((s: ShellState) => window.app.state(s), st.s!);
     const drawnAt = Date.now();
     // what the window reports goes to the UI server, as an app's IPC would carry it
-    const pass = async () => { for (const e of (await page.evaluate(() => (window as any).app.events())) as any[]) ui.event(e); };
+    const pass = async () => { for (const e of await page.evaluate(() => window.app.events())) ui.event(e); };
     const readOf = (view: string, panel: string) => ui.readProgress().find(r => r.view === view && r.panel === panel)?.read;
     const until = async (what: string, ok: () => boolean) => { for (let i = 0; i < 120; i++) { await page.waitForTimeout(100); await pass(); if (ok()) return; } throw new Error(`the window did not say: ${what}; read: ${JSON.stringify(ui.readProgress())}`); };
 
@@ -68,11 +67,11 @@ test('in Chromium: how far each panel has been read goes to the host as it grows
     assert.deepEqual(heard.filter(r => r.read === 1).map(r => `${r.view}/${r.panel}`).sort(), ['doc/pdf', 'inv/rows', 'note/gist']);
 
     // the model is told none of it: not in an account, not in what changed, not in look
-    const look = await c.json('look', {});
+    const look: Look = await c.json('look', {});
     const again = await c.json('show_view', { name: 'more', title: 'More', panels: [{ card: 'text', text: 'And one more.' }] });
     const delta = ui.delta();
     for (const said of [...accounts, look, again, delta]) assert.doesNotMatch(JSON.stringify(said), /"read"|read_?progress|"share"/i);
-    assert.ok(look.panes.find((p: any) => p.view === 'inv').in_sight, 'look still says what is in sight'); // what it said before
+    assert.ok(paneIn(look, 'inv').in_sight, 'look still says what is in sight'); // what it said before
     // the model shows the note anew: what was read of it goes with the old, and is read again from nothing
     await c.json('show_view', { name: 'note', title: 'Note', panels: [{ id: 'gist', card: 'text', text: 'Three invoices are late.' }] });
     assert.equal(readOf('note', 'gist'), undefined);
@@ -96,11 +95,11 @@ test('in Chromium: a page the model wrote is read as its document scrolls, and a
   try {
     const page = await browser.newPage({ viewport: { width: 1200, height: 700 } });
     await page.goto(shell.url);
-    await page.evaluate(() => (window as any).app.shell('light'));
+    await page.evaluate(() => window.app.shell('light'));
     const latest = new Map<string, Shown>(); for (const v of shown) latest.set(v.name, v);
-    for (const v of latest.values()) await page.evaluate((x: Shown) => (window as any).app.view(x), v);
-    await page.evaluate((s: ShellState) => (window as any).app.state(s), st.s!);
-    const pass = async () => { for (const e of (await page.evaluate(() => (window as any).app.events())) as any[]) ui.event(e); };
+    for (const v of latest.values()) await page.evaluate((x: Shown) => window.app.view(x), v);
+    await page.evaluate((s: ShellState) => window.app.state(s), st.s!);
+    const pass = async () => { for (const e of await page.evaluate(() => window.app.events())) ui.event(e); };
     const readOf = (view: string, panel: string) => ui.readProgress().find(r => r.view === view && r.panel === panel)?.read;
     const until = async (what: string, ok: () => boolean) => { for (let i = 0; i < 150; i++) { await page.waitForTimeout(100); await pass(); if (ok()) return; } throw new Error(`the window did not say: ${what}; read: ${JSON.stringify(ui.readProgress())}`); };
     const frameOf = async (view: string, panel: string) => (await (await page.waitForSelector(`.vindu-pane[data-view="${view}"] iframe[data-page-panel="${panel}"]`)).contentFrame())!;
@@ -109,7 +108,7 @@ test('in Chromium: a page the model wrote is read as its document scrolls, and a
     assert.ok(readOf('site', 'tall')! < 0.5 && readOf('src', 'file')! < 0.5, JSON.stringify(ui.readProgress()));
     await site.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
     await src.waitForSelector('body[data-ready]');
-    await src.evaluate(() => { const e = (globalThis as any).monaco.editor.getEditors()[0]; e.setScrollTop(e.getScrollHeight()); });
+    await src.evaluate(() => { const e = window.monaco.editor.getEditors()[0]; e.setScrollTop(e.getScrollHeight()); });
     await until('the page and the file read to their ends', () => readOf('site', 'tall') === 1 && readOf('src', 'file') === 1);
   } finally { await browser.close(); shell.close(); await c.mcp.close(); ui.close(); await vindu.close(); }
 });

@@ -11,7 +11,6 @@ import { startVindu, memoryResults, readableName, type Shown } from '../src/inde
 import { chartSvg } from '../src/chart-svg.js';
 import { chromium, mcpClient, shellServer } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /** The SVG of a chart's data: URL, as text. */
 const svgOf = (url: string) => Buffer.from(url.slice(url.indexOf(',') + 1), 'base64').toString('utf8');
 /** The text of each <text> in an SVG, in order. */
@@ -53,7 +52,7 @@ test('in a pane of 900 px the chart fills its width, drawn there at that width, 
   const page: BrowserPage = await browser.newPage({ viewport: { width: 1000, height: 900 } });
   try {
     await page.goto(server.url);
-    await page.evaluate(v => { (window as any).app.width(900); (window as any).app.catalog('view', v, { theme: true }); }, shown.at(-1)!);
+    await page.evaluate(v => { window.app.width(900); window.app.catalog('view', v, { theme: true }); }, shown.at(-1)!);
     const box = () => page.evaluate(() => {
       const chart = document.querySelector<HTMLElement>('vindu-chart .vb-chart')!, img = chart.querySelector('img')!, strips = chart.querySelector<HTMLElement>('.vb-strips')!;
       const c = chart.getBoundingClientRect(), i = img.getBoundingClientRect(), s = strips.getBoundingClientRect();
@@ -65,7 +64,7 @@ test('in a pane of 900 px the chart fills its width, drawn there at that width, 
     assert.ok(Math.abs(b.image - b.chart) <= 1 && Math.abs(b.natural - b.chart) <= 1, JSON.stringify(b)); // drawn at that width, not scaled
     assert.ok(Math.abs(b.left - 56) <= 1 && Math.abs(b.right - 24) <= 1, JSON.stringify(b)); // the strips over the plot
     // narrower, it is drawn again narrower
-    await page.evaluate(() => (window as any).app.width(700));
+    await page.evaluate(() => window.app.width(700));
     await page.waitForFunction(() => { const img = document.querySelector<HTMLImageElement>('vindu-chart img'); return !!img && img.naturalWidth < 700 && img.naturalWidth > 600; }, null, { timeout: 5000 });
   } finally { await page.close(); }
 });

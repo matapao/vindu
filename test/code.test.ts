@@ -10,7 +10,6 @@ import { gitHead, startVindu, memoryResults } from '../src/index.js';
 import { playwrightDriver } from '../src/drivers/playwright.js';
 import { chromium, mcpClient } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const work = tmp('code-work-');
 const git = (...a: string[]) => execFileSync('git', ['-C', work, '-c', 'user.name=Test', '-c', 'user.email=test@example.com', ...a], { encoding: 'utf8' });

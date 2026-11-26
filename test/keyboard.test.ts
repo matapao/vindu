@@ -13,7 +13,6 @@ import { VINDU_CATALOG } from '../src/catalog-id.js';
 import type { View } from '../src/renderer/index.js';
 import { chromium } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const site = http.createServer((req, res) => {
   const f = req.url === '/app.bundle.js' ? path.join(import.meta.dirname, 'fixtures', 'app.bundle.js') : path.join(import.meta.dirname, '..', '..', 'test', 'fixtures', 'shell.html');
   res.writeHead(200, { 'Content-Type': f.endsWith('.js') ? 'text/javascript' : 'text/html' }).end(fs.readFileSync(f));
@@ -41,14 +40,14 @@ async function windowWith(views: View[], metas: Record<string, ViewMeta>, layout
   for (const [name, m] of Object.entries(metas)) shell.show(name, m);
   if (layout !== undefined) shell.setLayout(layout);
   await page.evaluate(({ views, state, mount }) => {
-    const app = (window as any).app;
+    const app = window.app;
     if (mount === 'shell') app.shell('light'); else app.hostShell();
     for (const v of views) app.view(v);
     app.state(state);
   }, { views, state: shell.state(), mount });
   await page.waitForTimeout(300);
-  await page.evaluate(() => (window as any).app.events());
-  return { page, errors, events: () => page.evaluate(() => (window as any).app.events()) as Promise<any[]> };
+  await page.evaluate(() => window.app.events());
+  return { page, errors, events: () => page.evaluate(() => window.app.events()) };
 }
 const focusedView = (page: Page) => page.evaluate(() => (document.activeElement?.closest('.vindu-pane') as HTMLElement | null)?.dataset.view ?? null);
 
@@ -117,7 +116,7 @@ test('a browser pane drawn as pictures: keys go to the page, F6 and Shift+F6 lea
     await page.keyboard.press('Tab'); // by keyboard: its focus is drawn
     assert.ok(await slot.evaluate(el => el === document.activeElement));
     assert.equal(await slot.evaluate(el => getComputedStyle(el).outlineStyle), 'solid');
-    await page.evaluate(() => (window as any).app.browserCalls());
+    await page.evaluate(() => window.app.browserCalls());
     await page.keyboard.press('a');
     await page.keyboard.press('Tab'); // the page's own Tab, to its next field
     assert.ok(await slot.evaluate(el => el === document.activeElement));
@@ -127,11 +126,11 @@ test('a browser pane drawn as pictures: keys go to the page, F6 and Shift+F6 lea
     await page.keyboard.press('Shift+F6');
     assert.equal(await focusedView(page), 'web');
     assert.equal(await slot.evaluate(el => el === document.activeElement), false); // the pane, not the page: Tab goes on from there
-    const keys = (await page.evaluate(() => (window as any).app.browserCalls())).filter((c: any) => c.type === 'key' && c.event !== 'keyUp').map((c: any) => c.key);
+    const keys = (await page.evaluate(() => window.app.browserCalls())).filter(c => c.type === 'key' && c.event !== 'keyUp').map(c => c.key);
     assert.deepEqual(keys, ['a', 'Tab']); // F6 never reached the page
     await page.locator('.vindu-pane[data-view="web"] .vindu-point').click(); // pointing at the page, until it is picked or called off
-    await page.evaluate(() => (window as any).app.destroy());
-    assert.ok((await page.evaluate(() => (window as any).app.browserCalls())).some((c: any) => c.stopPointing === 'web'));
+    await page.evaluate(() => window.app.destroy());
+    assert.ok((await page.evaluate(() => window.app.browserCalls())).some(c => c.stopPointing === 'web'));
     assert.deepEqual(errors, []);
   } finally { await page.close(); }
 });
@@ -141,11 +140,11 @@ test('the activity: Back gives the keyboard to the list, a message is named by i
   try {
     await page.setContent('<main style="height:600px"></main><form id="f"><textarea></textarea><div id="tools"><button>Go</button></div></form>');
     await page.addScriptTag({ type: 'module', path: path.join(import.meta.dirname, 'fixtures', 'app.bundle.js') });
-    await page.waitForFunction(() => !!(window as any).app);
+    await page.waitForFunction(() => !!window.app);
     await page.evaluate(() => {
-      const f = document.getElementById('f')!;
-      const w = (window as any).app.mountWorkspace(document.querySelector('main')!, { elements: { composer: {
-        element: f, input: f.querySelector('textarea'), tools: f.querySelector('#tools'), send: f.querySelector('button'), context: undefined } } });
+      const f = document.querySelector('form')!;
+      const w = window.app.mountWorkspace(document.querySelector('main')!, { elements: { composer: {
+        element: f, input: f.querySelector('textarea')!, tools: f.querySelector<HTMLElement>('#tools')!, send: f.querySelector('button')!, context: undefined } } });
       w.setTasks([{ id: 't1', title: 'Review' }]);
       w.showThread('Review'); // the host opens the thread itself: no task was clicked
       w.setMessages([{ id: 'm1', role: 'assistant', text: 'Ready for review' }]);

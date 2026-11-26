@@ -5,8 +5,8 @@
 import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { Views, type Cdp, type PageNode, type ViewHost } from '../src/index.js';
-import { chromium, sleep } from './helpers.js';
+import { Views, type PageNode, type ViewHost } from '../src/index.js';
+import { cdpOf, chromium, sleep } from './helpers.js';
 
 const reached: string[] = []; // host and path of every request the sites got
 const reachedAt: number[] = []; // and when each came
@@ -39,7 +39,7 @@ function window(answer: (title: string) => boolean) {
   const confirm: ViewHost['confirm'] = async q => { asked.push(q.title); await sleep(150); answered.push(Date.now()); return answer(q.title); };
   const views = new Views({ terminal: false, browser: { open: async () => {
     const tab = await browser.newPage(); const s = await tab.context().newCDPSession(tab);
-    return { send: (m, p) => s.send(m, p), on: (e, f) => { s.on(e, f); return () => s.off(e, f); } } satisfies Cdp;
+    return cdpOf(s);
   } } }, { cwd: '.', dir: '.', confirm, pane: () => [], unpane() {}, tell() {}, log() {} });
   return { views, asked, answered };
 }

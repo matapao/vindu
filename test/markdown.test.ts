@@ -133,7 +133,7 @@ test('text full of marks that close nowhere, brackets and long lines still reads
 
 test('the start of a file: at most 512,000 bytes, cut after its last whole line, never inside a character; text only', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-start-'));
-  const file = path.join(dir, 'long.md'); fs.writeFileSync(file, `${'# Line of text, for the start\n'.repeat(20_000)}`); // 600,000 bytes
+  const file = path.join(dir, 'long.md'); fs.writeFileSync(file, '# Line of text, for the start\n'.repeat(20_000)); // 600,000 bytes
   const start = readTextStart(file, MARKDOWN_MOST)!;
   assert.equal(MARKDOWN_MOST, 512_000); assert.equal(start.size, 600_000);
   assert.ok(start.bytes <= 512_000 && start.bytes > 511_900 && start.text.endsWith('start\n'), String(start.bytes));

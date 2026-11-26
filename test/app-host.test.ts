@@ -7,12 +7,11 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import type { Frame, Page } from 'playwright';
-import { Shell } from '../src/shell.js';
+import { Shell, type ShellState } from '../src/shell.js';
 import { VINDU_CATALOG } from '../src/catalog-id.js';
 import type { View } from '../src/renderer/index.js';
 import { chromium, sleep } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // An app keeps what the window posts it (said), and tells the server here of each teardown it hears. answerAfter: how
 // long it takes to answer one, in ms; without it, it never answers, and sends a response of another id instead.
 const appPage = (answerAfter?: number) => `<!doctype html><p>app</p><script>
@@ -67,7 +66,7 @@ async function windowWith(views: View[], o: { locale?: string; width?: number } 
   const shell = new Shell();
   for (const view of views) shell.show(view.name, { title: view.name, fill: false, panels: 'app' });
   await page.evaluate(({ views, state, locale }) => {
-    const app = (window as any).app;
+    const app = window.app;
     app.shell('light', false, undefined, locale);
     for (const view of views) app.view(view);
     app.state(state);
@@ -80,19 +79,22 @@ const frameAt = async (page: Page, file: string): Promise<Frame> => {
 };
 /** What the app was told of its host context since it initialized, change by change. */
 const changes = (app: Frame): Promise<Record<string, unknown>[]> =>
-  app.evaluate(() => (window as any).said.filter((m: any) => m.method === 'ui/notifications/host-context-changed').map((m: any) => m.params));
+  app.evaluate(() => window.said.filter(m => m.method === 'ui/notifications/host-context-changed').map(m => {
+    if (!m.params) throw new Error('a change of host context without its params');
+    return m.params;
+  }));
 const changed = (app: Frame, key: string, count: number) =>
-  app.waitForFunction(([key, count]) => (window as any).said.filter((m: any) => m.params && key in m.params).length >= count, [key, count] as const);
+  app.waitForFunction(([key, count]) => window.said.filter(m => m.params && key in m.params).length >= count, [key, count] as const);
 
 test('an app hears the window\'s language: the host\'s at initialize, and again each time it changes', async () => {
   const { page, errors } = await windowWith([appView('language', [{ panel: 'app', file: '/app.html' }])], { locale: 'nb-no' });
   try {
     const app = await frameAt(page, '/app.html');
-    const init = await app.evaluate(() => (window as any).init());
+    const init = await app.evaluate(() => window.init());
     assert.equal(init.result.hostContext.locale, 'nb-NO'); // the host's tag, in its canonical form
-    await page.evaluate(() => (window as any).app.locale('en-GB'));
+    await page.evaluate(() => window.app.locale('en-GB'));
     await changed(app, 'locale', 1);
-    await page.evaluate(() => { (window as any).app.locale('en-GB'); (window as any).app.locale('not a tag'); }); // the same again tells nothing
+    await page.evaluate(() => { window.app.locale('en-GB'); window.app.locale('not a tag'); }); // the same again tells nothing
     await changed(app, 'locale', 2);
     assert.deepEqual((await changes(app)).filter(p => 'locale' in p), [{ locale: 'en-GB' }, { locale: 'de-DE' }]); // what is not a tag is the browser's
     assert.deepEqual(errors, []);
@@ -103,8 +105,8 @@ test('an app hears the theme: the shell\'s own as it changes, and the system\'s 
   const { page, errors } = await windowWith([appView('theme', [{ panel: 'app', file: '/app.html' }])]);
   try {
     const app = await frameAt(page, '/app.html');
-    assert.equal((await app.evaluate(() => (window as any).init())).result.hostContext.theme, 'light');
-    const theme = (t: string) => page.evaluate(t => (window as any).app.theme(t), t);
+    assert.equal((await app.evaluate(() => window.init())).result.hostContext.theme, 'light');
+    const theme = (t: 'light' | 'dark' | 'auto') => page.evaluate(t => window.app.theme(t), t);
     await theme('dark'); await changed(app, 'theme', 1);
     await theme('dark'); await theme('auto'); await changed(app, 'theme', 2); // the system's: light
     await page.emulateMedia({ colorScheme: 'dark' }); await changed(app, 'theme', 3);
@@ -113,8 +115,8 @@ test('an app hears the theme: the shell\'s own as it changes, and the system\'s 
     assert.deepEqual((await changes(app)).filter(p => 'theme' in p), [{ theme: 'dark' }, { theme: 'light' }, { theme: 'dark' }, { theme: 'light' }]);
 
     // the whole shell goes: hidden at once, and its app hears its teardown before its frame goes
-    assert.deepEqual(await page.evaluate(() => { (window as any).app.destroy(); return [document.querySelector<HTMLElement>('.vindu-shell')!.style.display, !!document.querySelector('iframe')]; }), ['none', true]);
-    await app.waitForFunction(() => (window as any).said.at(-1)?.method === 'ui/resource-teardown');
+    assert.deepEqual(await page.evaluate(() => { window.app.destroy(); return [document.querySelector<HTMLElement>('.vindu-shell')!.style.display, !!document.querySelector('iframe')]; }), ['none', true]);
+    await app.waitForFunction(() => window.said.at(-1)?.method === 'ui/resource-teardown');
     await page.waitForFunction(() => !document.querySelector('.vindu-shell'), undefined, { timeout: 2000 });
     assert.deepEqual(errors, []);
   } finally { await page.close(); }
@@ -126,7 +128,7 @@ test('an app hears its frame\'s new width, and nothing of a height it asked for'
     const app = await frameAt(page, '/app.html');
     const width = () => page.evaluate(() => document.querySelector('iframe')!.clientWidth);
     const before = await width();
-    assert.deepEqual((await app.evaluate(() => (window as any).init())).result.hostContext.containerDimensions, { width: before, maxHeight: 2000 });
+    assert.deepEqual((await app.evaluate(() => window.init())).result.hostContext.containerDimensions, { width: before, maxHeight: 2000 });
     await page.setViewportSize({ width: 1100, height: 800 }); // the lone pane widens with the window
     await changed(app, 'containerDimensions', 1);
     const after = await width();
@@ -135,11 +137,11 @@ test('an app hears its frame\'s new width, and nothing of a height it asked for'
     assert.ok(told.every(p => Object.keys(p).join() === 'containerDimensions'), JSON.stringify(told)); // only what changed
     assert.deepEqual(told.at(-1), { containerDimensions: { width: after, maxHeight: 2000 } });
 
-    const count = await app.evaluate(() => (window as any).said.length);
-    await app.evaluate(() => (window as any).tell('ui/notifications/size-changed', { height: 300 }));
+    const count = await app.evaluate(() => window.said.length);
+    await app.evaluate(() => window.tell('ui/notifications/size-changed', { height: 300 }));
     await page.waitForFunction(() => document.querySelector('iframe')!.clientHeight === 300);
     await sleep(300);
-    assert.equal(await app.evaluate(() => (window as any).said.length), count);
+    assert.equal(await app.evaluate(() => window.said.length), count);
     assert.deepEqual(errors, []);
   } finally { await page.close(); }
 });
@@ -152,27 +154,27 @@ test('an app hears its teardown before its pane goes: it goes once the app answe
   ]);
   try {
     const [answers, silent, idle] = await Promise.all(['/answers.html', '/app.html', '/idle.html', '/alone.html'].map(file => frameAt(page, file)));
-    for (const app of [answers, silent]) await app.evaluate(() => (window as any).init());
-    await page.evaluate(() => (window as any).app.events());
+    for (const app of [answers, silent]) await app.evaluate(() => window.init());
+    await page.evaluate(() => window.app.events());
     heard.length = 0;
 
     // a pane whose frame never initialized goes at once
     shell.drop('alone');
     assert.equal(await page.evaluate(state => {
       const frame = document.querySelector('iframe[data-app-panel="l"]')!;
-      (window as any).app.state(state);
+      window.app.state(state);
       return frame.isConnected;
     }, shell.state()), false);
 
     // one whose app answers: hidden at once, and gone once it has answered, 150 ms on
-    const goneAfter = (state: unknown, panel: string) => page.evaluate(({ state, panel }) => {
+    const goneAfter = (state: ShellState, panel: string) => page.evaluate(({ state, panel }) => {
       const frame = document.querySelector(`iframe[data-app-panel="${panel}"]`)!, pane = frame.closest('.vindu-pane')!, start = performance.now();
-      const w = window as any; w.gone = undefined;
+      const w = window; w.gone = undefined;
       new MutationObserver((_, watch) => { if (!frame.isConnected) { watch.disconnect(); w.gone = performance.now() - start; } }).observe(document.body, { childList: true, subtree: true });
       w.app.state(state);
       return frame.isConnected && getComputedStyle(pane).display === 'none';
     }, { state, panel });
-    const gone = () => page.waitForFunction(() => (window as any).gone, undefined, { timeout: 3000 }).then(h => h.jsonValue() as Promise<number>);
+    const gone = () => page.waitForFunction(() => window.gone, undefined, { timeout: 3000 }).then(h => h.jsonValue() as Promise<number>);
     shell.drop('answers');
     assert.equal(await goneAfter(shell.state(), 'a'), true);
     const answered = await gone();
@@ -182,15 +184,15 @@ test('an app hears its teardown before its pane goes: it goes once the app answe
     // it, which never initialized, is not asked
     shell.drop('silent');
     assert.equal(await goneAfter(shell.state(), 's'), true);
-    await silent.waitForFunction(() => (window as any).said.some((m: any) => m.method === 'ui/resource-teardown'));
-    const asked = await silent.evaluate(() => (window as any).said.find((m: any) => m.method === 'ui/resource-teardown'));
-    assert.deepEqual({ ...asked, id: typeof asked.id }, { jsonrpc: '2.0', id: 'string', method: 'ui/resource-teardown', params: {} });
-    assert.deepEqual(await idle.evaluate(() => (window as any).said), []);
+    await silent.waitForFunction(() => window.said.some(m => m.method === 'ui/resource-teardown'));
+    const asked = await silent.evaluate(() => window.said.find(m => m.method === 'ui/resource-teardown'));
+    assert.deepEqual({ ...asked, id: typeof asked?.id }, { jsonrpc: '2.0', id: 'string', method: 'ui/resource-teardown', params: {} });
+    assert.deepEqual(await idle.evaluate(() => window.said), []);
     const waited = await gone();
     assert.ok(waited >= 490 && waited < 1500, `${waited} ms`);
 
     assert.deepEqual(heard.map(h => [h.app, h.method]), [['/answers.html', 'ui/resource-teardown'], ['/app.html', 'ui/resource-teardown']]);
-    assert.deepEqual(await page.evaluate(() => (window as any).app.events().filter((e: any) => e.type === 'app')), []); // answers are the window's own
+    assert.deepEqual(await page.evaluate(() => window.app.events().filter(e => e.type === 'app')), []); // answers are the window's own
     assert.deepEqual(errors, []);
   } finally { await page.close(); }
 });

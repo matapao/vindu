@@ -8,9 +8,8 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { startVindu, memoryResults, type Shown, type ShellState } from '../src/index.js';
-import { chromium, mcpClient } from './helpers.js';
+import { chromium, mcpClient, paneIn, type Look } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const invoices = Array.from({ length: 40 }, (_, i) => ({ number: `INV-2026-${String(400 + i).padStart(4, '0')}`, customer: i % 2 ? 'Havgap Media' : 'Brattli Verksted', amount: 1000 + i * 37 }));
 const tasks = Array.from({ length: 30 }, (_, i) => ({ id: `t${i + 1}`, title: `Task ${i + 1}`, due: '2026-11-20' }));
@@ -34,18 +33,18 @@ test("in Chromium: what of each panel is in sight, read from the window's own ma
     const page = await browser.newPage({ viewport: { width: 1200, height: 700 } });
     const errors: string[] = []; page.on('pageerror', (e: Error) => errors.push(e.message));
     await page.goto(`http://127.0.0.1:${(app.address() as { port: number }).port}/shell.html`);
-    await page.evaluate(() => (window as any).app.shell('light'));
+    await page.evaluate(() => window.app.shell('light'));
     const latest = new Map<string, Shown>(); for (const v of shown) latest.set(v.name, v);
-    for (const v of latest.values()) await page.evaluate((x: Shown) => (window as any).app.view(x), v);
-    await page.evaluate((s: ShellState) => (window as any).app.state(s), st.s!);
+    for (const v of latest.values()) await page.evaluate((x: Shown) => window.app.view(x), v);
+    await page.evaluate((s: ShellState) => window.app.state(s), st.s!);
     // what the window reports goes to the UI server, as an app's IPC would carry it
-    const pass = async () => { for (const e of (await page.evaluate(() => (window as any).app.events())) as any[]) ui.event(e); };
-    const lookAt = async (pred: (a: any) => boolean) => { for (let i = 0; i < 60; i++) { await page.waitForTimeout(100); await pass(); const a = await c.json('look', {}); if (pred(a)) return a; } throw new Error('the window did not say'); };
-    const inv = (a: any) => a.panes.find((p: any) => p.view === 'inv')?.in_sight?.rows as string | undefined;
+    const pass = async () => { for (const e of await page.evaluate(() => window.app.events())) ui.event(e); };
+    const lookAt = async (pred: (a: Look) => boolean): Promise<Look> => { for (let i = 0; i < 60; i++) { await page.waitForTimeout(100); await pass(); const a: Look = await c.json('look', {}); if (pred(a)) return a; } throw new Error('the window did not say'); };
+    const inv = (a: Look) => a.panes.find(p => p.view === 'inv')?.in_sight?.rows;
     const top = await lookAt(a => /^rows 1 to \d+ of 40: INV-2026-0400 to INV-2026-0\d{3}$/.test(inv(a) ?? ''));
     const shownAtTop = Number(/^rows 1 to (\d+)/.exec(inv(top)!)![1]);
     assert.ok(shownAtTop > 3 && shownAtTop < 40, `some rows, not all: ${inv(top)}`);
-    assert.match(top.panes.find((p: any) => p.view === 'todo').in_sight.t, /^rows 1 to \d+ of 30: Task 1 to Task \d+$/); // a block's rows, by their own marks
+    assert.match(paneIn(top, 'todo').in_sight.t, /^rows 1 to \d+ of 30: Task 1 to Task \d+$/); // a block's rows, by their own marks
     // the person scrolls to the end of the invoices
     await page.evaluate(() => { const b = document.querySelector('.vindu-pane[data-view="inv"] .vindu-pane-body') as HTMLElement; b.scrollTop = b.scrollHeight; });
     const end = await lookAt(a => / to 40 of 40: INV-2026-\d{4} to INV-2026-0439$/.test(inv(a) ?? ''));

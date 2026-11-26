@@ -9,10 +9,9 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { startVindu, memoryResults, type Shown, type ShellState } from '../src/index.js';
-import { resolvePoint } from '../src/pointing.js';
-import { chromium, mcpClient, sleep } from './helpers.js';
+import { resolvePoint, type PointItem } from '../src/pointing.js';
+import { chromium, mcpClient, sleep, answerOf, componentIn, eventsOf, panelsIn, type SurfaceComponent } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const until = async (f: () => boolean, ms = 8000) => { const end = Date.now() + ms; while (!f()) { if (Date.now() > end) throw new Error('timed out'); await sleep(20); } };
 const invoices = [
@@ -56,7 +55,8 @@ test('what the person points at: a bar is the rows behind it; a row is its refer
   ui.event({ type: 'attach', view: 'invoices', on: true });
   const c = ui.context();
   assert.match(c.text, /^\[the window: \{"pointed_at":"p\d+","items":\[/); assert.match(c.text, /"in_the_chat":\[\{"view":"invoices"/);
-  assert.deepEqual((ui.answers().find(a => a.id === c.id) as any).values.items.length, 2);
+  const items = answerOf(ui.answers().find(a => a.id === c.id))?.values?.items;
+  assert.ok(Array.isArray(items)); assert.deepEqual(items.length, 2);
   assert.deepEqual(ui.selection(), []); // taken with the message; the pane stays in the chat
   assert.match(ui.context().text, /"in_the_chat"/); assert.doesNotMatch(ui.context().text, /pointed_at/);
   ui.event({ type: 'attach', view: 'invoices', on: false });
@@ -67,10 +67,9 @@ test('opening a bar shows the rows behind it in the same pane, exactly; back ret
   assert.equal(ui.event({ type: 'drill', view: 'overdue', panel: 'by-customer', row: 0 }), true);
   await until(() => JSON.stringify(shown.filter(v => v.name === 'overdue').at(-1)!.wide).includes('Havgap Media › ') === false && shown.filter(v => v.name === 'overdue').length > 1);
   const last = shown.filter(v => v.name === 'overdue').at(-1)!;
-  const comps = (last.wide.find((m: any) => m.updateComponents) as any).updateComponents.components;
-  assert.equal(comps.find((x: any) => x.id === 'path_text').text, 'Overdue › Havgap Media');
-  const rows = (last.wide.find((m: any) => m.updateDataModel) as any).updateDataModel.value.panels;
-  assert.equal(Object.values(rows)[0] && (Object.values(rows)[0] as any).rows.length, 2); // INV-2026-0412 and -0431
+  assert.equal(componentIn(last.wide, x => x.id === 'path_text').text, 'Overdue › Havgap Media');
+  const rows = panelsIn(last.wide);
+  assert.equal(Object.values(rows)[0] && Object.values(rows)[0].rows.length, 2); // INV-2026-0412 and -0431
   assert.match(ui.delta(), /opened Havgap Media in Overdue \(by-customer\): the 2 rows behind it/);
   const n = shown.length;
   assert.equal(ui.event({ type: 'action', view: 'overdue', name: 'drill_back', context: { depth: 1 } }), true);
@@ -81,7 +80,7 @@ test('opening a bar shows the rows behind it in the same pane, exactly; back ret
 
 test('suggestions go to the prompt box, unsent; a page proposes and reports through its bridge', async () => {
   const s = shown.filter(v => v.name === 'overdue').at(-1)!;
-  const btn = (s.wide.find((m: any) => m.updateComponents) as any).updateComponents.components.find((x: any) => x.id === 'suggest_0');
+  const btn = componentIn<SurfaceComponent & { action: { event: { context: Record<string, unknown> } } }>(s.wide, x => x.id === 'suggest_0');
   assert.deepEqual(btn.action.event.context, { n: 0, label: 'Who to remind first', prompt: 'Which customer should I remind first, and why?' });
   assert.equal(ui.event({ type: 'action', view: 'overdue', name: 'suggest', context: btn.action.event.context }), true);
   assert.deepEqual(suggested, ['Which customer should I remind first, and why?']);
@@ -105,34 +104,35 @@ test('in Chromium: Alt-click marks a row, Alt-drag marks bars, a plain click ope
     const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
     const errors: string[] = []; page.on('pageerror', (e: Error) => errors.push(e.message));
     await page.goto(`http://127.0.0.1:${(app.address() as { port: number }).port}/shell.html`);
-    await page.evaluate(() => (window as any).app.shell('light'));
+    await page.evaluate(() => window.app.shell('light'));
     const latest = new Map<string, Shown>(); for (const v of shown) if (!v.ask) latest.set(v.name, v);
-    for (const v of latest.values()) await page.evaluate((x: Shown) => (window as any).app.view(x), v);
-    await page.evaluate((s: ShellState) => (window as any).app.state(s), state!);
+    for (const v of latest.values()) await page.evaluate((x: Shown) => window.app.view(x), v);
+    await page.evaluate((s: ShellState) => window.app.state(s), state!);
     await page.waitForTimeout(900);
     const center = (sel: string) => page.evaluate((q: string) => { const e = document.querySelector(q); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height }; }, sel);
-    const rowOf = () => page.evaluate(() => { const all = [...document.querySelectorAll('.vindu-pane[data-view="invoices"] *')] as any[]; const e = all.find(x => x.context?.dataContext?.path === '/panels/p_list/rows/1'); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
-    await page.evaluate(() => (window as any).app.events()); // drop what drawing reported
+    const rowOf = () => page.evaluate(() => { const all = [...document.querySelectorAll<Element & { context?: { dataContext?: { path?: string } } }>('.vindu-pane[data-view="invoices"] *')]; const e = all.find(x => x.context?.dataContext?.path === '/panels/p_list/rows/1'); if (!e) throw new Error('no element is bound to row 1'); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+    await page.evaluate(() => window.app.events()); // drop what drawing reported
     const row = await rowOf();
     await page.keyboard.down('Alt'); await page.mouse.click(row.x, row.y); await page.keyboard.up('Alt');
-    let ev = await page.evaluate(() => (window as any).app.events());
-    assert.deepEqual(ev.find((e: any) => e.type === 'select'), { type: 'select', by: 'click', items: [{ view: 'invoices', pid: 'p_list', row: 1 }] });
+    let ev = await page.evaluate(() => window.app.events());
+    assert.deepEqual(ev.find(e => e.type === 'select'), { type: 'select', by: 'click', items: [{ view: 'invoices', pid: 'p_list', row: 1 }] });
     const s0 = await center('.vindu-pane[data-view="overdue"] .vb-strip[data-row="0"]'), s2 = await center('.vindu-pane[data-view="overdue"] .vb-strip[data-row="2"]');
     assert.ok(s0 && s2);
-    await page.keyboard.down('Alt'); await page.mouse.move(s0!.x - s0!.w / 2 + 3, s0!.y - 40); await page.mouse.down(); await page.mouse.move(s0!.x + 20, s0!.y, { steps: 4 }); await page.mouse.move(s2!.x - s2!.w / 2 - 3, s2!.y + 40, { steps: 4 }); await page.mouse.up(); await page.keyboard.up('Alt');
-    ev = await page.evaluate(() => (window as any).app.events());
-    const drag = ev.filter((e: any) => e.type === 'select').at(-1);
-    assert.equal(drag.by, 'drag'); assert.deepEqual(drag.items.filter((i: any) => i.view === 'overdue').map((i: any) => i.row).sort(), [0, 1]);
-    await page.mouse.click(s2!.x, s2!.y);
-    ev = await page.evaluate(() => (window as any).app.events());
-    assert.deepEqual(ev.find((e: any) => e.type === 'drill'), { type: 'drill', view: 'overdue', panel: 'by-customer', row: 2 });
+    await page.keyboard.down('Alt'); await page.mouse.move(s0.x - s0.w / 2 + 3, s0.y - 40); await page.mouse.down(); await page.mouse.move(s0.x + 20, s0.y, { steps: 4 }); await page.mouse.move(s2.x - s2.w / 2 - 3, s2.y + 40, { steps: 4 }); await page.mouse.up(); await page.keyboard.up('Alt');
+    ev = await page.evaluate(() => window.app.events());
+    const drag = eventsOf(ev, 'select').at(-1);
+    assert.ok(drag);
+    assert.equal(drag.by, 'drag'); assert.deepEqual((drag.items as PointItem[]).filter(i => i.view === 'overdue').map(i => i.row).sort((a, b) => Number(a) - Number(b)), [0, 1]);
+    await page.mouse.click(s2.x, s2.y);
+    ev = await page.evaluate(() => window.app.events());
+    assert.deepEqual(ev.find(e => e.type === 'drill'), { type: 'drill', view: 'overdue', panel: 'by-customer', row: 2 });
     const chat = await center('.vindu-pane[data-view="invoices"] .vindu-chat');
     await page.mouse.click(chat!.x, chat!.y);
-    ev = await page.evaluate(() => (window as any).app.events());
-    assert.deepEqual(ev.find((e: any) => e.type === 'attach'), { type: 'attach', view: 'invoices', on: true });
+    ev = await page.evaluate(() => window.app.events());
+    assert.deepEqual(ev.find(e => e.type === 'attach'), { type: 'attach', view: 'invoices', on: true });
     // the server's state marks what is picked, in every window
     ui.event({ type: 'select', items: [{ view: 'overdue', panel: 'by-customer', row: 1 }] });
-    await page.evaluate((s: ShellState) => (window as any).app.state(s), state!);
+    await page.evaluate((s: ShellState) => window.app.state(s), state!);
     await page.waitForTimeout(100);
     assert.equal(await page.evaluate(() => document.querySelectorAll('.vindu-pane[data-view="overdue"] .vb-strip.vb-picked').length), 1);
     assert.deepEqual(errors, []);

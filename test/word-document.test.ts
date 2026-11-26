@@ -10,7 +10,6 @@ import { startVindu, memoryResults, type Shown, type ShellState, type ViewPresen
 import { chromium, mcpClient, shellServer } from './helpers.js';
 import { paragraphStyle, wordDocument } from './office-fixtures.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const STYLES = paragraphStyle('Heading1', 'heading 1') + paragraphStyle('Heading2', 'heading 2') + paragraphStyle('ListParagraph', 'List Paragraph')
   + paragraphStyle('Overskrift3', 'Min overskrift', '<w:basedOn w:val="Heading2"/>') // a style of its own, based on Heading 2
   + '<w:style w:type="character" w:styleId="Strong"><w:name w:val="Strong"/><w:rPr><w:b/></w:rPr></w:style>';
@@ -73,7 +72,7 @@ test('a Word document is read by the system into a document\'s sections, and its
   const plan = presented.filter(x => x.name === 'plan').at(-1)!.panels[0], rows = plan.rows!;
   assert.deepEqual(rows.map(r => [r.heading, r.level, r.anchor]), [['Prosjektplan for Ålesund', 1, 'prosjektplan-for-ålesund'], ['Steg', 2, 'steg'], ['Vedlegg', 2, 'vedlegg']]);
   assert.equal(plan.summary.line, 'Prosjektplan for Ålesund'); // its card says its first heading
-  const [intro, steps] = rows.map(r => r.__blocks as any[]);
+  const [intro, steps] = rows.map(r => r.__blocks as unknown[]);
   assert.deepEqual(intro[0], { paragraph: ['Vanlig tekst med ', { strong: ['fet'] }, ', ', { em: ['kursiv'] }, ' og ', { strong: [{ em: ['begge'] }] }, ' og ', { strong: ['sterk'] }, '.'] });
   assert.deepEqual(intro[1], { paragraph: ['Les ', { link: 'https://example.com/plan?a=1&b=2', text: ['planen'] }, ', ', { link: 'mailto:post@example.com', text: ['skriv til oss'] }, ' eller ikke dette.'] });
   assert.deepEqual(intro[2], { paragraph: ['Endret: lagt til slutt.'] }); // the insertion as text, the deletion left out
@@ -110,9 +109,9 @@ test('drawn in Chromium: headings, bold and italic, the nested list, the table a
     const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
     const errors: string[] = []; page.on('pageerror', (e: Error) => errors.push(e.message));
     await page.goto(shell.url);
-    await page.evaluate(() => (window as any).app.shell('light'));
-    await page.evaluate((x: Shown) => (window as any).app.view(x), shown.filter(v => v.name === 'plan').at(-1)!);
-    await page.evaluate((s: ShellState) => (window as any).app.state({ ...s, tree: { view: 'plan' }, maximized: null }), state!);
+    await page.evaluate(() => window.app.shell('light'));
+    await page.evaluate((x: Shown) => window.app.view(x), shown.filter(v => v.name === 'plan').at(-1)!);
+    await page.evaluate((s: ShellState) => window.app.state({ ...s, tree: { view: 'plan', size: 1 }, maximized: null }), state!);
     const doc = page.locator('.vb-md').first();
     await doc.locator('.vb-mdbody [role="heading"]').first().waitFor();
     assert.deepEqual(await doc.locator('.vb-mdbody [role="heading"]').allInnerTexts(), ['Prosjektplan for Ålesund', 'Steg', 'Vedlegg']);

@@ -9,9 +9,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { startVindu, memoryResults, type Shown, type ShellState } from '../src/index.js';
-import { mcpClient, sleep } from './helpers.js';
+import { mcpClient, sleep, panelsIn, type HostJob, type HostNotice, type HostSource, type HostWatch } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const until = async (f: () => boolean, ms = 8000) => { const end = Date.now() + ms; while (!f()) { if (Date.now() > end) throw new Error('timed out'); await sleep(20); } };
 const invoices = (a: number, b: number) => [{ number: 'INV-2026-0412', customer: 'Havgap Media', amount: a }, { number: 'INV-2026-0418', customer: 'Brattli Verksted', amount: b }];
@@ -21,19 +20,19 @@ async function windowWith(o: { jobs?: boolean; perDay?: number } = {}) {
   const dir = tmp('hooks-'), results = memoryResults(dir);
   results.add({ server: 'accounts', tool: 'list_invoices', input: { status: 'overdue' }, value: invoices(31050, 19800) }); // r1
   results.add({ server: 'accounts', tool: 'send_reminder', input: { number: 'INV-2026-0412' }, value: { sent: true } }); // r2
-  const watches: { what: any; seconds: number; onRead: (id: string) => void }[] = []; const notices: any[] = []; const jobs: any[] = []; const sourced: any[] = [];
+  const watches: { what: HostWatch; seconds: number; onRead: (id: string) => void }[] = []; const notices: HostNotice[] = []; const jobs: HostJob[] = []; const sourced: HostSource[] = [];
   const more = {
     isRead: (_server: string, tool: string) => tool === 'list_invoices',
-    watch: (what: any, seconds: number, onRead: (id: string) => void) => { watches.push({ what, seconds, onRead }); return () => undefined; },
-    source: async (what: any) => { sourced.push(what); return results.add({ server: what.server, tool: what.tool, input: what.args, value: invoices(31050, 19800) }).id; },
-    onNotice: (n: any) => notices.push(n),
-    onJob: async (j: any) => { jobs.push(j); return { id: `job-${jobs.length}` }; },
+    watch: (what: HostWatch, seconds: number, onRead: (id: string) => void) => { watches.push({ what, seconds, onRead }); return () => undefined; },
+    source: async (what: HostSource) => { sourced.push(what); return results.add({ server: what.server, tool: what.tool ?? '', input: what.args, value: invoices(31050, 19800) }).id; },
+    onNotice: (n: HostNotice) => notices.push(n),
+    onJob: async (j: HostJob) => { jobs.push(j); return { id: `job-${jobs.length}` }; },
     ...(o.jobs === false ? { jobs: false } : {}),
   };
   const shown: Shown[] = []; const st: { s?: ShellState } = {};
   const ui = vindu.open({ results, dir }, { ...more, onView: v => shown.push(v), onState: s => { st.s = s; } });
   const c = await mcpClient(ui.url);
-  const model = (name: string) => (shown.filter(v => v.name === name).at(-1)!.wide.find((m: any) => m.updateDataModel) as any).updateDataModel.value.panels;
+  const model = (name: string) => panelsIn(shown.filter(v => v.name === name).at(-1)!.wide);
   const drawn = (name: string) => JSON.stringify(shown.filter(v => v.name === name).at(-1)?.wide ?? null);
   /** The host reads the source again: a new result, given to the window as a watch does. */
   const reread = (a: number, b: number) => { const r = results.add({ server: 'accounts', tool: 'list_invoices', input: { status: 'overdue' }, value: invoices(a, b) }); watches[0].onRead(r.id); return r.id; };
@@ -55,7 +54,7 @@ test('a live panel: its source read again by the host; a read that says the same
     const acc = await w.json('show_view', VIEW);
     assert.equal(acc.live, undefined); // both live, on one source: one watch
     assert.deepEqual(w.watches.map(x => [x.what.server, x.what.tool, x.what.args, x.what.after, x.seconds]), [['accounts', 'list_invoices', { status: 'overdue' }, 'r1', 30]]);
-    assert.deepEqual(acc.hooks.map((h: any) => h.state), ['on: the system does it by itself', 'on: the system does it by itself', 'off until the person turns it on, in the window']);
+    assert.deepEqual(acc.hooks.map((h: { state: string }) => h.state), ['on: the system does it by itself', 'on: the system does it by itself', 'off until the person turns it on, in the window']);
     assert.match(acc.hooks[2].does, /^Chase: When you pick a row in Invoices, start a job: Draft a reminder/);
     assert.ok(w.drawn('overdue').includes('Chase: When you pick a row in Invoices, start a job: Draft a reminder for the invoice picked in Overdue. · off'));
     const n = w.shown.length;
@@ -63,7 +62,7 @@ test('a live panel: its source read again by the host; a read that says the same
     assert.equal(w.shown.length, n); assert.equal(w.notices.length, 0);
     const id = w.reread(31050, 42000); // differs: shown, followed, told, and its hooks run
     await until(() => w.notices.length >= 2);
-    assert.deepEqual(w.model('overdue').p_inv.rows.map((r: any) => r.c1), ['31,050', '42,000']);
+    assert.deepEqual(w.model('overdue').p_inv.rows.map(r => r.c1), ['31,050', '42,000']);
     assert.equal(w.model('overdue').p_total.value, '73,050');
     assert.deepEqual(w.notices.map(x => x.text), ['Overdue invoices changed', 'More than 60 000 is overdue']); // the change, and the line crossed
     assert.ok(w.drawn('overdue').includes('What changed? (the system)'));
@@ -97,7 +96,7 @@ test('only a tool that only reads is read again; a job is off until the person t
     await until(() => w.jobs.length === 1);
     const j = w.jobs[0];
     assert.deepEqual([j.view, j.hook, j.label, j.prompt, j.writes], ['overdue', 2, 'Chase', 'Draft a reminder for the invoice picked in Overdue.', false]);
-    assert.deepEqual(j.snapshot.views.map((v: any) => v.name).sort(), ['overdue', 'sent']); assert.deepEqual([...(j.snapshot.ids as string[])].sort(), ['r1', 'r2']); // the window as it is, and what it points at
+    assert.deepEqual(j.snapshot.views.map(v => v.name).sort(), ['overdue', 'sent']); assert.deepEqual([...j.snapshot.ids].sort(), ['r1', 'r2']); // the window as it is, and what it points at
     assert.match(w.ui.delta(), /started its job, as the task job-1 \(it only reads\)/);
     w.ui.event({ type: 'view', view: 'overdue', action: 'select', panel: 'p_inv', from: 0 });
     await until(() => /it has run 1 times in the last day, its budget \(1\)/.test(w.ui.delta()));

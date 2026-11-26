@@ -11,9 +11,8 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { startVindu, memoryResults, VIEW_WORDS_NB, VIEW_WORDS_NN, bytesIn, whenIn, type MessageDraft, type SendResult, type Shown, type ShellState } from '../src/index.js';
-import { chromium, mcpClient, sleep } from './helpers.js';
+import { chromium, mcpClient, sleep, type Row } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const settle = async (f: () => boolean | Promise<boolean>, what: string, ms = 8000) => { const end = Date.now() + ms; while (!(await f())) { if (Date.now() > end) throw new Error(`timed out: ${what}`); await sleep(25); } };
 const dir = tmp('draft-window-'), work = tmp('draft-window-work-');
@@ -49,14 +48,14 @@ await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin }
 const page = await context.newPage();
 const errors: string[] = []; page.on('pageerror', (e: Error) => errors.push(e.message));
 await page.goto(`${origin}/shell.html`);
-await page.evaluate(() => (window as any).app.shell('light'));
+await page.evaluate(() => window.app.shell('light'));
 // as a host does: each view the UI server draws goes to the window, and what the person does in a draft comes back with who
 let carried = 0, stopped = false;
 const pump = (async () => {
   while (!stopped) {
-    const events = await page.evaluate(() => (window as any).app.events()).catch(() => []);
-    for (const e of events as any[]) if (e.type === 'message') ui.event({ ...e, by: person });
-    while (carried < shown.length) await page.evaluate((v: Shown) => (window as any).app.view(v), shown[carried++]).catch(() => undefined);
+    const events: Row[] = await page.evaluate(() => window.app.events()).catch(() => []); // a draft's own actions among them
+    for (const e of events) if (e.type === 'message') ui.event({ ...e, by: person });
+    while (carried < shown.length) await page.evaluate((v: Shown) => window.app.view(v), shown[carried++]).catch(() => undefined);
     await sleep(25);
   }
 })();
@@ -69,7 +68,7 @@ const drafted = (view: string) => ui.checkpoint().drafts!.find(d => d.view === v
 async function shownAlone(view: string, data: Record<string, unknown>) {
   await json('show_view', { name: view, title: `Mail ${view}`, panels: [{ id: 'draft', card: 'message', layout: 'draft', data }] });
   await settle(() => carried === shown.length, 'the view in the window');
-  await page.evaluate((s: ShellState) => (window as any).app.state(s), { ...state!, tree: { view }, maximized: null });
+  await page.evaluate((s: ShellState) => window.app.state(s), { ...state!, tree: { view, size: 1 }, maximized: null });
   await draftIn(view).waitFor();
   return draftIn(view);
 }

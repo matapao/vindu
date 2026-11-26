@@ -9,8 +9,7 @@ import { fieldPrivacy, SECRET_REFUSED } from '../src/views/browser-fields.js';
 import { readAccessibleTree, TREE_LIMITS } from '../src/views/browser-accessibility.js';
 import { SECRET_FIELDS } from '../src/views/browser-requests.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-function scripted(onSend: (method: string, params: any) => unknown): Cdp {
+function scripted(onSend: (method: string, params: Record<string, unknown> | undefined) => unknown): Cdp {
   return { send: async (m, p) => onSend(m, p) ?? {}, on: () => () => {} };
 }
 /** A page whose focused element is described by `focused` (DOM.describeNode's node), and the keys that reach it. */
@@ -19,7 +18,7 @@ function focusedOn(focused: { nodeName: string; attributes: string[] }) {
   const page = new BrowserPage('p', scripted((method, params) => {
     if (method === 'Runtime.evaluate') return { result: { objectId: 'focused' } };
     if (method === 'DOM.describeNode') return { node: focused };
-    if (method === 'Input.dispatchKeyEvent') keys.push(`${params.type} ${params.key}`);
+    if (method === 'Input.dispatchKeyEvent') keys.push(`${String(params?.type)} ${String(params?.key)}`);
     return {};
   }));
   return { page, keys };
@@ -57,8 +56,8 @@ test('a textarea or an editable element marked as secret is a secret field', asy
 const publicField = async () => 'public' as const;
 test('the accessibility tree is read within bounds: deep, looping, wordy or wide, however the page builds it', async () => {
   // a page nested 50,000 deep, with a button at the bottom
-  const deep = Array.from({ length: 50_000 }, (_, i) => ({ nodeId: String(i), ...(i ? { parentId: String(i - 1) } : {}), childIds: [String(i + 1)], role: { value: i ? 'generic' : 'RootWebArea' } }));
-  deep.push({ nodeId: '50000', parentId: '49999', childIds: [], role: { value: 'button' }, name: { value: 'Deep' } } as any);
+  const deep: Parameters<typeof readAccessibleTree>[0] = Array.from({ length: 50_000 }, (_, i) => ({ nodeId: String(i), ...(i ? { parentId: String(i - 1) } : {}), childIds: [String(i + 1)], role: { value: i ? 'generic' : 'RootWebArea' } }));
+  deep.push({ nodeId: '50000', parentId: '49999', childIds: [], role: { value: 'button' }, name: { value: 'Deep' } });
   const d = await readAccessibleTree(deep, publicField, 1500);
   assert.equal(d.references.size, 0); assert.ok(d.cut >= 1, String(d.cut)); // past the depth: left out, and said to be
   // a tree that loops back on itself

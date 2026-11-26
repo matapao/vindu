@@ -8,12 +8,11 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import type { Frame, Page } from 'playwright';
-import { Shell } from '../src/shell.js';
+import { Shell, type ShellEvent } from '../src/shell.js';
 import { VINDU_CATALOG } from '../src/catalog-id.js';
-import type { View } from '../src/renderer/index.js';
-import { chromium, sleep } from './helpers.js';
+import type { ShellSkin, View } from '../src/renderer/index.js';
+import { chromium, sleep, eventsOf, methodOf } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const rpc = `const said = []; let n = 0; const waiting = new Map();
 addEventListener('message', e => { if (e.source !== parent) return; said.push(e.data); waiting.get(e.data?.id)?.(e.data); });
 window.said = said;
@@ -54,17 +53,17 @@ const viewOf = (name: string, components: Record<string, unknown>[]): View => {
   ];
   return { name, wide: surface, compact: surface };
 };
-async function windowWith(view: View, o: { hostShell?: { tokens?: unknown; icon?: string } } = {}) {
+async function windowWith(view: View, o: { hostShell?: { tokens?: ShellSkin; icon?: string } } = {}) {
   const page: Page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   const errors: string[] = []; page.on('pageerror', (e: Error) => errors.push(e.message));
   await page.goto(`${siteAt}/shell.html`);
   const shell = new Shell(); shell.show(view.name, { title: 'Frames', fill: false, panels: 'page' });
   await page.evaluate(({ view, state, host }) => {
-    const app = (window as any).app;
+    const app = window.app;
     if (host) app.hostShell(host); else app.shell('light');
     app.view(view); app.state(state);
   }, { view, state: shell.state(), host: o.hostShell });
-  const events = async (type: string) => (await page.evaluate(() => (window as any).app.events())).filter((e: any) => e.type === type);
+  const events = async <T extends ShellEvent['type']>(type: T) => eventsOf(await page.evaluate(() => window.app.events()), type);
   return { page, errors, events };
 }
 const frameAt = async (page: Page, file: string): Promise<Frame> => {
@@ -84,8 +83,8 @@ test('a page picks and asks only while the person uses it, as often and as much 
     await frame.locator('#ask').click(); // counted on its own
     await sleep(200);
     const asked = await events('page');
-    assert.deepEqual(asked.filter((e: any) => e.kind === 'select'), Array(5).fill({ type: 'page', kind: 'select', view: 'frames', panel: 'pick', items: ['picked'], note: 'by a click' }));
-    assert.deepEqual(asked.filter((e: any) => e.kind === 'ask'), [{ type: 'page', kind: 'ask', view: 'frames', panel: 'pick', prompt: 'Why is it late?' }]);
+    assert.deepEqual(asked.filter(e => e.kind === 'select'), Array(5).fill({ type: 'page', kind: 'select', view: 'frames', panel: 'pick', items: ['picked'], note: 'by a click' }));
+    assert.deepEqual(asked.filter(e => e.kind === 'ask'), [{ type: 'page', kind: 'ask', view: 'frames', panel: 'pick', prompt: 'Why is it late?' }]);
     assert.deepEqual(errors, []);
   } finally { await page.close(); }
 });
@@ -95,7 +94,7 @@ test('an MCP App: the window answers its display, and its mount is the document\
   try {
     const app = await frameAt(page, '/app.html');
     const answers = await app.evaluate(async () => {
-      const w = window as any;
+      const w = window;
       const init = await w.init();
       return { init, ping: await w.call('ping'), mode: await w.call('ui/request-display-mode', { mode: 'pip' }), badMode: await w.call('ui/request-display-mode', { mode: 'tab' }),
         asRequest: await w.call('ui/notifications/size-changed', { height: 300 }) };
@@ -105,19 +104,19 @@ test('an MCP App: the window answers its display, and its mount is the document\
     assert.deepEqual(Object.keys(answers.init.result).sort(), ['hostCapabilities', 'hostContext', 'hostInfo', 'protocolVersion']);
     assert.deepEqual([answers.ping.result, answers.mode.result], [{}, { mode: 'inline' }]);
     assert.deepEqual([answers.badMode.error, answers.asRequest.error], [{ code: -32602, message: 'Invalid params for ui/request-display-mode: mode: Invalid input' }, { code: -32601, message: 'Method not found' }]);
-    await app.evaluate(() => (window as any).tell('ui/notifications/size-changed', { height: 300 }));
+    await app.evaluate(() => window.tell('ui/notifications/size-changed', { height: 300 }));
     await page.waitForFunction(() => document.querySelector<HTMLIFrameElement>('iframe[data-app-panel]')!.style.height === '300px');
     const carried = await events('app');
-    assert.deepEqual(carried.map((e: any) => e.msg.method), ['ui/initialize', 'ui/notifications/size-changed', 'ui/notifications/size-changed']); // the display's own requests stay here
+    assert.deepEqual(carried.map(e => methodOf(e.msg)), ['ui/initialize', 'ui/notifications/size-changed', 'ui/notifications/size-changed']); // the display's own requests stay here
     const first = carried[0].mount;
 
     // it goes to a document that initializes at once: a mount of its own, which lasts past its load
     await app.evaluate(() => { location.href = '/again.html'; });
     const again = await frameAt(page, '/again.html');
-    await again.waitForFunction(() => (window as any).said.length >= 1);
+    await again.waitForFunction(() => window.said.length >= 1);
     await sleep(400);
     const second = await events('app');
-    assert.deepEqual(second.map((e: any) => e.msg.method), ['ui/initialize', 'tools/call']);
+    assert.deepEqual(second.map(e => methodOf(e.msg)), ['ui/initialize', 'tools/call']);
     assert.notEqual(second[0].mount, first);
     assert.equal(second[1].mount, second[0].mount);
 
@@ -125,10 +124,10 @@ test('an MCP App: the window answers its display, and its mount is the document\
     await again.evaluate(() => { location.href = '/other.html'; });
     const other = await frameAt(page, '/other.html');
     await sleep(500);
-    await page.evaluate((mount: string) => (window as any).app.app('frames', 'app', { vinduMount: mount, jsonrpc: '2.0', method: 'ui/notifications/tool-result', params: {} }), second[0].mount);
+    await page.evaluate((mount: string) => window.app.app('frames', 'app', { vinduMount: mount, jsonrpc: '2.0', method: 'ui/notifications/tool-result', params: {} }), second[0].mount);
     await sleep(200);
     assert.deepEqual(await events('app'), []);
-    assert.deepEqual(await other.evaluate(() => (window as any).said), []);
+    assert.deepEqual(await other.evaluate(() => window.said), []);
     assert.deepEqual(errors, []);
   } finally { await page.close(); }
 });
@@ -165,14 +164,14 @@ test('a host\'s look and icon: values only, never what loads; the icon\'s drawin
     assert.doesNotMatch(skin, /url|72l|\/\*|--v-line/);
     const drawn = await page.evaluate(() => {
       const b = document.querySelector('button[data-action="mine"]')!;
-      return { label: b.getAttribute('aria-label'), html: b.innerHTML, ran: (window as any).ran ?? null };
+      return { label: b.getAttribute('aria-label'), html: b.innerHTML, ran: window.ran ?? null };
     });
     assert.equal(drawn.label, 'Mine');
     assert.equal(drawn.ran, null);
     assert.equal(drawn.html, '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h8"></path><circle r="2" stroke="url(#own)"></circle></svg>');
-    await page.evaluate(() => (window as any).app.hostShell({ icon: '<img src=x onerror="window.ran = 3">' }));
+    await page.evaluate(() => window.app.hostShell({ icon: '<img src=x onerror="window.ran = 3">' }));
     await sleep(100);
-    assert.deepEqual(await page.evaluate(() => [document.querySelector('button[data-action="mine"]')!.textContent, (window as any).ran ?? null]), ['Mine', null]);
+    assert.deepEqual(await page.evaluate(() => [document.querySelector('button[data-action="mine"]')!.textContent, window.ran ?? null]), ['Mine', null]);
     assert.deepEqual(errors, []);
   } finally { await page.close(); }
 });

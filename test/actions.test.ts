@@ -11,9 +11,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { startVindu, memoryResults, applyAction, BLOCKS, type Shown, type ShellState } from '../src/index.js';
 import { actInViewFor, cardActsFor } from '../src/server/view-schemas.js';
-import { chromium, mcpClient, sleep } from './helpers.js';
+import { chromium, mcpClient, sleep, componentIn, panelsIn, type SurfaceComponent } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const until = async (f: () => boolean, ms = 8000) => { const end = Date.now() + ms; while (!f()) { if (Date.now() > end) throw new Error('timed out'); await sleep(20); } };
 const invoices = [
@@ -37,7 +36,7 @@ async function windowWith(arrange?: 'allow' | 'suggest' | 'off') {
   await c.json('show_view', { name: 'todo', title: 'To do', panels: [{ id: 't', card: 'tasks', from: 'r2' }] });
   await c.json('show_view', { name: 'deck', title: 'Deck', panels: [{ id: 's', card: 'slides', from: 'r3' }] });
   const last = (name: string) => shown.filter(v => v.name === name).at(-1)!;
-  const rowsOf = (name: string, pid: string) => ((last(name).wide.find((m: any) => m.updateDataModel) as any).updateDataModel.value.panels[pid].rows as any[]);
+  const rowsOf = (name: string, pid: string) => panelsIn(last(name).wide)[pid].rows;
   const markOf = (name: string) => st.s!.views.find(v => v.name === name)?.mark;
   return { vindu, ui, ...c, shown, st, last, rowsOf, markOf, close: async () => { await c.mcp.close(); ui.close(); await vindu.close(); } };
 }
@@ -56,14 +55,13 @@ test('a plan or a slide is the action of the card that takes it: offered only wh
 test("the person's changes inside a view: a column's head sorts, a task moves, a slide; told to the model, and theirs to undo", async () => {
   const w = await windowWith();
   try {
-    const head = (w.last('inv').wide.find((m: any) => m.updateComponents) as any).updateComponents.components.find((x: any) => x.id === 'p_rows__hb2');
+    const head = componentIn<SurfaceComponent & { action: { event: { name: string; context: Record<string, unknown> } } }>(w.last('inv').wide, x => x.id === 'p_rows__hb2');
     assert.deepEqual(head.action.event, { name: 'view_action', context: { action: 'sort', panel: 'rows', field: 'amount' } });
     const n = w.shown.length;
     assert.equal(w.ui.event({ type: 'action', view: 'inv', name: 'view_action', context: head.action.event.context, by: { name: 'Kari', window: 'main' } }), true);
     await until(() => w.shown.length > n && w.rowsOf('inv', 'p_rows')[0].c2 === '17,160');
     assert.deepEqual(w.rowsOf('inv', 'p_rows').map(r => r.c0), ['INV-2026-0431', 'INV-2026-0418', 'INV-2026-0412']);
-    const comps = (w.last('inv').wide.find((m: any) => m.updateComponents) as any).updateComponents.components;
-    assert.equal(comps.find((x: any) => x.id === 'p_rows__h2').text, 'amount ↑');
+    assert.equal(componentIn(w.last('inv').wide, x => x.id === 'p_rows__h2').text, 'amount ↑');
     assert.deepEqual(w.markOf('inv'), { text: 'Sorted by amount, smallest or earliest first', by: 'person', undo: true });
     w.ui.event({ type: 'action', view: 'inv', name: 'view_action', context: head.action.event.context }); // again: the other way round
     await until(() => w.rowsOf('inv', 'p_rows')[0].c2 === '31,050' && w.markOf('inv')?.text === 'Sorted by amount, largest or latest first'); await sleep(30);
@@ -89,7 +87,7 @@ test("the person's changes inside a view: a column's head sorts, a task moves, a
 
     assert.equal(w.ui.event({ type: 'view', view: 'deck', action: 'slide', panel: 's', to: 1 }), true);
     await until(() => w.markOf('deck')?.text === 'Slide 2');
-    const deck = (w.last('deck').wide.find((x: any) => x.updateComponents) as any).updateComponents.components.find((x: any) => x.component === 'VSlides');
+    const deck = componentIn(w.last('deck').wide, x => x.component === 'VSlides');
     assert.equal(deck.at, 1); // every window shows the same slide
 
     const none = await w.call('act_in_view', { view: 'inv', action: 'filter', field: 'customer', value: 'Nobody AS' });
@@ -155,16 +153,16 @@ test('in Chromium: a column head sorts, a task is dragged and moved with Alt and
     const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
     const errors: string[] = []; page.on('pageerror', (e: Error) => errors.push(e.message));
     await page.goto(`http://127.0.0.1:${(app.address() as { port: number }).port}/shell.html`);
-    await page.evaluate(() => (window as any).app.shell('light'));
+    await page.evaluate(() => window.app.shell('light'));
     const draw = async () => {
       const latest = new Map<string, Shown>(); for (const v of w.shown) if (!v.ask) latest.set(v.name, v);
-      for (const v of latest.values()) await page.evaluate((x: Shown) => (window as any).app.view(x), v);
-      await page.evaluate((s: ShellState) => (window as any).app.state(s), w.st.s!);
+      for (const v of latest.values()) await page.evaluate((x: Shown) => window.app.view(x), v);
+      await page.evaluate((s: ShellState) => window.app.state(s), w.st.s!);
       await page.waitForTimeout(400);
     };
     await draw();
-    await page.evaluate(() => (window as any).app.events());
-    const events = async () => (await page.evaluate(() => (window as any).app.events())) as any[];
+    await page.evaluate(() => window.app.events());
+    const events = async () => page.evaluate(() => window.app.events());
     // the head of "amount" is a button: a plain click sorts
     await page.locator('.vindu-pane[data-view="inv"]').getByRole('button', { name: 'amount' }).click();
     const sort = (await events()).find(e => e.type === 'action' && e.name === 'view_action');

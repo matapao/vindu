@@ -10,9 +10,8 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { startVindu, memoryResults, type Shown, type ShellState } from '../src/index.js';
-import { chromium, get, mcpClient } from './helpers.js';
+import { chromium, get, mcpClient, eventsOf, panelsIn, type LookPane } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
 const dir = tmp('gallery-'), work = tmp('gallery-work-');
@@ -37,7 +36,7 @@ const ui = vindu.open({ results, dir, work }, { onView: v => shown.push(v), onSt
 const { mcp, call, json } = await mcpClient(ui.url);
 afterAll(async () => { await mcp.close(); ui.close(); await vindu.close(); });
 const PHOTOS = { name: 'photos', title: 'Site photos', panels: [{ id: 'pics', card: 'gallery', title: 'Photos', media: [A.dent, 'shot.png', R.snapshot, A.clip, A.scratch] }] };
-const modelOf = (v: Shown) => (v.wide.find(m => m.updateDataModel) as any).updateDataModel.value.panels;
+const modelOf = (v: Shown) => panelsIn<{ items: { kind: string; url: string; at: string }[] }>(v.wide);
 
 test('a gallery of attachments, a file in the working folder and a result\'s image: each served by the page host, and the account says how many and their names', async () => {
   const a = await json('show_view', PHOTOS);
@@ -48,7 +47,7 @@ test('a gallery of attachments, a file in the working folder and a result\'s ima
   assert.equal(p.from, `${A.dent}, work/shot.png, ${R.snapshot}, ${A.clip}, ${A.scratch}`);
   assert.equal(a.panels[0].marked, undefined); // the files themselves, never the model's words
   const items = modelOf(shown.at(-1)!).p_pics.items;
-  assert.deepEqual(items.map((i: any) => [i.kind, i.url, i.at]), [
+  assert.deepEqual(items.map(i => [i.kind, i.url, i.at]), [
     ['image', `${ui.pages}/media/${A.dent}`, '1 of 5'], ['image', `${ui.pages}/work/shot.png`, '2 of 5'], ['image', `${ui.pages}/media/${R.snapshot}`, '3 of 5'],
     ['video', `${ui.pages}/media/${A.clip}`, '4 of 5'], ['image', `${ui.pages}/media/${A.scratch}`, '5 of 5'],
   ]);
@@ -92,9 +91,9 @@ test('in Chromium: tiles marked for pointing and sight, one opened large over th
     const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
     const errors: string[] = []; page.on('pageerror', (e: Error) => errors.push(e.message));
     await page.goto(`http://127.0.0.1:${(app.address() as { port: number }).port}/shell.html`);
-    await page.evaluate(() => (window as any).app.shell('light'));
-    await page.evaluate((x: Shown) => (window as any).app.view(x), shown.filter(v => v.name === 'photos').at(-1)!);
-    await page.evaluate((s: ShellState) => (window as any).app.state({ ...s, tree: { view: 'photos' }, maximized: null }), state!);
+    await page.evaluate(() => window.app.shell('light'));
+    await page.evaluate((x: Shown) => window.app.view(x), shown.filter(v => v.name === 'photos').at(-1)!);
+    await page.evaluate((s: ShellState) => window.app.state({ ...s, tree: { view: 'photos', size: 1 }, maximized: null }), state!);
     const pane = page.locator('.vindu-pane[data-view="photos"]');
     await pane.locator('.vb-tile').first().waitFor();
     const tiles = pane.locator('[data-panel="pics"][data-row]');
@@ -109,8 +108,8 @@ test('in Chromium: tiles marked for pointing and sight, one opened large over th
     // what of it is in sight, as the window measured it from the same marks, goes to the UI server as an app carries it
     let sight: string | undefined;
     for (let i = 0; i < 40 && !sight; i++) {
-      for (const e of await page.evaluate(() => (window as any).app.events())) ui.event(e);
-      sight = (await json('look', {})).panes.find((p: any) => p.view === 'photos')?.in_sight?.pics;
+      for (const e of await page.evaluate(() => window.app.events())) ui.event(e);
+      sight = (await json('look', {})).panes.find((p: LookPane) => p.view === 'photos')?.in_sight?.pics;
       if (!sight) await page.waitForTimeout(100);
     }
     assert.equal(sight, 'all 5 rows');
@@ -123,7 +122,7 @@ test('in Chromium: tiles marked for pointing and sight, one opened large over th
     assert.equal(await dialog.evaluate((d: Element) => (d as HTMLDialogElement).open && d.matches(':modal')), true);
     assert.equal(await at(), '2 of 5'); assert.equal(await dialog.locator('.vb-viewername').textContent(), 'shot.png');
     const [over, paneBox] = [await dialog.boundingBox(), await pane.boundingBox()];
-    assert.ok(over && paneBox && ['x', 'y', 'width', 'height'].every(k => Math.abs(over[k] - paneBox[k]) < 1.5), JSON.stringify({ over, paneBox }));
+    assert.ok(over && paneBox && (['x', 'y', 'width', 'height'] as const).every(k => Math.abs(over[k] - paneBox[k]) < 1.5), JSON.stringify({ over, paneBox }));
     assert.equal(await inside(), true);
     // Previous and Next, going round
     await dialog.getByRole('button', { name: 'Next ›' }).click(); assert.equal(await at(), '3 of 5');
@@ -150,11 +149,11 @@ test('in Chromium: tiles marked for pointing and sight, one opened large over th
     assert.equal(await dialog.evaluate((d: Element) => (d as HTMLDialogElement).open), false);
     await page.waitForFunction(() => (document.activeElement as HTMLElement | null)?.dataset.row === '0', null, { timeout: 2000 });
     // Alt and a click points at a tile, as at any row, and opens nothing; the model is told which item it is
-    await page.evaluate(() => (window as any).app.events());
+    await page.evaluate(() => window.app.events());
     await page.keyboard.down('Alt'); await tiles.nth(3).click(); await page.keyboard.up('Alt');
     assert.equal(await dialog.evaluate((d: Element) => (d as HTMLDialogElement).open), false);
-    const events = await page.evaluate(() => (window as any).app.events());
-    const select = events.find((e: any) => e.type === 'select');
+    const events = await page.evaluate(() => window.app.events());
+    const select = eventsOf(events, 'select')[0];
     assert.deepEqual(select.items, [{ view: 'photos', panel: 'pics', row: 3 }]);
     ui.event(select);
     assert.deepEqual(ui.selection().at(-1), { view: 'photos', panel: 'pics', card: 'gallery', title: 'Photos', media: 'clip.mp4', type: 'video/mp4', from: A.clip, item: '4 of 5' });

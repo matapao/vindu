@@ -11,7 +11,6 @@ import type { Page as BrowserPage } from 'playwright';
 import { startVindu, memoryResults, type Shown, type ShellState } from '../src/index.js';
 import { chromium, mcpClient, shellServer } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pictures-')), work = fs.mkdtempSync(path.join(os.tmpdir(), 'pictures-work-'));
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
 fs.writeFileSync(path.join(work, 'photo.png'), png);
@@ -46,7 +45,7 @@ test('a photo with marks and a gallery\'s tiles at the host\'s own scheme are dr
   const page: BrowserPage = await browser.newPage({ viewport: { width: 1000, height: 1200 } });
   try {
     await page.goto(one.url);
-    const draw = (options: Record<string, unknown>) => page.evaluate(([v, o]) => { (window as any).app.catalog('view', v, { theme: true, ...o }); }, [view, options] as const);
+    const draw = (options: Record<string, unknown>) => page.evaluate(([v, o]) => { window.app.catalog('view', v, { theme: true, ...o }); }, [view, options] as const);
     await draw({});
     await page.locator('vindu-media-marks img').waitFor({ state: 'attached' });
     assert.deepEqual(await sources(page), { marked: '', video: '', tiles: [''] }); // a scheme it was not told of: nothing drawn from it
@@ -61,9 +60,9 @@ test('mountShell takes the same sources for every pane it draws', async () => {
   const page: BrowserPage = await browser.newPage({ viewport: { width: 1200, height: 1000 } });
   try {
     await page.goto(shell.url);
-    await page.evaluate(() => (window as any).app.shell('light', false, undefined, undefined, ['media:']));
-    await page.evaluate((v: Shown) => (window as any).app.view(v), hosted());
-    await page.evaluate((s: ShellState) => (window as any).app.state(s), st.s!);
+    await page.evaluate(() => window.app.shell('light', false, undefined, undefined, ['media:']));
+    await page.evaluate((v: Shown) => window.app.view(v), hosted());
+    await page.evaluate((s: ShellState) => window.app.state(s), st.s!);
     await page.waitForFunction(() => !!document.querySelector('vindu-media-marks img')?.getAttribute('src'), null, { timeout: 5000 });
     assert.deepEqual(await sources(page), { marked: 'media://task/work/photo.png', video: '', tiles: ['media://task/work/photo.png'] });
   } finally { await page.close(); }
@@ -73,9 +72,10 @@ test('sources are schemes alone, lowercase and ending in ":", and never javascri
   const page: BrowserPage = await browser.newPage();
   try {
     const refused = (sources: unknown, where: 'view' | 'shell') => page.evaluate(([s, w]) => {
+      const given = s as string[]; // whatever a host gives: the window checks it
       try {
-        if (w === 'view') (window as any).app.catalog('view', { name: 'x', wide: [], compact: [] }, { sources: s });
-        else (window as any).app.shell('light', false, undefined, undefined, s);
+        if (w === 'view') window.app.catalog('view', { name: 'x', wide: [], compact: [] }, { sources: given });
+        else window.app.shell('light', false, undefined, undefined, given);
         return null;
       } catch (e) { return (e as Error).message; }
     }, [sources, where] as const);

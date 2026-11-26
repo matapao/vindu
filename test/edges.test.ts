@@ -8,16 +8,15 @@ import { BLOCKS, bytesIn, compile, Refusal, type ViewSpec } from '../src/index.j
 import type { PanelSpec, Resolved } from '../src/cards.js';
 import { niceScale } from '../src/chart-svg.js';
 import { shape } from '../src/view-rows.js';
+import { componentIn, type SurfaceComponent } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-const componentsOf = (surface: Record<string, unknown>[]) => (surface.find((m: any) => m.updateComponents) as any).updateComponents.components as any[];
 
 test("each panel has a place of its own in the window: ids that would share one are refused; an input's name is one step of its path", () => {
   const two: ViewSpec = { name: 'v', title: 'V', panels: [{ id: 'a-b', card: 'text' }, { id: 'a_b', card: 'text' }] as PanelSpec[] };
   const data: Record<string, Resolved> = { 'a-b': { text: 'one' }, a_b: { text: 'two' } };
   assert.throws(() => compile(two, data, { compact: false }), /panels "a-b" and "a_b" go by the same id in the window \(p_a_b\)/);
   const view: ViewSpec = { name: 'v', title: 'V', panels: [{ id: 'k', card: 'text', inputs: { 'a/b': 2 } }] as PanelSpec[] };
-  const field = componentsOf(compile(view, { k: { text: 'what if', inputs: { 'a/b': 2 } } }, { compact: false })).find(c => c.id === 'p_k__in0');
+  const field = componentIn<SurfaceComponent & { value: { path: string } }>(compile(view, { k: { text: 'what if', inputs: { 'a/b': 2 } } }, { compact: false }), c => c.id === 'p_k__in0');
   assert.equal(field.value.path, '/panels/p_k/inputs/a~1b');
 });
 

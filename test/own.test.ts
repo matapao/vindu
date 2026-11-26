@@ -8,11 +8,11 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
+import type { ShellCommand } from '@matapao/vindu';
 import { memoryResults, type Shown, type ShellState } from '@matapao/vindu/server';
 import { startFjord } from '../examples/own-server.js';
-import { chromium, mcpClient } from './helpers.js';
+import { chromium, mcpClient, type Look, type Row } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const SHOTS = process.env.VINDU_SHOTS;
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const dir = tmp('own-'), work = tmp('ownwork-');
@@ -48,14 +48,14 @@ const { mcp, call, json } = await mcpClient(ui.mcpServer.url);
 const ctx = await browser.newContext({ viewport: { width: 1366, height: 800 }, deviceScaleFactor: SHOTS ? 2 : 1, permissions: ['clipboard-read', 'clipboard-write'] });
 const p = await ctx.newPage();
 const errors: string[] = [];
-p.on('pageerror', (e: Error) => errors.push(e.message)); p.on('console', (m: any) => { if (m.type() === 'error') errors.push(m.text()); });
+p.on('pageerror', (e: Error) => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
 await p.goto(`http://127.0.0.1:${(app.address() as { port: number }).port}/shell.html`);
 afterAll(async () => { await mcp.close(); ui.close(); await provider.close(); await browser.close(); app.close(); });
 
-const relay = async () => { for (const e of await p.evaluate(() => (window as any).app.events())) ui.event(e); };
+const relay = async () => { for (const e of await p.evaluate(() => window.app.events())) ui.event(e); };
 const push = async (views: Shown[]) => {
-  for (const v of views) await p.evaluate((x: Shown) => (window as any).app.view(x), v);
-  if (state) await p.evaluate((s: ShellState) => (window as any).app.state(s), state);
+  for (const v of views) await p.evaluate((x: Shown) => window.app.view(x), v);
+  if (state) await p.evaluate((s: ShellState) => window.app.state(s), state);
 };
 const sync = async (views?: Shown[]) => { await relay(); await push(views ?? fresh.splice(0)); await p.waitForTimeout(300); await relay(); await push(fresh.splice(0)); await p.waitForTimeout(250); await relay(); };
 const rects = () => p.evaluate(() => {
@@ -63,7 +63,7 @@ const rects = () => p.evaluate(() => {
   const r = (e: Element) => { const b = e.getBoundingClientRect(); return [Math.round(b.left - desk.left), Math.round(b.top - desk.top), Math.round(b.width), Math.round(b.height)]; };
   return Object.fromEntries([...document.querySelectorAll<HTMLElement>('.vindu-pane:not([hidden])')].map(e => [e.dataset.view!, r(e)]));
 });
-const boxes = (look: any) => Object.fromEntries(look.panes.map((x: any) => [x.view, x.box]));
+const boxes = (look: Look) => Object.fromEntries(look.panes.map(x => [x.view, x.box]));
 const tokens = () => p.evaluate(() => {
   const r = getComputedStyle(document.querySelector('.vindu-shell')!), pane = document.querySelector('.vindu-pane');
   return { accent: r.getPropertyValue('--v-accent').trim(), primary: r.getPropertyValue('--a2ui-color-primary').trim(), font: r.fontFamily, radius: r.getPropertyValue('--v-radius').trim(), pane: pane ? getComputedStyle(pane).backgroundColor : '' };
@@ -79,9 +79,8 @@ document.getElementById('last').textContent = last.meter + ' m i veke ' + last.v
 document.getElementById('s').innerHTML = sparkline(rows.map(r => r.meter), { width: Math.min(640, innerWidth - 32), height: 100 });
 </script>`;
 
-let told: any;
 test("a host's own card, library and look: the panes drawn are where the model is told, as in vindu's look", async () => {
-  await p.evaluate(() => (window as any).app.shell('light')); // vindu's own look first
+  await p.evaluate(() => window.app.shell('light')); // vindu's own look first
   await p.waitForTimeout(200); await relay();
   await json('show_view', { name: 'nokkeltal', title: 'Nøkkeltal', panels: [
     { card: 'kpi', title: 'Meter ferdig', from: 'r1', value: 'sum(ferdig_m)' },
@@ -90,7 +89,7 @@ test("a host's own card, library and look: the panes drawn are where the model i
   ] });
   const page = await json('show_view', { name: 'veke', title: 'Meter per veke', panels: [{ card: 'page', html: PAGE, uses: ['r3'] }] });
   assert.equal(page.ok ?? true, true);
-  told = await json('show_view', { name: 'framdrift', title: 'Framdrift', subtitle: 'seks strekningar · syntetiske data', panels: [{ card: 'progress', from: 'r1', label: 'strekning', done: 'ferdig_m', total: 'total_m' }] });
+  const told: { panels: Row[] } = await json('show_view', { name: 'framdrift', title: 'Framdrift', subtitle: 'seks strekningar · syntetiske data', panels: [{ card: 'progress', from: 'r1', label: 'strekning', done: 'ferdig_m', total: 'total_m' }] });
   assert.equal(told.panels[0].rows, 6); assert.equal(told.panels[0].complete, 1); // the card's own account, to the model
   await json('show_view', { name: 'avvik', title: 'Opne avvik', subtitle: 'kvalitet · 6 meldingar', panels: [{ card: 'table', from: 'r2', columns: ['id', 'strekning', 'tema', 'alvor', 'meldt'] }] });
   const bad = await call('show_view', { name: 'feil', title: 'Feil', panels: [{ card: 'progress', from: 'r1', label: 'strekning', done: 'status', total: 'total_m' }] });
@@ -102,17 +101,17 @@ test("a host's own card, library and look: the panes drawn are where the model i
   assert.deepEqual(await rects(), boxes(look));
   const gap = await p.locator('.vindu-pane[data-view="framdrift"] .vindu-pane-body').innerText(); // a window without the host's component
   assert.equal(gap.trim(), 'This card needs the component "Progress", which this window has not registered.');
-  await p.evaluate(() => (window as any).app.nynorsk()); // the same note, in the host's words
+  await p.evaluate(() => window.app.nynorsk()); // the same note, in the host's words
   await sync(all);
   assert.equal((await p.locator('.vindu-pane[data-view="framdrift"] .vindu-pane-body').innerText()).trim(), 'Dette kortet treng komponenten «Progress», som ikkje er registrert i dette vindauget.');
 
-  await p.evaluate(() => (window as any).app.shell('light', true)); // vindu's look, with the host's component
+  await p.evaluate(() => window.app.shell('light', true)); // vindu's look, with the host's component
   await sync(all);
   assert.deepEqual(await rects(), boxes(look));
   assert.equal(await p.locator('.vindu-pane[data-view="framdrift"] x-progress .row').count(), 6);
   await shot('own-0-vindu-look');
 
-  await p.evaluate(() => (window as any).app.fjord('light')); // the host's look, the same process
+  await p.evaluate(() => window.app.fjord('light')); // the host's look, the same process
   assert.equal(await p.locator('.vindu-empty').innerText(), 'Visingar kjem her når oppgåva viser dei.');
   await sync(all);
   const look2 = await json('look', {});
@@ -124,21 +123,21 @@ test("a host's own card, library and look: the panes drawn are where the model i
   assert.deepEqual(broken, []); // in a wider font too, no word in the table is broken across lines
   const full = await p.evaluate(() => { const r = [...document.querySelectorAll('x-progress .row')].find(e => e.textContent.includes('Solberg bru'))!; return [r.querySelector('.fill')!.getBoundingClientRect().width, r.querySelector('.track')!.getBoundingClientRect().width]; });
   assert.ok(full[0] > 0 && Math.abs(full[0] - full[1]) < 0.5, JSON.stringify(full)); // 420 of 420
-  const f = p.frames().find((x: any) => x.url().startsWith(ui.pages));
+  const f = p.frames().find(x => x.url().startsWith(ui.pages));
   assert.ok(f, 'the page frame');
-  await f!.waitForFunction(() => document.querySelector('#s svg polyline') !== null, null, { timeout: 5000 }); // the host's library, imported by name
-  assert.equal(await f!.locator('#last').innerText(), '470 m i veke 45');
-  assert.equal(await f!.evaluate(() => document.documentElement.scrollHeight <= innerHeight), true); // the page fits its pane
+  await f.waitForFunction(() => document.querySelector('#s svg polyline') !== null, null, { timeout: 5000 }); // the host's library, imported by name
+  assert.equal(await f.locator('#last').innerText(), '470 m i veke 45');
+  assert.equal(await f.evaluate(() => document.documentElement.scrollHeight <= innerHeight), true); // the page fits its pane
   await shot('own-1-host-look');
 });
 
 test("the host's tokens hold in light and dark, through the theme and through the system's preference", async () => {
   const light = await tokens();
   assert.deepEqual(light, { accent: '#0f7b5f', primary: '#0f7b5f', font: 'Poppins, Inter, system-ui, sans-serif', radius: '10px', pane: 'rgb(255, 255, 255)' });
-  await p.evaluate(() => (window as any).app.theme('dark'));
+  await p.evaluate(() => window.app.theme('dark'));
   assert.deepEqual(await tokens(), { ...light, accent: '#3fbf95', primary: '#3fbf95', pane: 'rgb(18, 27, 22)' });
   assert.deepEqual(await rects(), boxes(await json('look', {}))); // dark moves nothing either
-  await p.evaluate(() => (window as any).app.theme('auto'));
+  await p.evaluate(() => window.app.theme('auto'));
   await p.emulateMedia({ colorScheme: 'dark' });
   assert.equal((await tokens()).accent, '#3fbf95');
   assert.deepEqual(await rects(), boxes(await json('look', {})));
@@ -159,14 +158,14 @@ test("the host's words, and its buttons: on the panes they are for, and in the b
   const copied = await p.evaluate(() => navigator.clipboard.readText());
   assert.match(copied, /AV-115/); assert.match(copied, /Arbeidsvarsling/);
   await p.hover('.vindu-pane[data-view="framdrift"]'); await p.click('.vindu-pane[data-view="framdrift"] [data-action="ask"]');
-  assert.deepEqual(await p.evaluate(() => (window as any).app.asked()), ['Om «Framdrift»: ']);
+  assert.deepEqual(await p.evaluate(() => window.app.asked()), ['Om «Framdrift»: ']);
   await p.click('.vindu-bar-actions [data-action="next"]'); // Neste rute: the same as F6
   await sync();
   assert.equal((await json('look', {})).focus, 'avvik');
 });
 
 test("the person's moves by name, for an app's menus: each is drawn and the model hears of it, as if done by hand", async () => {
-  const cmd = (c: unknown) => p.evaluate((x: unknown) => (window as any).app.command(x), c);
+  const cmd = (c: ShellCommand) => p.evaluate((x: ShellCommand) => window.app.command(x), c);
   assert.equal(await cmd({ type: 'maximize' }), true); // the focused pane
   await sync();
   let look = await json('look', {});
@@ -193,7 +192,7 @@ test("the person's moves by name, for an app's menus: each is drawn and the mode
 });
 
 test('a pane maximized by name has the focus, and the bar marks it: as drawn, and in the state the UI server sends back', async () => {
-  const cmd = (c: unknown) => p.evaluate((x: unknown) => (window as any).app.command(x), c);
+  const cmd = (c: ShellCommand) => p.evaluate((x: ShellCommand) => window.app.command(x), c);
   const marked = () => p.locator('.vindu-bar-views .vindu-bar-view.is-focus').allInnerTexts();
   assert.equal(await cmd({ type: 'show', view: 'nokkeltal' }), true);
   await sync();

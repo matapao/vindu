@@ -8,11 +8,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { startVindu, memoryResults, VIEW_WORDS_NB, type Shown, type ShellState, type ViewPresentation } from '../src/index.js';
-import { chromium, mcpClient, shellServer } from './helpers.js';
+import { chromium, mcpClient, shellServer, panelsIn } from './helpers.js';
 import { formatCode, lookOf, serialDate } from '../src/xlsx-formats.js';
 import { sheetXml, stylesXml, workbook } from './office-fixtures.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const STRINGS = ['Post', 'Første kvartal', 'Dato', 'Sum', 'Godkjent', 'Kontorrekvisita', 'Feil', 'Navn', 'Født', 'Aktiv', 'Åse Øvrebø', 'Bjørn Ærø'];
 // cell styles: 1 is 0%, 2 is 0.00%, 3 a date (built-in 14), 4 a date and time of the workbook's own, 5 #,##0.00
 const STYLES = stylesXml({ 164: 'dd.mm.yyyy hh:mm' }, [0, 9, 10, 14, 164, 4]);
@@ -58,7 +57,9 @@ function windowIn(options: Record<string, unknown>) {
 const en = windowIn({}), nb = windowIn({ locale: 'nb-NO', viewWords: VIEW_WORDS_NB });
 const clients = { en: await mcpClient(en.ui.url), nb: await mcpClient(nb.ui.url) };
 afterAll(async () => { await clients.en.mcp.close(); await clients.nb.mcp.close(); en.ui.close(); nb.ui.close(); await vindu.close(); });
-const modelOf = (shown: Shown[], name: string, pid: string) => (shown.filter(v => v.name === name).at(-1)!.wide.find(m => m.updateDataModel) as any).updateDataModel.value.panels[pid];
+/** A sheet's part of a view's data model: its rows (each row's values, as JSON), its words, each row's looks and its tabs. */
+type SheetModel = { rows: string[]; props: { words?: Record<string, string>; cells: { looks: string[]; sheets: { name: string; fields: string[]; start: number; count: number; first: number; rows: number; columns: number; at: string; merges: string }[] } } };
+const modelOf = (shown: Shown[], name: string, pid: string) => panelsIn<SheetModel>(shown.filter(v => v.name === name).at(-1)!.wide)[pid];
 
 test('a workbook is read exactly by the system into a sheet: a tab for each sheet in order, its values as Excel saved them, in English and in Norwegian', async () => {
   for (const [language, w] of [['en', en], ['nb', nb]] as const) {
@@ -81,7 +82,7 @@ test('a workbook is read exactly by the system into a sheet: a tab for each shee
     // the window is sent each tab's cells, each row's looks (formulas and formats), and the merged header
     const model = modelOf(w.shown, 'book', 'p_book');
     const sheets = model.props.cells.sheets;
-    assert.deepEqual(sheets.map((s: any) => [s.name, s.fields, s.start, s.count, s.first, s.rows, s.columns, s.at]), [
+    assert.deepEqual(sheets.map(s => [s.name, s.fields, s.start, s.count, s.first, s.rows, s.columns, s.at]), [
       ['Budsjett', ['Post', 'Første kvartal', 'c3', 'Dato', 'Sum', 'Godkjent'], 0, 4, 0, 4, 6, 'B2'], ['Ansatte', ['Navn', 'Født', 'Aktiv'], 4, 2, 4, 2, 3, 'A1']]);
     assert.equal(model.props.cells.looks[3], ''); // a row drawn as its values are
     assert.deepEqual(JSON.parse(sheets[0].merges), [[-1, 1, 1, 2]]);
@@ -117,7 +118,7 @@ test('a workbook\'s sheet draws its first 1,000 rows, and the account says how m
   assert.deepEqual(a.panels[0].file.sheets, [{ name: 'Long', rows: 1200, columns: 2, at: 'A1', formulas: 1200, shown_rows: 1000 }, { name: 'Ansatte', rows: 2, columns: 3, at: 'A1', dates: 2 }]);
   const model = modelOf(en.shown, 'long', 'p_long');
   assert.equal(model.rows.length, 1002);
-  assert.deepEqual(model.props.cells.sheets.map((s: any) => [s.start, s.count, s.first, s.rows]), [[0, 1000, 0, 1200], [1000, 2, 1200, 2]]);
+  assert.deepEqual(model.props.cells.sheets.map(s => [s.start, s.count, s.first, s.rows]), [[0, 1000, 0, 1200], [1000, 2, 1200, 2]]);
   assert.deepEqual(JSON.parse(model.rows[999]), [1000, 1_000_000]);
 });
 
@@ -149,9 +150,9 @@ test('drawn in Chromium, in English and in Norwegian: tabs for the sheets, the m
       const page = await browser.newPage({ viewport: { width: 1400, height: 1000 }, locale: language === 'en' ? 'en-GB' : 'nb-NO' });
       const errors: string[] = []; page.on('pageerror', (e: Error) => errors.push(e.message));
       await page.goto(shell.url);
-      await page.evaluate(() => (window as any).app.shell('light'));
-      await page.evaluate((x: Shown) => (window as any).app.view(x), w.shown.filter(v => v.name === 'book').at(-1)!);
-      await page.evaluate((s: ShellState) => (window as any).app.state(s), w.state());
+      await page.evaluate(() => window.app.shell('light'));
+      await page.evaluate((x: Shown) => window.app.view(x), w.shown.filter(v => v.name === 'book').at(-1)!);
+      await page.evaluate((s: ShellState) => window.app.state(s), w.state());
       const sheet = page.locator('vindu-sheet');
       await sheet.locator('[role="tab"]').first().waitFor();
       assert.deepEqual(await sheet.locator('[role="tab"]').allTextContents(), ['Budsjett', 'Ansatte'], language);

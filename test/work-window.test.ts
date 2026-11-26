@@ -9,7 +9,6 @@ import path from 'node:path';
 import { startVindu, memoryResults, type Shown, type ShellState } from '../src/index.js';
 import { chromium, mcpClient, sleep } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const until = async (f: () => boolean | Promise<boolean>, ms = 8000) => { const end = Date.now() + ms; while (!(await f())) { if (Date.now() > end) throw new Error('timed out'); await sleep(40); } };
 const work = tmp('wwork-'), dir = tmp('wtask-');
@@ -41,13 +40,13 @@ const ui = vindu.open({ results, dir, work }, { onView: v => views.push(v), onSt
 const { mcp, call, json } = await mcpClient(ui.url);
 const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
 await page.goto(`http://127.0.0.1:${(site.address() as { port: number }).port}/shell.html`);
-await page.evaluate(() => (window as any).app.shell('light'));
+await page.evaluate(() => window.app.shell('light'));
 let running = true;
 const pump = (async () => { // the host's part: views and state to the window, the window's events to the UI server
   while (running) {
-    for (const e of await page.evaluate(() => (window as any).app.events())) ui.event(e);
-    for (const v of views.splice(0)) await page.evaluate((x: Shown) => (window as any).app.view(x), v);
-    if (state) { const s = state; state = undefined; await page.evaluate((x: ShellState) => (window as any).app.state(x), s); }
+    for (const e of await page.evaluate(() => window.app.events())) ui.event(e);
+    for (const v of views.splice(0)) await page.evaluate((x: Shown) => window.app.view(x), v);
+    if (state) { const s = state; state = undefined; await page.evaluate((x: ShellState) => window.app.state(x), s); }
     await sleep(40);
   }
 })();

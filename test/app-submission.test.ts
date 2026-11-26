@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { APP_SUBMIT_OBSERVER, appSubmitDocument, observeAppSubmit } from '../src/app-submission.js';
 import { readFileSync } from 'node:fs';
+import type { Browser } from 'playwright';
 import { chromium } from './helpers.js';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -31,7 +32,7 @@ const SEARCH = `document.querySelector("form").onsubmit = e => { e.preventDefaul
   parent.postMessage({ method: "search", args: { query: e.target.elements.query.value } }, "*"); };`;
 /** A host page with the app in an opaque frame: each search the app calls is written down as matched or not, given
  *  the tool annotations in window.tool (none given while it is unset). */
-async function hostWith(browser: { newPage(): Promise<any> }, body: string) {
+async function hostWith(browser: Browser, body: string) {
   const page = await browser.newPage();
   await page.addScriptTag({ type: 'module', content: `import { observeAppSubmit } from ${JSON.stringify(observer)}; window.observeSubmit = observeAppSubmit;` });
   await page.waitForFunction(() => 'observeSubmit' in window);
@@ -73,6 +74,7 @@ it('observes a real opaque form submit and leaves scripted submissions on ordina
     await page.evaluate(() => Reflect.set(window, 'tool', [{ readOnlyHint: true }]));
     await form.locator('button').click();
     await outcomes('yes no no no yes');
+    expect(await page.locator('output').textContent()).toBe('yes no no no yes ');
   } finally { await browser.close(); }
 });
 
@@ -98,8 +100,13 @@ it('takes no evidence from a control the person could not see, a click it did no
     for (const [body, where] of cases) {
       const { page, form, outcomes } = await hostWith(browser, body);
       if (where === 'button') await form.locator('button').click({ force: true });
-      else { const box = await page.locator('iframe').boundingBox(); await page.mouse.click(box.x + 200, box.y + 150); }
+      else {
+        const box = await page.locator('iframe').boundingBox();
+        if (!box) throw new Error('the frame is not drawn');
+        await page.mouse.click(box.x + 200, box.y + 150);
+      }
       await outcomes('no');
+      expect(await page.locator('output').textContent()).toBe('no ');
       await page.close();
     }
   } finally { await browser.close(); }

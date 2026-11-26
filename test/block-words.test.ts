@@ -9,9 +9,8 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Page as BrowserPage } from 'playwright';
 import { BLOCK_WORDS, startVindu, memoryResults, VIEW_WORDS_NB, VIEW_WORDS_NN, wordWith, type Shown, type ShellState, type ViewWords } from '../src/index.js';
-import { chromium, mcpClient, shellServer, tinyPdf } from './helpers.js';
+import { chromium, mcpClient, shellServer, tinyPdf, panelsIn, type AccountPanel } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 
 /** A window in a language: its task's results, and every block that says something of its own, in one view. */
@@ -42,7 +41,7 @@ async function windowIn(words?: ViewWords, locale = 'en-GB') {
     { id: 'plan', card: 'document', from: notes.id },
   ] });
   const view = shown.filter(v => v.name === 'all').at(-1)!;
-  const model = (view.wide.find(m => (m as any).updateDataModel) as any).updateDataModel.value.panels;
+  const model = panelsIn(view.wide);
   return { account, view, model, st, close: async () => { await c.mcp.close(); ui.close(); await vindu.close(); } };
 }
 
@@ -50,7 +49,7 @@ test('in English, the blocks draw their own words, and the surface carries none'
   const w = await windowIn();
   try {
     for (const pid of ['p_inv', 'p_free', 'p_sent', 'p_where', 'p_todo', 'p_plan']) assert.equal(w.model[pid].props?.words, undefined, pid);
-    assert.equal(w.account.panels.find((p: any) => p.id === 'inv').mismatch, 'the document\'s own total is not what its lines add up to'); // the model's, in English
+    assert.equal(w.account.panels.find((p: AccountPanel) => p.id === 'inv').mismatch, 'the document\'s own total is not what its lines add up to'); // the model's, in English
     assert.equal(wordWith(BLOCK_WORDS.batch.ok, { count: '4' }), '4 ok');
   } finally { await w.close(); }
 });
@@ -72,13 +71,13 @@ for (const [language, words, locale, said] of [
     try {
       assert.deepEqual(w.model.p_inv.props.words, words.money);
       assert.deepEqual([w.model.p_free.props.words, w.model.p_sent.props.words, w.model.p_where.props.words, w.model.p_todo.props.words, w.model.p_plan.props.words], [words.events, words.batch, words.map, words.tasks, words.document]);
-      assert.equal(w.account.panels.find((p: any) => p.id === 'inv').mismatch, 'the document\'s own total is not what its lines add up to'); // the model's stays English
+      assert.equal(w.account.panels.find((p: AccountPanel) => p.id === 'inv').mismatch, 'the document\'s own total is not what its lines add up to'); // the model's stays English
       const page: BrowserPage = await browser.newPage({ viewport: { width: 1200, height: 3000 } });
       const errors: string[] = []; page.on('pageerror', (e: Error) => errors.push(e.message));
       await page.goto(shell.url);
-      await page.evaluate(() => (window as any).app.shell('light'));
-      await page.evaluate((x: Shown) => (window as any).app.view(x), w.view);
-      await page.evaluate((s: ShellState) => (window as any).app.state({ ...s, tree: { view: 'all' }, maximized: null }), w.st.s!);
+      await page.evaluate(() => window.app.shell('light'));
+      await page.evaluate((x: Shown) => window.app.view(x), w.view);
+      await page.evaluate((s: ShellState) => window.app.state({ ...s, tree: { view: 'all', size: 1 }, maximized: null }), w.st.s!);
       await page.locator('vindu-tasks .vb-item').waitFor();
       const money = await read(page, 'vindu-money');
       for (const t of [...said.head, said.lines, said.sums, said.total, said.differs]) assert.ok(money.includes(t), `"${t}" in: ${money}`);

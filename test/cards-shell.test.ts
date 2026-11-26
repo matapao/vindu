@@ -9,10 +9,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { memoryResults, startVindu, type ShellState, type Shown } from '../src/index.js';
-import { chromium, mcpClient, shellServer } from './helpers.js';
+import { memoryResults, startVindu, type ShellEvent, type ShellState, type Shown } from '../src/index.js';
+import { chromium, mcpClient, shellServer, paneIn, type Look, type LookPane, type McpJson } from './helpers.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cards-'));
 const results = memoryResults(dir);
 const invoices = results.add({ server: 'accounts', tool: 'invoices', value: [
@@ -32,18 +31,18 @@ async function windowWith(options: Record<string, unknown>, width = 1280) {
   const errors: string[] = [];
   page.on('pageerror', (e: Error) => errors.push(e.message));
   await page.goto(server.url);
-  await page.evaluate(() => (window as any).app.shell('light'));
-  const kept: any[] = []; // what the host hears of the person's choices
-  const relay = async () => { for (const e of await page.evaluate(() => (window as any).app.events())) { kept.push(e); ui.event(e); } };
+  await page.evaluate(() => window.app.shell('light'));
+  const kept: ShellEvent[] = []; // what the host hears of the person's choices
+  const relay = async () => { for (const e of await page.evaluate(() => window.app.events())) { kept.push(e); ui.event(e); } };
   const push = async () => {
-    for (const v of views.splice(0)) await page.evaluate((x: Shown) => (window as any).app.view(x), v);
-    if (state) await page.evaluate((s: ShellState) => (window as any).app.state(s), state);
+    for (const v of views.splice(0)) await page.evaluate((x: Shown) => window.app.view(x), v);
+    if (state) await page.evaluate((s: ShellState) => window.app.state(s), state);
   };
   const sync = async () => { await relay(); await push(); await page.waitForTimeout(200); await relay(); await push(); await page.waitForTimeout(150); };
   const close = async () => { await page.close(); await mcp.close(); ui.close(); };
   return { ui, json, page, sync, close, errors, kept };
 }
-const show = (json: (n: string, a: Record<string, unknown>) => Promise<any>, name: string, panels: Record<string, unknown>[]) =>
+const show = (json: McpJson, name: string, panels: Record<string, unknown>[]) =>
   json('show_view', { name, title: name[0].toUpperCase() + name.slice(1), panels });
 const TABLE = { id: 'all', card: 'table', from: invoices };
 const CHART = { card: 'bar-chart', from: invoices, x: 'customer', y: 'amount_nok' };
@@ -70,11 +69,11 @@ test('auto: one view is drawn whole, in its pane; several are cards in a grid, w
     const boxes = await w.page.locator('.vindu-card').evaluateAll(cs => cs.map(c => { const b = c.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top)]; }));
     assert.equal(new Set(boxes.map(b => b[1])).size, 1, 'three cards in one row');
     assert.match((await w.page.locator('.vindu-card[data-view="invoices"]').innerText()).replace(/\u00a0/g, ' '), /table[\s\S]*Invoices[\s\S]*2 rows · total NOK 4,200\.50/);
-    const look = await w.json('look', {});
+    const look: Look = await w.json('look', {});
     assert.match(look.mode, /^cards: 3 views as cards in a grid/);
     assert.deepEqual([look.shows.as, look.shows.chosen, look.shows.cards], ['cards', 'auto', ['invoices', 'customers', 'notes']]);
-    assert.equal(look.panes.find((p: any) => p.view === 'customers').at, 'card 2 of 3, in a grid');
-    assert.equal(look.panes.find((p: any) => p.view === 'customers').box, undefined);
+    assert.equal(paneIn(look, 'customers').at, 'card 2 of 3, in a grid');
+    assert.equal(paneIn(look, 'customers').box, undefined);
     assert.deepEqual(w.errors, []);
   } finally { await w.close(); }
 });
@@ -119,7 +118,8 @@ test('cards with one view is one card; content draws every view in its pane as b
     now = await drawn(w.page);
     assert.deepEqual([now.mode, now.cards], ['cards', ['invoices', 'customers']]);
     assert.deepEqual(w.kept.filter(e => e.type === 'presentation'), [{ type: 'presentation', as: 'cards' }]); // for the host to keep
-    assert.throws(() => w.ui.setPresentation('tiles' as any), /presentation: "tiles" is none/);
+    const tiles: unknown = 'tiles'; // as a host might pass what it read
+    assert.throws(() => w.ui.setPresentation(tiles as Parameters<typeof w.ui.setPresentation>[0]), /presentation: "tiles" is none/);
   } finally { await w.close(); }
 });
 
@@ -132,7 +132,7 @@ test('narrow: the cards are a list, one under another, and no switch is offered'
     const boxes = await w.page.locator('.vindu-card').evaluateAll(cs => cs.map(c => { const b = c.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.width)]; }));
     assert.deepEqual(boxes.map(b => b[0]), [0, 0]);
     assert.equal(boxes[0][1], await w.page.evaluate(() => (document.querySelector('.vindu-desk') as HTMLElement).clientWidth));
-    const look = await w.json('look', {});
+    const look: Look = await w.json('look', {});
     assert.match(look.mode, /cards in a list/);
     assert.match(look.shows.list, /narrow/);
     w.ui.setPresentation(undefined, { narrow: false }); await w.sync();
@@ -146,7 +146,7 @@ test('what waits for the person is always drawn whole, above the cards: a mail t
     await show(w.json, 'invoices', [TABLE]); await show(w.json, 'customers', [CHART]);
     await show(w.json, 'reply', [{ card: 'message', layout: 'draft', data: { to: ['kari@example.com'], subject: 'INV-2', body: 'Hei Kari' } }]);
     const asking = w.json('ask', { question: 'Which customer first?', choices: ['Brattli Verksted', 'Havgap Media'] }).catch(() => undefined);
-    for (let i = 0; i < 50 && !(await w.json('look', {})).panes.some((p: any) => String(p.view).startsWith('ask-')); i++) await new Promise(r => setTimeout(r, 20));
+    for (let i = 0; i < 50 && !(await w.json('look', {})).panes.some((p: LookPane) => String(p.view).startsWith('ask-')); i++) await new Promise(r => setTimeout(r, 20));
     await w.sync();
     const now = await drawn(w.page);
     assert.deepEqual(now.cards, ['invoices', 'customers']);
@@ -158,9 +158,9 @@ test('what waits for the person is always drawn whole, above the cards: a mail t
     });
     assert.ok(order.reply < order.cards, 'drawn above the cards');
     assert.ok(await w.page.locator('.vindu-pane[data-view="reply"] [contenteditable], .vindu-pane[data-view="reply"] textarea, .vindu-pane[data-view="reply"] input').count() > 0, 'the draft itself, to edit and send');
-    const look = await w.json('look', {});
+    const look: Look = await w.json('look', {});
     assert.ok(look.shows.whole.includes('reply'));
-    assert.equal(look.panes.find((p: any) => p.view === 'reply').at, 'drawn whole, full width, above the cards');
+    assert.equal(paneIn(look, 'reply').at, 'drawn whole, full width, above the cards');
     void asking;
   } finally { await w.close(); }
 });
@@ -175,8 +175,10 @@ test('a small view has no maximize button and is never fullscreen; a notice is a
     const max = (view: string) => w.page.locator(`.vindu-pane[data-view="${view}"] .vindu-pane-tools button[aria-label="Maximize"]`).isVisible();
     assert.deepEqual([await max('invoices'), await max('overdue'), await max('closed')], [true, false, false]);
     await w.page.dblclick('.vindu-pane[data-view="overdue"] .vindu-pane-title'); await w.sync();
-    assert.notEqual((await w.page.evaluate(() => (window as any).app.placement())).mode, 'maximized');
-    assert.equal(await w.page.evaluate(() => (window as any).app.command({ type: 'maximize', view: 'overdue' })), false);
+    const placed = await w.page.evaluate(() => window.app.placement());
+    assert.ok(placed, 'the window is placed');
+    assert.notEqual(placed.mode, 'maximized');
+    assert.equal(await w.page.evaluate(() => window.app.command({ type: 'maximize', view: 'overdue' })), false);
     const refused = await w.json('arrange', { maximize: 'overdue' }).catch((e: Error) => e.message);
     assert.match(String(refused.refusal ?? refused), /"overdue" is not maximized: it is small: never shown fullscreen/);
     const strip = w.page.locator('.vindu-pane[data-view="closed"]');

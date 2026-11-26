@@ -1,57 +1,13 @@
 // CSV, TSV and JSON files shown as a table or a sheet, read exactly by the system from an attachment or from the
 // working folder, and the model's notes on cells by A1 address: over real MCP, as a processor calls show_view, then a
 // sheet drawn in Chromium. All data is synthetic.
-import { afterAll, test } from 'vitest';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import http from 'node:http';
-import os from 'node:os';
 import path from 'node:path';
-import { startVindu, memoryResults, type Shown, type ShellState, type ViewPresentation } from '../src/index.js';
-import type { Page as BrowserPage } from 'playwright';
-import { chromium, mcpClient, shellServer } from './helpers.js';
+import { componentsIn, panelsIn } from './helpers.js';
+import { work, FILES, attached, shown, presented, call, json } from './data-files-session.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-const tmp = (p: string) => fs.mkdtempSync(path.join(os.tmpdir(), p));
-const dir = tmp('data-files-'), work = tmp('data-work-');
-fs.mkdirSync(path.join(work, 'data'));
-const results = memoryResults(dir);
-const png = path.join(dir, 'shot.png'); fs.writeFileSync(png, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64'));
-results.attach('shot.png', 'image/png', png); // a1
-
-// each file as written, where it is put, and the rows the system must read from it
-const FILES = {
-  csv: { name: 'invoices.csv', mime: 'text/csv',
-    text: '\uFEFFid,customer,note,amount\r\nINV-1,"Vik Data, AS","Line one\nline two",31050\r\nINV-2,Strand Bygg,"He said ""pay""",35740.5\r\nINV-3,Nordlys,,007\r\n',
-    rows: [{ id: 'INV-1', customer: 'Vik Data, AS', note: 'Line one\nline two', amount: 31050 }, { id: 'INV-2', customer: 'Strand Bygg', note: 'He said "pay"', amount: 35740.5 }, { id: 'INV-3', customer: 'Nordlys', note: '', amount: '007' }] },
-  tsv: { name: 'stock.tsv', mime: 'text/tab-separated-values',
-    text: 'name\tqty\tprice\nBolts, M8\t100\t2.5\nNuts\t250\t0.80\n',
-    rows: [{ name: 'Bolts, M8', qty: 100, price: 2.5 }, { name: 'Nuts', qty: 250, price: '0.80' }] },
-  records: { name: 'records.json', mime: 'application/json', text: JSON.stringify([{ sku: 'A-1', stock: 12 }, { sku: 'B-2', stock: 0, bin: 'K4' }]),
-    rows: [{ sku: 'A-1', stock: 12 }, { sku: 'B-2', stock: 0, bin: 'K4' }] },
-  lists: { name: 'lists.json', mime: 'application/json', text: JSON.stringify([['sku', 'stock'], ['A-1', 12], ['B-2', 0]]),
-    rows: [{ sku: 'A-1', stock: 12 }, { sku: 'B-2', stock: 0 }] },
-  object: { name: 'target.json', mime: 'application/json', text: JSON.stringify({ region: 'Nord', target: 125000, owner: 'Kari' }),
-    rows: [{ Key: 'region', Value: 'Nord' }, { Key: 'target', Value: 125000 }, { Key: 'owner', Value: 'Kari' }] },
-};
-const attached: Record<string, string> = {};
-for (const [k, f] of Object.entries(FILES)) {
-  fs.writeFileSync(path.join(work, 'data', f.name), f.text);
-  const file = path.join(dir, f.name); fs.writeFileSync(file, f.text);
-  attached[k] = results.attach(f.name, f.mime, file).id;
-}
-// a sheet wider and longer than it draws, and a file over the limit
-const wide = [Array.from({ length: 210 }, (_, i) => `f${i + 1}`).join(','), ...Array.from({ length: 1200 }, (_, r) => Array.from({ length: 210 }, (_, i) => String(r * 1000 + i)).join(','))].join('\n');
-fs.writeFileSync(path.join(work, 'data', 'wide.csv'), wide);
-fs.writeFileSync(path.join(work, 'data', 'big.csv'), `a,b\n${'1,2\n'.repeat(1_500_000)}`); // 6 MB
-fs.writeFileSync(path.join(work, 'data', 'text.json'), '"just a string"');
-fs.writeFileSync(path.join(work, 'data', 'plain.json'), '[1, 2, 3]');
-
-const shown: Shown[] = [], presented: ViewPresentation[] = []; let state: ShellState | undefined;
-const vindu = await startVindu();
-const ui = vindu.open({ results, dir, work }, { onView: v => shown.push(v), onState: s => { state = s; }, onPresentation: v => presented.push(v) });
-const { mcp, call, json } = await mcpClient(ui.url);
-afterAll(async () => { await mcp.close(); ui.close(); await vindu.close(); });
 
 test('a CSV, TSV or JSON file is read exactly by the system, as a table and as a sheet, from an attachment and from the working folder', async () => {
   for (const [k, f] of Object.entries(FILES)) {
@@ -81,7 +37,7 @@ test('a sheet from a file draws its first 1,000 rows and 200 columns, a table it
   assert.deepEqual([s.panels[0].file.rows, s.panels[0].file.columns, s.panels[0].rows, s.panels[0].shown_rows, s.panels[0].shown_columns], [1200, 210, 1200, 1000, 200]);
   assert.deepEqual([s.panels[1].file.rows, s.panels[1].rows, s.panels[1].shown_rows, s.panels[1].fields.length], [1200, 1200, 100, 6]);
   assert.ok(s.suggestions.some((x: { label: string }) => x.label === 'Show all 1200 rows'), JSON.stringify(s.suggestions));
-  const model = (shown.at(-1)!.wide.find(m => m.updateDataModel) as any).updateDataModel.value.panels.p_sheet;
+  const model = panelsIn<{ rows: string[]; props: { cells: { fields: string[]; rows: number; columns: number } } }>(shown.at(-1)!.wide).p_sheet;
   assert.equal(model.rows.length, 1000); assert.deepEqual(JSON.parse(model.rows[999]).slice(0, 2), [999000, 999001]);
   assert.deepEqual([model.props.cells.fields.length, model.props.cells.rows, model.props.cells.columns], [200, 1200, 210]);
 });
@@ -112,9 +68,9 @@ test('notes on cells by A1 address: placed and told back, on a table and a sheet
   assert.deepEqual(a.panels[0].notes, told);
   assert.deepEqual(a.panels[1].notes, told);
   assert.deepEqual(a.panels[2].notes, [{ n: 1, cell: 'B2', field: 'b', value: '1' }]);
-  const comps = (shown.at(-1)!.wide.find(m => m.updateComponents) as any).updateComponents.components as { id: string; component: string }[];
+  const comps = componentsIn(shown.at(-1)!.wide);
   assert.equal(comps.find(c => c.id === 'p_table__cells')?.component, 'VNotedTable'); // a noted table keeps its A1 addresses, wide and narrow
-  const model = (shown.at(-1)!.compact.find(m => m.updateDataModel) as any).updateDataModel.value.panels;
+  const model = panelsIn<{ cells: { notes: unknown[] }; props: { cells: { notes: unknown[] } } }>(shown.at(-1)!.compact);
   assert.deepEqual(model.p_table.cells.notes[0], { n: 1, cell: 'B3', note: 'Pays late every quarter', row: 1, column: 1 });
   assert.deepEqual(model.p_sheet.props.cells.notes[1], { n: 2, cell: 'A1', note: 'Invoice numbers from the ledger', row: -1, column: 0 });
   const listed = await json('show_view', { name: 'noted', title: 'Noted', panels: [{ id: 'l', card: 'list', path: 'data/invoices.csv', rows: [{ label: 'a' }], notes }] });
@@ -139,81 +95,4 @@ test('a note that cannot be placed is refused, each for its own reason', async (
   assert.match(narrower.text, /there is no cell C2 here: the cells drawn are A1 to B4 \(row 1 is the header and 3 rows follow it; columns A to B are id, amount\)/); // the columns drawn, as chosen
   const message = await call('show_view', { name: 'x', title: 'X', panels: [{ id: 'p', card: 'message', rows: [{ subject: 'Hi', body: 'Text' }], notes: [{ cell: 'A1', note: 'x' }] }] });
   assert.equal(message.text, 'not shown: panel p: notes go on the cells of a table or a sheet; a message takes none');
-});
-
-test('drawn in Chromium: a sheet from a CSV has A1 letters, a marked cell described by its note, and the notes listed; no page errors', async () => {
-  await json('show_view', { name: 'sheet', title: 'Invoices', panels: [{ id: 'inv', card: 'sheet', path: 'data/invoices.csv', notes: [{ cell: 'B3', note: 'Pays late every quarter' }, { cell: 'D2', note: 'Disputed' }] }] });
-  const app = http.createServer((req, res) => {
-    const f = req.url === '/app.bundle.js' ? path.join(import.meta.dirname, 'fixtures', 'app.bundle.js') : path.join(import.meta.dirname, '..', '..', 'test', 'fixtures', 'shell.html');
-    res.writeHead(200, { 'Content-Type': f.endsWith('.js') ? 'text/javascript' : 'text/html' }).end(fs.readFileSync(f));
-  });
-  await new Promise<void>(r => app.listen(0, '127.0.0.1', r));
-  const browser = await chromium.launch();
-  try {
-    const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
-    const errors: string[] = []; page.on('pageerror', (e: Error) => errors.push(e.message));
-    await page.goto(`http://127.0.0.1:${(app.address() as { port: number }).port}/shell.html`);
-    await page.evaluate(() => (window as any).app.shell('light'));
-    await page.evaluate((x: Shown) => (window as any).app.view(x), shown.filter(v => v.name === 'sheet').at(-1)!);
-    await page.evaluate((s: ShellState) => (window as any).app.state(s), state!);
-    const sheet = page.locator('vindu-sheet');
-    await sheet.locator('td.vb-noted').first().waitFor();
-    assert.deepEqual(await sheet.locator('.vb-letter').allTextContents(), ['A', 'B', 'C', 'D']);
-    assert.deepEqual(await sheet.locator('tbody .vb-rownum').allTextContents(), ['2', '3', '4']);
-    assert.equal(await page.locator('[data-panel="inv"][data-row]').count(), 3);
-    const noted = sheet.locator('tr[data-row="1"] td.vb-noted');
-    assert.equal(await noted.getAttribute('title'), 'Pays late every quarter');
-    assert.equal(await noted.locator('.vb-notemark').textContent(), '1');
-    // the accessible description, as Chromium computes it
-    const cdp = await page.context().newCDPSession(page);
-    const { root } = await cdp.send('DOM.getDocument', { depth: -1 });
-    const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: 'vindu-sheet tr[data-row="1"] td.vb-noted' });
-    const { nodes } = await cdp.send('Accessibility.getPartialAXTree', { nodeId, fetchRelatives: false });
-    assert.equal(nodes[0].description?.value, 'Pays late every quarter');
-    // focusable with Tab: the first noted cell in the order of the page, then the next
-    await page.evaluate(() => { const start = document.querySelector<HTMLElement>('vindu-sheet tr[data-row="0"] th')!; start.tabIndex = -1; start.focus(); });
-    await page.keyboard.press('Tab');
-    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-description')), 'Disputed');
-    await page.keyboard.press('Tab');
-    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-description')), 'Pays late every quarter');
-    assert.deepEqual(await sheet.locator('ol.vb-cellnotes li').allTextContents(), ['B3 Pays late every quarter', 'D2 Disputed']);
-    assert.deepEqual(errors, []);
-  } finally { await browser.close(); app.close(); }
-});
-
-test('drawn in Chromium at phone width, a sheet and a noted table read alike: a code whole on its line, a value with its own line breaks, numbers on the right', async () => {
-  fs.writeFileSync(path.join(work, 'data', 'codes.csv'), 'id,note,amount\nINV-1,"Delivered to the north warehouse on Monday, and signed for by the night shift",31050\nINV-2,"Line one\nline two",007\nINV-3,Paid,35740.5\n');
-  const notes = [{ cell: 'A2', note: 'From the ledger' }];
-  await json('show_view', { name: 'codes', title: 'Codes', panels: [{ id: 'sheet', card: 'sheet', path: 'data/codes.csv', notes }, { id: 'table', card: 'table', path: 'data/codes.csv', notes }] });
-  const shell = await shellServer(import.meta.dirname), browser = await chromium.launch();
-  try {
-    const page: BrowserPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
-    const errors: string[] = []; page.on('pageerror', (e: Error) => errors.push(e.message));
-    await page.goto(shell.url);
-    await page.evaluate(() => (window as any).app.shell('light'));
-    await page.evaluate((x: Shown) => (window as any).app.view(x), shown.filter(v => v.name === 'codes').at(-1)!);
-    await page.evaluate((s: ShellState) => (window as any).app.state(s), state!);
-    await page.locator('vindu-noted-table td.vb-noted').waitFor();
-    // each cell of a column: its own text (its note's mark aside) and how many lines that takes, its text as shown, how
-    // it is aligned, and whether it overflows its column
-    const column = (tag: string, n: number) => page.evaluate(([t, i]) => [...document.querySelectorAll<HTMLElement>(`${t} tbody tr td:nth-of-type(${i})`)].map(cell => {
-      const tops = new Set<number>(), range = document.createRange(), texts = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
-      let own = '';
-      for (let text = texts.nextNode(); text; text = texts.nextNode()) {
-        if (text.parentElement?.closest('.vb-notemark')) continue;
-        own += text.textContent; range.selectNodeContents(text);
-        for (const r of range.getClientRects()) if (r.width > 0) tops.add(Math.round(r.top));
-      }
-      return { own, lines: tops.size, shown: cell.innerText, align: getComputedStyle(cell).textAlign, overflows: cell.scrollWidth > cell.clientWidth };
-    }), [tag, n] as const);
-    for (const tag of ['vindu-sheet', 'vindu-noted-table']) {
-      const ids = await column(tag, 1), said = await column(tag, 2), amounts = await column(tag, 3);
-      assert.deepEqual(ids.map(c => [c.own, c.lines, c.overflows]), [['INV-1', 1, false], ['INV-2', 1, false], ['INV-3', 1, false]], tag);
-      assert.equal(await page.locator(`${tag} tbody tr td.vb-noted .vb-notemark`).textContent(), '1'); // A2, marked
-      assert.equal(said[1].shown, 'Line one\nline two', tag); // the value's own line break
-      assert.ok(said[0].lines > 1, `${tag}: a long text wraps at its spaces`);
-      assert.deepEqual(amounts.map(c => [c.shown, c.align]), [['31,050', 'right'], ['007', 'start'], ['35,740.5', 'right']], tag); // a number on the right; text as written where text goes
-    }
-    assert.deepEqual(errors, []);
-  } finally { await browser.close(); shell.close(); }
 });
