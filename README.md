@@ -1,15 +1,20 @@
 # Vindu
 
+[![Checks](https://github.com/matapao/vindu/actions/workflows/checks.yml/badge.svg)](https://github.com/matapao/vindu/actions/workflows/checks.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/matapao/vindu/badge)](https://scorecard.dev/viewer/?uri=github.com/matapao/vindu)
+
 Vindu is a TypeScript UI SDK for browsers and Electron: it turns tool results into interactive panes and accepts
 input from them. The host owns the harness, credentials, permissions, conversation and workspace. Each exported option
 and function says in its doc comment what it does.
 
-## Install
+## Setup
 
-`pnpm add @matapao/vindu` installs it from npm; the server needs Node.js 22 or later. To build it, use Node 24 and
-pnpm: `pnpm install --frozen-lockfile`, then `pnpm build`. A sibling app can depend on it through `link:../vindu`.
+`pnpm add @matapao/vindu` installs it from npm; the server needs Node.js 22 or later. A sibling app can depend on it
+through `link:../vindu`.
 
-## Connect a task
+## Use
+
+### Connect a task
 
 In the Node backend or Electron main process, open one session per task with the host’s transport (`ipc` here).
 
@@ -28,7 +33,7 @@ access to the task; `mcpTokenIn: 'header'` keeps the token out of URLs), and `ui
 coordinator. What a session writes from results goes with `ui.close()`, in a temporary folder (`tempDir`); its
 checkpoint keeps where each came from, read again by `refetch` on `restore`. Close the provider with `provider.close()`.
 
-## Render and interact
+### Render and interact
 
 - `mountShell` (`@matapao/vindu`) is a component the host mounts in its own window; nothing installs into it. It draws
   views and layout (`shell.view`, `shell.state`); route `onEvent` to `ui.event`. `mountWorkspace` adds a composer.
@@ -38,13 +43,23 @@ checkpoint keeps where each came from, read again by `refetch` on `restore`. Clo
   hardened one, for a host that accepts running git on a folder the model can write.
 - `@matapao/vindu/app-submission` gives evidence, never approval: see `matches`.
 
-## Keep page data in
+### Keep page data in
 
 Pages cannot fetch from the network, but a frame can navigate away with what it read: put `frame-src
 ${pageFrameSource(provider.pagesPort)}` in the window’s CSP, check Electron’s `will-frame-navigate` with
 `pageNavigationAllowed` and set `pageParentOrigins`. Working-folder pages read only their `uses`; secret files stay out.
 
-## Checks
+## Develop
 
-`pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:package` and `pnpm check:security` run in CI on macOS and Linux.
-The workspace patch and the renderer’s guard cover A2UI’s Zod advisory GHSA-mrhx-c7xc-m3w5.
+`pnpm install --frozen-lockfile && pnpm check`, on the Node in `.nvmrc` and pnpm 12. [AGENTS.md](AGENTS.md) has the
+rest.
+
+## Security
+
+Please report a vulnerability privately with GitHub's "Report a vulnerability" form (Security tab); it is handled on a
+best-effort basis, when time allows. Verify a release's tarball with `gh attestation verify <tarball> --repo
+matapao/vindu`.
+
+## License
+
+MIT: see [LICENSE](LICENSE).
