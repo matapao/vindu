@@ -11,7 +11,7 @@ on:
   workflow_call:
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: read # the code it checks
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name != 'workflow_call' }}

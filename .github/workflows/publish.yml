@@ -10,7 +10,10 @@ on:
   push:
     tags: ['v*']
 permissions:
-  contents: read
+  contents: read # each job asks for what it needs
+concurrency:
+  group: release-${{ github.ref }} # its own: the workflows it calls take the run's name in theirs
+  cancel-in-progress: false # a release that has begun finishes
 
 jobs:
   checks:
@@ -28,7 +31,7 @@ jobs:
     permissions:
       contents: write # the release and its assets
       id-token: write # the identity npm trusts to publish, and that signs the attestation and npm's provenance
-      attestations: write
+      attestations: write # the tarball's attestation, stored with the repository
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

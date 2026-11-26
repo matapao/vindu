@@ -21,7 +21,11 @@ on:
   schedule:
     - cron: '17 5 * * *' # daily: new advisories arrive without a push
 permissions:
-  contents: read
+  contents: read # the code it checks
+concurrency:
+  # its own when publish.yml calls it, beside the checks; a pull request's newer push replaces its run
+  group: ${{ github.workflow }}-security-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   security:
