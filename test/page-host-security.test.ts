@@ -273,21 +273,36 @@ test("who may frame pages and apps: exact origins, or a window's own scheme alon
 
 test('a page that stops waiting for events takes its timers with it', async () => {
   const timers = () => process.getActiveResourcesInfo().filter((r) => r === 'Timeout').length;
-  const before = timers();
-  const requests = ['/__vindu/events?v=0&n=0', '/__vindu/changes?since=0', '/__vindu/events?v=0&n=0'].map((p) =>
+  const ask = (p: string) =>
     http
       .get({ host: '127.0.0.1', port: host.port, path: p, headers: { host: new URL(base).host } })
-      .on('error', () => undefined),
-  );
-  // the timers as soon as they count as expected, or after 5 s: polled, as the requests arrive when they do
-  const settled = async (expected: (n: number) => boolean) => {
-    for (const end = Date.now() + 5000; !expected(timers()) && Date.now() < end;) await sleep(10);
+      .on('error', () => undefined);
+  const now = async () => JSON.parse((await get(`${base}/__vindu/events?v=-1&n=-1`)).body) as { v: number; n: number };
+  // the timers as soon as they count as expected, or after the time given: polled, as the requests arrive when they do
+  const settled = async (expected: (n: number) => boolean, ms: number) => {
+    for (const end = Date.now() + ms; !expected(timers()) && Date.now() < end;) await sleep(10);
     return timers();
   };
-  const during = await settled((n) => n >= before + 3);
+  // Three requests that wait from the page's own version and result count, so none is answered at once. A change
+  // that lands while they wait (an earlier test's file, seen late) answers them early: then they are asked again.
+  let before = 0,
+    during = 0,
+    requests: http.ClientRequest[] = [];
+  for (let attempt = 0; attempt < 3 && during < before + 3; attempt++) {
+    if (attempt) {
+      for (const r of requests) r.destroy();
+      await settled((count) => count <= before, 1000);
+    }
+    const { v, n } = await now();
+    before = timers();
+    requests = [`/__vindu/events?v=${v}&n=${n}`, `/__vindu/changes?since=${v}`, `/__vindu/events?v=${v}&n=${n}`].map(
+      ask,
+    );
+    during = await settled((count) => count >= before + 3, 3000);
+  }
   assert.ok(during >= before + 3, `${during} timers while they wait, ${before} before`);
   for (const r of requests) r.destroy();
-  const after = await settled((n) => n <= before);
+  const after = await settled((count) => count <= before, 5000);
   assert.ok(after <= before, `${after} timers after they left, ${during} while they waited, ${before} before`);
 });
 
