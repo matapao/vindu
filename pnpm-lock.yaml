@@ -54,8 +54,8 @@ importers:
         specifier: ^3.3.3
         version: 3.3.3
       monaco-editor:
-        specifier: 0.58.0-dev-20261109
-        version: 0.58.0-dev-20261109
+        specifier: 0.58.0-rc.2
+        version: 0.58.0-rc.2
       pdfjs-dist:
         specifier: 6.5.438
         version: 6.5.438
@@ -1123,6 +1123,9 @@ packages:
   '@vitest/spy@5.1.0':
     resolution: {integrity: sha512-2DPO5OMHWKrBngC+fCmTQqemNF0gidRhp3lxbBmRhW+M1XJrfgPpqNqWVevXtn2f2ufD5ZaR1B6B641aAlcX5A==}
 
+  '@vscode/diff@0.0.2-145':
+    resolution: {integrity: sha512-atPcmNrAU4B8OsbrmqYlHbZREt//m8z52o400YA8uuvq3Be5wnmIhLoLqhMum7Jv7kRC0FE+m3WAUbaZF681wg==}
+
   '@xterm/addon-fit@0.11.0':
     resolution: {integrity: sha512-jYcgT6xtVYhnhgxh3QgYDnnNMYTcf8ElbxxFzX0IZo+vabQqSPAjC3c1wJrKB5E19VwQei89QCiZZP86DCPF7g==}
 
@@ -1445,8 +1448,8 @@ packages:
     engines: {node: '>= 16'}
     hasBin: true
 
-  monaco-editor@0.58.0-dev-20261109:
-    resolution: {integrity: sha512-6SapnimCFPhP0xSngKj/bbkuXUe+8iHmudi6ZEyBo6WDyuOpETFN4+8Fd+PHLRlh+dqGjtvqEUPUs59oYsphCA==}
+  monaco-editor@0.58.0-rc.2:
+    resolution: {integrity: sha512-0X7Rmk6aF6HJF8U+iLGx6x8pvaUaneF7sdXk7UyuDRk5rLbTumFO+J1hHhS4k6U822axCdk9MwiBolr1f8whJw==}
 
   mri@1.2.0:
     resolution: {integrity: sha512-tzzskb3bG8LvYGFF/mDTpq3jpI6Q9wc3LEmBaghu+DdCssd1FakN7Bc0hVNmEyGq1bq3RgfkCb3cmQLpNPOroA==}
@@ -2487,6 +2490,8 @@ snapshots:
 
   '@vitest/spy@5.1.0': {}
 
+  '@vscode/diff@0.0.2-145': {}
+
   '@xterm/addon-fit@0.11.0': {}
 
   '@xterm/addon-serialize@0.14.0': {}
@@ -2785,8 +2790,9 @@ snapshots:
 
   marked@9.1.6: {}
 
-  monaco-editor@0.58.0-dev-20261109:
+  monaco-editor@0.58.0-rc.2:
     dependencies:
+      '@vscode/diff': 0.0.2-145
       dompurify: 3.4.17
       marked: 14.0.0
 
