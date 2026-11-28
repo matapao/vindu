@@ -56,9 +56,8 @@ rest.
 
 ## Security
 
-Please report a vulnerability privately with GitHub's "Report a vulnerability" form (Security tab); it is handled on a
-best-effort basis, when time allows. Verify a release's tarball with `gh attestation verify <tarball> --repo
-matapao/vindu`.
+Report a vulnerability privately, as [.github/SECURITY.md](.github/SECURITY.md) says. Verify a release's tarball with
+`gh attestation verify <tarball> --repo matapao/vindu`.
 
 ## License
 
